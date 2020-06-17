@@ -1,0 +1,575 @@
+"""
+===============
+Spice Testbench
+===============
+
+Testbench generation class for spice simulations.
+Generates testbenches for eldo and spectre.
+
+Last modification by Okko Järvinen, 03.06.2020 13:30
+
+"""
+import os
+import sys
+import subprocess
+import shlex
+from abc import * 
+from thesdk import *
+from spice import *
+from spice.module import spice_module
+import pdb
+
+import numpy as np
+import pandas as pd
+from functools import reduce
+import textwrap
+from datetime import datetime
+## Some guidelines:
+## DUT is parsed from the eldo file.
+## Simparams are parsed to header from the parent
+## All io's are read from a file? (Is this good)
+## Code injection should be possible
+## at least between blocks
+## Default structure during initialization?
+
+# Utilizes logging method from thesdk
+# Is extendsd eldo module with some additional properties
+class testbench(spice_module):
+    @property
+    def _classfile(self):
+        return os.path.dirname(os.path.realpath(__file__)) + "/"+__name__
+
+    def __init__(self, parent=None, **kwargs):
+        if parent==None:
+            self.print_log(type='F', msg="Parent of Eldo testbench not given")
+        else:
+            self.parent=parent
+        try:  
+            if self.parent.interactive_spice:
+                self._file=self.parent.spicesrcpath + '/tb_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
+                self._subcktfile=self.parent.spicesrcpath + '/subckt_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
+                #pdb.set_trace()
+            else:
+                self._file=self.parent.spicesimpath + '/tb_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
+                #self._dutfile=self.parent.spicesimpath + '/subckt_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
+                self._subcktfile=self.parent.spicesimpath + '/subckt_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
+            self._dutfile=self.parent.spicesrcpath + '/' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
+            self._trantime=0
+        except:
+            self.print_log(type='F', msg="Eldo Testbench file definition failed")
+        
+        #The methods for these are derived from eldo_module
+        self._name=''
+        self.iofiles=Bundle()
+        self.dcsources=Bundle()
+        self.simcmds=Bundle()
+        
+    @property
+    def file(self):
+        if not hasattr(self,'_file'):
+            self._file=None
+        return self._file
+
+    @file.setter
+    def file(self,value):
+            self._file=value
+
+    @property
+    def dut_instance(self):
+        if not hasattr(self,'_dut_instance'):
+            self._dut_instance=spice_module(**{'file':self._dutfile})
+        return self._dut_instance
+
+    @dut_instance.setter
+    def dut_instance(self,value):
+        self._dut_instance=value
+
+    # Generating spice options string
+    @property
+    def options(self):
+        if not hasattr(self,'_options'):
+            self._options = "%s Options\n" % self.parent.syntaxdict["commentchar"]
+            i=0
+            for optname,optval in self.parent.spiceoptions.items():
+                if self.parent.model=='spectre':
+                    self._options += "Option%d " % i # spectre options need unique names
+                    i+=1
+                if optval != "":
+                    self._options += self.parent.syntaxdict["option"] + optname + "=" + optval + "\n"
+                else:
+                    self._options += ".option " + optname + "\n"
+        return self._options
+    @options.setter
+    def options(self,value):
+        self._options=value
+    @options.deleter
+    def options(self,value):
+        self._options=None
+
+    # Generating eldo/spectre parameters string
+    @property
+    def parameters(self):
+        if not hasattr(self,'_parameters'):
+            self._parameters = "%s Parameters\n" % self.parent.syntaxdict["commentchar"]
+            for parname,parval in self.parent.spiceparameters.items():
+                self._parameters += self.parent.syntaxdict["parameter"] + parname + "=" + parval + "\n"
+        return self._parameters
+    @parameters.setter
+    def parameters(self,value):
+        self._parameters=value
+    @parameters.deleter
+    def parameters(self,value):
+        self._parameters=None
+
+    # Generating eldo/spectre library inclusion string
+    @property
+    def libcmd(self):
+        if not hasattr(self,'_libcmd'):
+            libfile = ""
+            corner = "top_tt"
+            temp = "27"
+            for optname,optval in self.parent.spicecorner.items():
+                if optname == "temp":
+                    temp = optval
+                if optname == "corner":
+                    corner = optval
+            if self.parent.model == 'eldo':
+                try:
+                    libfile = thesdk.GLOBALS['ELDOLIBFILE']
+                    if libfile == '':
+                        raise ValueError
+                    else:
+                        self._libcmd = "*** Eldo device models\n"
+                        self._libcmd += ".lib " + libfile + " " + corner + "\n"
+                except:
+                    self.print_log(type='W',msg='Global TheSDK variable ELDOLIBPATH not set.')
+                    self._libcmd = "*** Eldo device models (undefined)\n"
+                    self._libcmd += "*.lib " + libfile + " " + corner + "\n"
+                self._libcmd += ".temp " + str(temp) + "\n"
+            if self.parent.model == 'spectre':
+                try:
+                    libfile = thesdk.GLOBALS['SPECTRELIBFILE']
+                    if libfile == '':
+                        raise ValueError
+                    else:
+                        self._libcmd = "// Spectre device models\n"
+                        self._libcmd += 'include "%s" section=%s\n' % (libfile,corner)
+                except:
+                    self.print_log(type='W',msg='Global TheSDK variable SPECTRELIBPATH not set.')
+                    self._libcmd = "// Spectre device models (undefined)\n"
+                    self._libcmd += "//include " + libfile + " " + corner + "\n"
+                self._libcmd += 'tempOption options temp=%s\n' % str(temp)
+        return self._libcmd
+    @libcmd.setter
+    def libcmd(self,value):
+        self._libcmd=value
+    @libcmd.deleter
+    def libcmd(self,value):
+        self._libcmd=None
+
+    # Generating eldo/spectre device model string
+    @property
+    def corner(self):
+        if not hasattr(self,'_corner'):
+            self._corner = "*** Device models\n"
+            for optname,optval in self.parent.eldocorner.items():
+                if optname == "temp":
+                    self._corner += "." + optname + " " + optval + "\n"
+                if optname == "process":
+                    self._process = optval
+        return self._corner
+    @corner.setter
+    def corner(self,value):
+        self._corner=value
+    @corner.deleter
+    def corner(self,value):
+        self._corner=None
+
+    # Generating netlist inclusion string
+    @property
+    def includecmd(self):
+        if not hasattr(self,'_includecmd'):
+            self._includecmd = "%s Subcircuit file\n"  % self.parent.syntaxdict["commentchar"]
+            self._includecmd += "%s \"%s\"\n" % (self.parent.syntaxdict["include"],self._subcktfile)
+        return self._includecmd
+    @includecmd.setter
+    def includecmd(self,value):
+        self._includecmd=value
+    @includecmd.deleter
+    def includecmd(self,value):
+        self._includecmd=None
+
+    @property
+    def misccmd(self):
+        if not hasattr(self,'_misccmd'):
+            self._misccmd="%s Manual commands\n" % (self.parent.syntaxdict["commentchar"])
+            mcmd = self.parent.spicemisc
+            for cmd in mcmd:
+                self._misccmd += cmd + "\n"
+        return self._misccmd
+    @misccmd.setter
+    def misccmd(self,value):
+        self._misccmd=value
+    @misccmd.deleter
+    def misccmd(self,value):
+        self._misccmd=None
+
+    @property
+    def ahdlincludecmd(self):
+        if not hasattr(self,'_ahdlincludecmd'):
+            self._ahdlincludecmd="%s VerilogA block includes\n" % (self.parent.syntaxdict["commentchar"])
+            self._ahdlincludecmd += 'ahdl_include "' + self.parent.entitypath + '/../spice/spice/veriloga_csv_write_edge.va"\n'
+            self._ahdlincludecmd += 'ahdl_include "' + self.parent.entitypath + '/../spice/spice/veriloga_csv_write_allpoints.va"\n'
+            self._ahdlincludecmd += 'ahdl_include "' + self.parent.entitypath + '/../spice/spice/veriloga_csv_write_allpoints_current.va"\n'
+            ahldincludes = self.parent.ahdlpath
+            for ahdlfile in ahldincludes:
+                self._ahdlincludecmd += 'ahdl_include' + ahdlfile + "\n"
+        return self._ahdlincludecmd
+    @ahdlincludecmd.setter
+    def ahdlincludecmd(self,value):
+        self._ahdlincludecmd=value
+    @ahdlincludecmd.deleter
+    def ahdlincludecmd(self,value):
+        self._ahdlincludecmd=None
+
+    # Generating eldo dcsources string
+    @property
+    def dcsourcestr(self):
+        if not hasattr(self,'_dcsourcestr'):
+            self._dcsourcestr = "%s DC sources\n" % self.parent.syntaxdict["commentchar"]
+            for name, val in self.dcsources.Members.items():
+                if self.parent.model == 'eldo':
+                    if val.ramp == 0:
+                        self._dcsourcestr += "%s%s %s %s %g %s\n" % \
+                                (val.sourcetype.upper(),val.name.lower(),val.pos,val.neg,val.value, \
+                                'NONOISE' if not val.noise else '')
+                    else:
+                        self._dcsourcestr += "%s%s %s %s %s %s\n" % \
+                                (val.sourcetype.upper(),val.name.lower(),val.pos,val.neg, \
+                                'pulse(0 %g 0 %g)' % (val.value,abs(val.ramp)), \
+                                'NONOISE' if not val.noise else '')
+                    # If the DC source is a supply, the power consumption is extracted for it automatically
+                    if val.extract:
+                        supply = "%s%s"%(val.sourcetype.upper(),val.name.lower())
+                        self._dcsourcestr += ".defwave p_%s=v(%s)*i(%s)\n" % \
+                                (supply.lower(),supply,supply)
+                        self._dcsourcestr += ".extract label=current_%s abs(average(i(%s),%s,%s))\n" % \
+                                (supply.lower(),supply,val.ext_start,val.ext_stop)
+                        self._dcsourcestr += ".extract label=power_%s abs(average(w(p_%s),%s,%s))\n" % \
+                                (supply.lower(),supply.lower(),val.ext_start,val.ext_stop)
+                elif self.parent.model == 'spectre':
+                    if val.extract:
+                        probenode = '_p'
+                    else:
+                        probenode = ''
+                    if val.ramp == 0:
+                        self._dcsourcestr += "%s%s %s%s %s %s%g\n" % \
+                                (val.sourcetype.upper(),val.name.lower(),self.esc_bus(val.pos),
+                                        probenode,self.esc_bus(val.neg),
+                                ('%ssource dc=' % val.sourcetype.lower()),val.value)
+                    else:
+                        self._dcsourcestr += "%s%s %s%s %s %s type=pulse val0=0 val1=%g rise=%g\n" % \
+                                (val.sourcetype.upper(),val.name.lower(),self.esc_bus(val.pos),probenode,
+                                        self.esc_bus(val.neg),('%ssource' % val.sourcetype.lower()),val.value,val.ramp)
+                    if val.extract:
+                        # Plotting power and current waveforms for this supply
+                        self._dcsourcestr += 'save %s%s:pwr\n' % (val.sourcetype.upper(),val.name.lower())
+                        self._dcsourcestr += 'save %s%s:p\n' % (val.sourcetype.upper(),val.name.lower())
+                        # Writing source current consumption to a file
+                        self._dcsourcestr += "pwrout_%s%s (%s_p %s) veriloga_csv_write_allpoints_current filename=\"%s\"\n" % \
+                            (val.sourcetype.lower(),val.name.lower().replace('.','_'),self.esc_bus(val.pos),self.esc_bus(val.pos),val._extfile)
+        return self._dcsourcestr
+    @dcsourcestr.setter
+    def dcsourcestr(self,value):
+        self._dcsourcestr=value
+    @dcsourcestr.deleter
+    def dcsourcestr(self,value):
+        self._dcsourcestr=None
+
+    # Generating inputsignals string
+    @property
+    def inputsignals(self):
+        if not hasattr(self,'_inputsignals'):
+            self._inputsignals = "%s Input signals\n" % self.parent.syntaxdict["commentchar"]
+            for name, val in self.iofiles.Members.items():
+                # Input file becomes a source
+                if val.dir.lower()=='in' or val.dir.lower()=='input':
+                    if val.iotype.lower()=='event':
+                        for i in range(len(val.ionames)):
+                            # Finding the max time instant
+                            maxtime = val.Data[-1,0]
+                            if float(self._trantime) < float(maxtime):
+                                self._trantime = maxtime
+                            # Adding the source
+                            if self.parent.model=='eldo':
+                                self._inputsignals += "%s%s %s 0 pwl(file=\"%s\")\n" % \
+                                        (val.sourcetype.upper(),val.ionames[i].lower(),val.ionames[i].upper(),val.file[i])
+                            elif self.parent.model=='spectre':
+                                self._inputsignals += "%s%s %s 0 %ssource type=pwl file=\"%s\"\n" % \
+                                        (val.sourcetype.upper(),self.esc_bus(val.ionames[i].lower()),
+                                        self.esc_bus(val.ionames[i].upper()),val.sourcetype.lower(),val.file[i])
+                    elif val.iotype.lower()=='sample':
+                        if self.parent.model == 'eldo':
+                            for i in range(len(val.ionames)):
+                                pattstr = ''
+                                for d in val.Data[:,i]:
+                                    pattstr += '%s ' % str(d)
+                                if float(self._trantime) < len(val.Data)/val.rs:
+                                    self._trantime = len(val.Data)/val.rs
+                                # Checking if the given bus is actually a 1-bit signal
+                                if ('<' not in val.ionames[i]) and ('>' not in val.ionames[i]) and len(str(val.Data[0,i])) == 1:
+                                    busname = '%s_BUS' % val.ionames[i]
+                                    self._inputsignals += '.setbus %s %s\n' % (busname,val.ionames[i])
+                                else:
+                                    busname = val.ionames[i]
+                                # Adding the source
+                                self._inputsignals += ".sigbus %s vhi=%s vlo=%s tfall=%s trise=%s thold=%s tdelay=%s base=%s PATTERN %s\n" % \
+                                        (busname,str(val.vhi),str(val.vlo),str(val.tfall),str(val.trise),str(1/val.rs),'0','bin',pattstr)
+                        elif self.parent.model == 'spectre':
+                            for i in range(len(val.ionames)):
+                                self._inputsignals += 'vec_include "%s"\n' % val.file[i]
+                    else:
+                        self.print_log(type='F',msg='Input type \'%s\' undefined.' % val.iotype)
+
+            if self._trantime == 0:
+                self._trantime = "simtime"
+        return self._inputsignals
+    @inputsignals.setter
+    def inputsignals(self,value):
+        self._inputsignals=value
+    @inputsignals.deleter
+    def inputsignals(self,value):
+        self._inputsignals=None
+
+    # Generating simcmds string
+    @property
+    def simcmdstr(self):
+        if not hasattr(self,'_simcmdstr'):
+            self._simcmdstr = "%s Simulation commands\n" % self.parent.syntaxdict["commentchar"]
+            for sim, val in self.simcmds.Members.items():
+                if str(sim).lower() == 'tran':
+                    #TODO could this if-else be avoided?
+                    if self.parent.model=='eldo':
+                        self._simcmdstr += '.%s %s %s %s\n' % \
+                                (sim,str(val.tprint),str(val.tstop) if val.tstop is not None else str(self._trantime+2e-9) \
+                                ,'UIC' if val.uic else '')
+                        if val.noise:
+                            self._simcmdstr += '.noisetran fmin=%s fmax=%s nbrun=1 NONOM %s\n' % \
+                                    (str(val.fmin),str(val.fmax),'seed=%d'%(val.seed) if val.seed is not None else '')
+                    elif self.parent.model=='spectre':
+                        self._simcmdstr += 'TRAN_analysis %s pstep=%s stop=%s %s' % \
+                                (sim,str(val.tprint),str(val.tstop) if val.tstop is not None else str(self._trantime) \
+                                ,'UIC' if val.uic else '') #TODO initial conditions
+                                #(sim,str(val.tprint),str(val.tstop) if val.tstop is not None else str(self._trantime+2e-9) \
+                        if val.noise:
+                            if val.seed==0:
+                                self.print_log(type='E',msg='spectre disables noise if noiseseed=0')
+                            self._simcmdstr += 'trannoisemethod=default noisefmin=%s noisefmax=%s %s\n' % \
+                                    (str(val.fmin),str(val.fmax),'noiseseed=%d'%(val.seed) if val.seed is not None else '')
+                        self._simcmdstr += '\n' 
+                else:
+                    self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
+        return self._simcmdstr
+    @simcmdstr.setter
+    def simcmdstr(self,value):
+        self._simcmdstr=value
+    @simcmdstr.deleter
+    def simcmdstr(self,value):
+        self._simcmdstr=None
+    
+    # Helper function to escape bus characters for spectre bus<3:0> --> bus\<3:0\>
+    def esc_bus(self,name):
+        if self.parent.model == 'spectre':
+            return name.replace('<','\\<').replace('>','\\>').replace('[','\\[').replace(']','\\]').replace(':','\\:')
+        else:
+            return name
+
+    # Generating plot and print commands
+    @property
+    def plotcmd(self):
+        if not hasattr(self,'_plotcmd'):
+            self._plotcmd = "" 
+            if len(self.parent.plotlist) > 0:
+                self._plotcmd = "%s Manually probed signals\n" % self.parent.syntaxdict["commentchar"]
+                self._plotcmd += '.plot ' if self.parent.model == 'eldo' else 'save '
+                for i in self.parent.plotlist:
+                    self._plotcmd += self.esc_bus(i) + " "
+                self._plotcmd += "\n\n"
+            self._plotcmd += "%s Output signals\n" % self.parent.syntaxdict["commentchar"]
+            for name, val in self.iofiles.Members.items():
+                # Output iofile becomes an extract command
+                if val.dir.lower()=='out' or val.dir.lower()=='output':
+                    if val.iotype=='event':
+                        for i in range(len(val.ionames)):
+                            if self.parent.model=='eldo':
+                                self._plotcmd += ".printfile %s(%s) file=\"%s\"\n" % \
+                                        (val.sourcetype,val.ionames[i].upper(),val.file[i])
+                            elif self.parent.model=='spectre':
+                                signame = self.esc_bus(val.ionames[i].upper())
+                                self._plotcmd += 'save %s\n' % signame
+                                self._plotcmd += "eventout_%s (%s) veriloga_csv_write_allpoints filename=\"%s\"\n" % \
+                                        (val.ionames[i].upper().replace('.','_').replace('<','').replace('>',''),signame,val.file[i])
+                    elif val.iotype=='sample':
+                        for i in range(len(val.ionames)):
+                            # Checking the given trigger(s)
+                            if isinstance(val.trigger,list):
+                                if len(val.trigger) == len(val.ionames):
+                                    trig = val.trigger[i]
+                                else:
+                                    trig = val.trigger[0]
+                                    self.print_log(type='W',msg='%d triggers given for %d ionames. Using the first trigger for all ionames.' % (len(val.trigger),len(val.ionames)))
+                            else:
+                                trig = val.trigger
+                            # Checking the polarity of the triggers (for now every trigger has to have same polarity)
+                            vthstr = ',%s' % str(val.vth)
+                            afterstr = ',%g' % float(val.after)
+                            beforestr = ',end'
+                            if val.edgetype.lower()=='falling':
+                                polarity = 'xdown'
+                            elif val.edgetype.lower()=='both':
+                                # Syntax for tcross is a bit different
+                                polarity = 'tcross'
+                                vthstr = ',vth=%s' % str(val.vth)
+                                afterstr = ',after=%g' % float(val.after)
+                                beforestr = ',before=end'
+                            else:
+                                polarity = 'xup'
+                            if self.parent.model=='eldo':
+                                self._plotcmd += ".extract file=\"%s\" vect label=%s yval(v(%s<*>),%s(v(%s)%s%s%s))\n" % (val.file[i],val.ionames[i],val.ionames[i].upper(),polarity,trig,vthstr,afterstr,beforestr)
+                            elif self.parent.model=='spectre':
+                                # Extracting the bus width from the ioname
+                                signame = val.ionames[i].upper()
+                                signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
+                                if len(signame) == 1:
+                                    busstart = 0
+                                    busstop = 0
+                                else:
+                                    busstart = int(signame[1])
+                                    busstop = int(signame[2])
+                                if busstart > busstop:
+                                    buswidth = busstart-busstop+1
+                                else:
+                                    buswidth = busstop-busstart+1
+                                # Writing every individual bit of a bus to its own file (TODO: maybe to one file?)
+                                for j in range(buswidth):
+                                    bitname = self.esc_bus('%s<%d>' % (signame[0],j))
+                                    #self._plotcmd += 'save %s\n' % bitname
+                                    self._plotcmd += "sampleout_%s_%d (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
+                                            (signame[0],j,self.esc_bus(trig),bitname,val.file[i].replace('.txt','_%d.txt'%j),val.vth,-1 if val.edgetype.lower() is 'falling' else 1)
+
+                    elif val.iotype=='time':
+                        for i in range(len(val.ionames)):
+                            if self.parent.model == 'eldo':
+                                self._plotcmd += ".printfile %s(%s) file=\"%s\"\n" % \
+                                        (val.sourcetype,val.ionames[i].upper(),val.file[i])
+                                #for i in range(len(val.ionames)):
+                                #    vthstr = ',%s' % str(val.vth)
+                                #    if val.edgetype.lower()=='falling':
+                                #        edge = 'xdown'
+                                #    elif val.edgetype.lower()=='both':
+                                #        edge = 'tcross'
+                                #        vthstr = ',vth=%s' % str(val.vth)
+                                #    elif val.edgetype.lower()=='risetime':
+                                #        edge = 'trise'
+                                #        vthstr = ''
+                                #    elif val.edgetype.lower()=='falltime':
+                                #        edge = 'tfall'
+                                #        vthstr = ''
+                                #    else:
+                                #        edge = 'xup'
+                                #    self._plotcmd += ".extract file=\"%s\" vect label=%s %s(v(%s)%s)\n" % (val.file[i],val.ionames[i],edge,val.ionames[i].upper(),vthstr)
+                            elif self.parent.model == 'spectre':
+                                signame = self.esc_bus(val.ionames[i].upper())
+                                #self._plotcmd += 'save %s\n' % signame
+                                self._plotcmd += "timeout_%s_%s (%s) veriloga_csv_write_allpoints filename=\"%s\"\n" % \
+                                        (val.edgetype.lower(),val.ionames[i].upper().replace('.','_').replace('<','').replace('>',''),signame,val.file[i])
+                    elif val.iotype=='vsample':
+                        for i in range(len(val.ionames)):
+                            # Checking the given trigger(s)
+                            if isinstance(val.trigger,list):
+                                if len(val.trigger) == len(val.ionames):
+                                    trig = val.trigger[i]
+                                else:
+                                    trig = val.trigger[0]
+                                    self.print_log(type='W',msg='%d triggers given for %d ionames. Using the first trigger for all ionames.' % (len(val.trigger),len(val.ionames)))
+                            else:
+                                trig = val.trigger
+                            if self.parent.model=='eldo':
+                                self.print_log(type='F',msg='not yet done') #TODO
+                            elif self.parent.model=='spectre':
+                                #self._plotcmd += 'save %s\n' % val.ionames[i].upper()
+                                self._plotcmd += "vsampleout_%s (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
+                                        (val.ionames[i].upper().replace('.','_'),trig,val.ionames[i].upper(),val.file[i],val.vth,-1 if val.edgetype.lower() is 'falling' else 1)
+                    else:
+                        self.print_log(type='W',msg='Output filetype incorrectly defined.')
+        return self._plotcmd
+    @plotcmd.setter
+    def plotcmd(self,value):
+        self._plotcmd=value
+    @plotcmd.deleter
+    def plotcmd(self,value):
+        self._plotcmd=None
+
+
+    def export(self,**kwargs):
+        if not os.path.isfile(self.file):
+            self.print_log(type='I',msg='Exporting spice testbench to %s.' %(self.file))
+            with open(self.file, "w") as module_file:
+                module_file.write(self.contents)
+
+        elif os.path.isfile(self.file) and not kwargs.get('force'):
+            self.print_log(type='F', msg=('Export target file %s exists.\n Force overwrite with force=True.' %(self.file)))
+
+        elif kwargs.get('force'):
+            self.print_log(type='I',msg='Forcing overwrite of spice testbench to %s.' %(self.file))
+            with open(self.file, "w") as module_file:
+                module_file.write(self.contents)
+
+    def export_subckt(self,**kwargs):
+        if self.postlayout:
+            return
+        if not os.path.isfile(self.parent.spicesubcktsrc):
+            self.print_log(type='I',msg='Exporting spice subcircuit to %s.' %(self.parent.spicesubcktsrc))
+            with open(self.parent.spicesubcktsrc, "w") as module_file:
+                module_file.write(self.subckt)
+
+        elif os.path.isfile(self.parent.spicesubcktsrc) and not kwargs.get('force'):
+            self.print_log(type='F', msg=('Export target file %s exists.\n Force overwrite with force=True.' %(self.parent.spicesubcktsrc)))
+
+        elif kwargs.get('force'):
+            self.print_log(type='I',msg='Forcing overwrite of spice subcircuit to %s.' %(self.parent.spicesubcktsrc))
+            with open(self.parent.spicesubcktsrc, "w") as module_file:
+                module_file.write(self.subckt)
+
+    def generate_contents(self):
+        date_object = datetime.now()
+        headertxt = self.parent.syntaxdict["commentline"] +\
+                    "%s Testbench for %s\n" % (self.parent.syntaxdict["commentchar"],self.parent.name) +\
+                    "%s Generated on %s \n" % (self.parent.syntaxdict["commentchar"],date_object) +\
+                    self.parent.syntaxdict["commentline"]
+        libcmd = self.libcmd
+        includecmd = self.includecmd
+        ahdlincludecmd = self.ahdlincludecmd
+        options = self.options
+        params = self.parameters
+        subinst = self.subinst
+        dcsourcestr = self.dcsourcestr
+        inputsignals = self.inputsignals
+        misccmd = self.misccmd
+        simcmd = self.simcmdstr
+        plotcmd = self.plotcmd
+        self.contents = (headertxt + "\n" +
+                        libcmd + "\n" +\
+                        includecmd + "\n" +
+                        ahdlincludecmd + "\n" +
+                        options + "\n" +\
+                        params + "\n" +
+                        subinst + "\n\n" +\
+                        misccmd + "\n" +
+                        dcsourcestr + "\n" +\
+                        inputsignals + "\n" +\
+                        simcmd + "\n" +\
+                        plotcmd + "\n" +\
+                        self.parent.syntaxdict["lastline"])
+if __name__=="__main__":
+    pass
