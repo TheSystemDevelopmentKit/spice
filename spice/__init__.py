@@ -1,13 +1,15 @@
 """
 =======
-ELDO
+Spice
 =======
-Simulation interface package for The System Development Kit 
+Analog simulation interface package for The System Development Kit 
 
-Provides utilities to import spice modules to python environment and
+Provides utilities to import spice-like modules to python environment and
 automatically generate testbenches for the most common simulation cases.
 
 Initially written by Okko Järvinen, 2019
+
+Release 1.4 , Jun 2020 supports Eldo and Spectre
 """
 import os
 import sys
