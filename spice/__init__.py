@@ -426,7 +426,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             if self.interactive_spice:
                 self._eldowdbsrc=self.eldosrcpath + '/tb_' + self.name + '.wdb'
             else:
-                self._eldowdbsrc=self.eldosimpath + '/tb_' + self.name + '.wdb'
+                self._eldowdbsrc=self.spicesimpath + '/tb_' + self.name + '.wdb'
         return self._eldowdbsrc
 
     @property
@@ -435,7 +435,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             if self.interactive_spice:
                 self._eldochisrc=self.eldosrcpath + '/tb_' + self.name + '.chi'
             else:
-                self._eldochisrc=self.eldosimpath + '/tb_' + self.name + '.chi'
+                self._eldochisrc=self.spicesimpath + '/tb_' + self.name + '.chi'
         return self._eldochisrc
 
     @property
@@ -695,5 +695,5 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     self.extract_powers()
             except:
                 self.print_log(type='I',msg=traceback.format_exc())
-                self.print_log(type='F',msg='Failed while loading results from %s.' % self._eldosimpath)
+                self.print_log(type='F',msg='Failed while loading results from %s.' % self._spicesimpath)
 
