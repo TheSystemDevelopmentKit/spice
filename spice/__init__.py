@@ -423,7 +423,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @property
     def eldowdbsrc(self):
         if not hasattr(self, '_eldowdbsrc'):
-            if self.interactive_eldo:
+            if self.interactive_spice:
                 self._eldowdbsrc=self.eldosrcpath + '/tb_' + self.name + '.wdb'
             else:
                 self._eldowdbsrc=self.eldosimpath + '/tb_' + self.name + '.wdb'
@@ -432,7 +432,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @property
     def eldochisrc(self):
         if not hasattr(self, '_eldochisrc'):
-            if self.interactive_eldo:
+            if self.interactive_spice:
                 self._eldochisrc=self.eldosrcpath + '/tb_' + self.name + '.chi'
             else:
                 self._eldochisrc=self.eldosimpath + '/tb_' + self.name + '.chi'
@@ -585,7 +585,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             status = int(os.system(self.spicecmd)/256)
             # Status code 9 seems to result from failed licensing in LSF runs
             # Let's not try to restart if in interactive mode
-            if status != 9 or count == 10 or self.interactive_eldo:
+            if status != 9 or count == 10 or self.interactive_spice:
                 break
             else:
                 count += 1
