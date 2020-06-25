@@ -205,7 +205,7 @@ class spice_module(thesdk):
                                     words.pop(1)
                                     line = ' '.join(words)
                                 self._subinst += line + "%s\n" % ('\\' if lastline else '')
-                        self._subinst += '+' if self.parent.model == 'eldo' else ') '  + self.parent.name.upper()
+                        self._subinst += ('+' if self.parent.model == 'eldo' else ') ' )  + self.parent.name.upper()
                     else:
                         # This part is the above copy-pasted, only difference is that its read from a file
                         # TODO: needs obvious refactoring
