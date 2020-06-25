@@ -424,7 +424,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def eldowdbsrc(self):
         if not hasattr(self, '_eldowdbsrc'):
             if self.interactive_spice:
-                self._eldowdbsrc=self.eldosrcpath + '/tb_' + self.name + '.wdb'
+                self._eldowdbsrc=self.spicesrcpath + '/tb_' + self.name + '.wdb'
             else:
                 self._eldowdbsrc=self.spicesimpath + '/tb_' + self.name + '.wdb'
         return self._eldowdbsrc
@@ -433,7 +433,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def eldochisrc(self):
         if not hasattr(self, '_eldochisrc'):
             if self.interactive_spice:
-                self._eldochisrc=self.eldosrcpath + '/tb_' + self.name + '.chi'
+                self._eldochisrc=self.spicesrcpath + '/tb_' + self.name + '.chi'
             else:
                 self._eldochisrc=self.spicesimpath + '/tb_' + self.name + '.chi'
         return self._eldochisrc

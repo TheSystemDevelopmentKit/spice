@@ -171,6 +171,7 @@ class spice_module(thesdk):
                 elif self.parent.model=='spectre':
                     startmatch=re.compile(r"\SUBCKT %s " % self.parent.name.upper(),re.IGNORECASE)
                 subckt = self.subckt.split('\n')
+
                 if len(subckt) <= 3 and not self.postlayout:
                     self.print_log(type='W',msg='No subcircuit found.')
                     self._subinst = "%s Empty subcircuit\n" % (self.parent.syntaxdict["commentchar"])
@@ -184,7 +185,7 @@ class spice_module(thesdk):
                         for line in subckt:
                             if startmatch.search(line) != None:
                                 startfound = True
-                            if startfound and len(line) > 0:
+                            elif startfound and len(line) > 0:
                                 if self.parent.model == 'eldo' and line[0] != '+':
                                     endfound = True
                                     startfound = False
@@ -197,7 +198,10 @@ class spice_module(thesdk):
                             if startfound and not endfound:
                                 words = line.split(" ")
                                 if words[0].lower() == self.parent.syntaxdict["subckt"]:
-                                    words[0] = "X%s%s" % (self.parent.name.upper(),'' if self.parent.model == 'eldo' else ' (')
+                                    if self.parent.model == 'eldo':
+                                        words[0] = "X%s%s" % (self.parent.name.upper(),'')  
+                                    else:
+                                        words[0] = "X%s%s" % (self.parent.name.upper(), ' (')
                                     words.pop(1)
                                     line = ' '.join(words)
                                 self._subinst += line + "%s\n" % ('\\' if lastline else '')
