@@ -6,7 +6,7 @@ Spice Testbench
 Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
-Last modification by Okko Järvinen, 03.06.2020 13:30
+Last modification by Okko Järvinen, 25.06.2020 15:19
 
 """
 import os
@@ -217,13 +217,16 @@ class testbench(spice_module):
     @property
     def ahdlincludecmd(self):
         if not hasattr(self,'_ahdlincludecmd'):
-            self._ahdlincludecmd="%s VerilogA block includes\n" % (self.parent.syntaxdict["commentchar"])
-            self._ahdlincludecmd += 'ahdl_include "' + self.parent.entitypath + '/../spice/spice/veriloga_csv_write_edge.va"\n'
-            self._ahdlincludecmd += 'ahdl_include "' + self.parent.entitypath + '/../spice/spice/veriloga_csv_write_allpoints.va"\n'
-            self._ahdlincludecmd += 'ahdl_include "' + self.parent.entitypath + '/../spice/spice/veriloga_csv_write_allpoints_current.va"\n'
-            ahldincludes = self.parent.ahdlpath
-            for ahdlfile in ahldincludes:
-                self._ahdlincludecmd += 'ahdl_include' + ahdlfile + "\n"
+            if self.parent.model == 'spectre':
+                self._ahdlincludecmd="%s VerilogA block includes\n" % (self.parent.syntaxdict["commentchar"])
+                self._ahdlincludecmd += 'ahdl_include "' + self.parent.entitypath + '/../spice/spice/veriloga_csv_write_edge.va"\n'
+                self._ahdlincludecmd += 'ahdl_include "' + self.parent.entitypath + '/../spice/spice/veriloga_csv_write_allpoints.va"\n'
+                self._ahdlincludecmd += 'ahdl_include "' + self.parent.entitypath + '/../spice/spice/veriloga_csv_write_allpoints_current.va"\n'
+                ahldincludes = self.parent.ahdlpath
+                for ahdlfile in ahldincludes:
+                    self._ahdlincludecmd += 'ahdl_include' + ahdlfile + "\n"
+            else:
+                self._ahdlincludecmd = ''
         return self._ahdlincludecmd
     @ahdlincludecmd.setter
     def ahdlincludecmd(self,value):
