@@ -250,7 +250,8 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def dcsource_bundle(self):
         for name, val in self.dcsource_bundle.Members.items():
             if self.preserve_iofiles:
-                self.print_log(type="I", msg="Preserving file %s." % val.extfile)
+                if val.extract:
+                    self.print_log(type="I", msg="Preserving file %s." % val.extfile)
             else:
                 val.remove()
 
