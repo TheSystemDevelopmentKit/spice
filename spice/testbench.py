@@ -6,7 +6,7 @@ Spice Testbench
 Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
-Last modification by Okko Järvinen, 25.06.2020 15:19
+Last modification by Okko Järvinen, 21.09.2020 15:00
 
 """
 import os
@@ -112,7 +112,7 @@ class testbench(spice_module):
         if not hasattr(self,'_parameters'):
             self._parameters = "%s Parameters\n" % self.parent.syntaxdict["commentchar"]
             for parname,parval in self.parent.spiceparameters.items():
-                self._parameters += self.parent.syntaxdict["parameter"] + parname + "=" + parval + "\n"
+                self._parameters += self.parent.syntaxdict["parameter"] + str(parname) + "=" + str(parval) + "\n"
         return self._parameters
     @parameters.setter
     def parameters(self,value):
