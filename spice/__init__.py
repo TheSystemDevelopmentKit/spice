@@ -579,20 +579,23 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         # Call spice here
         self.print_log(type='I', msg="Running external command %s\n" %(self.spicecmd) )
     
-        # This is some experimental stuff
-        count = 0
-        while True:
-            status = int(os.system(self.spicecmd)/256)
-            # Status code 9 seems to result from failed licensing in LSF runs
-            # Let's not try to restart if in interactive mode
-            if status != 9 or count == 10 or self.interactive_spice:
-                break
-            else:
-                count += 1
-                self.print_log(type='W',msg='License error, trying again... (%d/10)' % count)
-                time.sleep(5)
-        if status > 0:
-            self.print_log(type='F',msg='Eldo encountered an error (%d).' % status)
+        if self.model == 'eldo':
+            # This is some experimental stuff
+            count = 0
+            while True:
+                status = int(os.system(self.spicecmd)/256)
+                # Status code 9 seems to result from failed licensing in LSF runs
+                # Let's not try to restart if in interactive mode
+                if status != 9 or count == 10 or self.interactive_spice:
+                    break
+                else:
+                    count += 1
+                    self.print_log(type='W',msg='License error, trying again... (%d/10)' % count)
+                    time.sleep(5)
+            if status > 0:
+                self.print_log(type='F',msg='Eldo encountered an error (%d).' % status)
+        else:
+            os.system(self.spicecmd)
 
     def extract_powers(self):
         self.powers = {}
