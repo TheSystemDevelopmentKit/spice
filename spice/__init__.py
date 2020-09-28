@@ -623,10 +623,13 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     if val.extract and val.sourcetype.lower() == 'v':
                         arr = genfromtxt(val._extfile,delimiter=', ',skip_header=self.syntaxdict["csvskip"])
                         if val.ext_start is not None:
-                            arr = arr[np.where(arr[:,0] >= val.ext_start)[0],1]
+                            arr = arr[np.where(arr[:,0] >= val.ext_start)[0],:]
                         if val.ext_stop is not None:
-                            arr = arr[np.where(arr[:,0] <= val.ext_stop)[0],1]
-                        meancurr = np.mean(np.abs(arr))
+                            arr = arr[np.where(arr[:,0] <= val.ext_stop)[0],:]
+                        # The time points are non-uniform -> use deltas as weights
+                        dt = np.diff(arr[:,0])
+                        totaltime = arr[-1,0]-arr[0,0]
+                        meancurr = np.sum(np.abs(arr[1:,1])*dt)/totaltime
                         meanpwr = meancurr*val.value
                         sourcename = '%s%s' % (val.sourcetype.upper(),val.name.upper())
                         self.currents[sourcename] = meancurr
