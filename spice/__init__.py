@@ -532,7 +532,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         elif self.model=='spectre':
             #spicesimcmd = "\"sleep 10; spectre %s %s \"" % (plottingprogram,nprocflag)
             #spicesimcmd = "spectre %s %s " % (plottingprogram,nprocflag)
-            spicesimcmd = "spectre -64 ++aps=%s %s %s %s " % (self.errpreset,plflag,plottingprogram,nprocflag)
+            spicesimcmd = "spectre -64 +lqtimeout ++aps=%s %s %s %s " % (self.errpreset,plflag,plottingprogram,nprocflag)
         #spicesimcmd = "%s %s %s " % (self.syntaxdict["simulatorcmd"],plottingprogram,nprocflag)
         spicetbfile = self.spicetbsrc
         self._spicecmd = submission +\
