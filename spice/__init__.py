@@ -56,6 +56,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     "parameter" : '.param ',
                     "option" : '.option ',
                     "include" : '.include',
+                    "dspfinclude" : '.include',
                     "subckt" : '.subckt',
                     "lastline" : '.end',
                     "csvskip" : 2
@@ -72,6 +73,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     "parameter" : 'parameters ',
                     "option" : 'options ',
                     "include" : 'include ',
+                    "dspfinclude" : 'dspf_include ',
                     "subckt" : 'subckt',
                     "lastline" : '///', #needed?
                     "csvskip" : 0
@@ -282,7 +284,8 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 #temporary fix
                 #self._spice_submission=' '
                 #self._spice_submission='sleep 10;'+thesdk.GLOBALS['LSFSUBMISSION']+' -q "CentOS6" -o %s/bsublog.txt ' %self.spicesimpath
-                self._spice_submission=thesdk.GLOBALS['LSFSUBMISSION']+' -q "CentOS7" -o %s/bsublog.txt ' %self.spicesimpath
+                #self._spice_submission=thesdk.GLOBALS['LSFSUBMISSION']+' -R "rusage[spectre=1||spectre_mm=%d]" -q "CentOS7" -o %s/bsublog.txt ' % (1,self.spicesimpath)
+                self._spice_submission=thesdk.GLOBALS['LSFSUBMISSION']+' -q "CentOS7" -o %s/bsublog.txt ' % (self.spicesimpath)
             except:
                 self.print_log(type='W',msg='Variable thesdk.GLOBALS incorrectly defined. _spice_submission defaults to empty string and simulation is ran in localhost.')
                 self._spice_submission=''
@@ -506,40 +509,43 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def spicecmd(self):
-        if self.interactive_spice:
+        if not hasattr(self,'_spicecmd'):
+            if self.interactive_spice:
+                if self.model=='eldo':
+                    plottingprogram = "-ezwave"
+                elif self.model=='spectre':
+                    #plottingprogram = "-ezwave"
+                    plottingprogram = ''
+                submission=""
+            else:
+                plottingprogram = ""
+                submission=self.spice_submission
+
+            if self.nproc:
+                nprocflag = "%s%d" % (self.syntaxdict["nprocflag"],self.nproc)
+                self.print_log(type='I',msg='Enabling multithreading \'%s\'.' % nprocflag)
+            else:
+                nprocflag = ""
+
+            if self.tb.postlayout:
+                plflag = '+postlayout=upa'
+                self.print_log(type='I',msg='Enabling post-layout optimization \'%s\'.' % plflag)
+            else:
+                plflag = ''
+
             if self.model=='eldo':
-                plottingprogram = "-ezwave"
+                spicesimcmd = "eldo -64b %s %s " % (plottingprogram,nprocflag)
             elif self.model=='spectre':
-                #plottingprogram = "-ezwave"
-                plottingprogram = ''
-            submission=""
-        else:
-            plottingprogram = ""
-            submission=self.spice_submission
+                #spicesimcmd = "\"sleep 10; spectre %s %s \"" % (plottingprogram,nprocflag)
+                #spicesimcmd = "spectre %s %s " % (plottingprogram,nprocflag)
+                spicesimcmd = "spectre -64 +lqtimeout=0 +aps=%s %s %s %s " % (self.errpreset,plflag,plottingprogram,nprocflag)
 
-        if self.nproc:
-            nprocflag = "%s%d" % (self.syntaxdict["nprocflag"],self.nproc)
-        else:
-            nprocflag = ""
-
-        if self.tb.postlayout:
-            plflag = '+postlayout=upa'
-        else:
-            plflag = ''
-
-        if self.model=='eldo':
-            spicesimcmd = "eldo -64b %s %s " % (plottingprogram,nprocflag)
-        elif self.model=='spectre':
-            #spicesimcmd = "\"sleep 10; spectre %s %s \"" % (plottingprogram,nprocflag)
-            #spicesimcmd = "spectre %s %s " % (plottingprogram,nprocflag)
-            spicesimcmd = "spectre -64 +lqtimeout ++aps=%s %s %s %s " % (self.errpreset,plflag,plottingprogram,nprocflag)
-        #spicesimcmd = "%s %s %s " % (self.syntaxdict["simulatorcmd"],plottingprogram,nprocflag)
-        spicetbfile = self.spicetbsrc
-        self._spicecmd = submission +\
-                        spicesimcmd +\
-                        spicetbfile
+            #spicesimcmd = "%s %s %s " % (self.syntaxdict["simulatorcmd"],plottingprogram,nprocflag)
+            spicetbfile = self.spicetbsrc
+            self._spicecmd = submission +\
+                            spicesimcmd +\
+                            spicetbfile
         return self._spicecmd
-
     # Just to give the freedom to set this if needed
     @spicecmd.setter
     def spicecmd(self,value):

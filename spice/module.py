@@ -71,6 +71,7 @@ class spice_module(thesdk):
             # Extract the module definition
             if os.path.isfile(self._dutfile):
                 try:
+                    self.print_log(type='I',msg='Parsing source netlist %s.' % self._dutfile)
                     with open(self._dutfile) as infile:
                         wholefile=infile.readlines()
                         startfound=False
@@ -80,7 +81,8 @@ class spice_module(thesdk):
                             if not startfound and cellnamematch.search(line) != None:
                                 words = line.split()
                                 cellname = words[-1]
-                                self.print_log(type='I',msg='Found cell-name definition ("%s").' % cellname)
+                                self.print_log(type='I',msg='Found top-level cell name "%s".' % cellname)
+                                self.origcellname = cellname
                             # First subcircuit not started, finding Calibre xRC written program name
                             if not startfound and prognamematch.search(line) != None:
                                 self.print_log(type='I',msg='Post-layout netlist detected (%s).' % (' '.join(line.split()[2:])))
@@ -122,6 +124,7 @@ class spice_module(thesdk):
                                 if words[1].lower() == cellname.lower():
                                     self._subckt+="\n%s Subcircuit definition for %s module\n" % (self.parent.syntaxdict["commentchar"],self.parent.name)
                                     words[1] = self.parent.name.upper()
+                                    self.print_log(type='I',msg='Renaming design cell "%s" to "%s".' % (cellname,self.parent.name))
                                     line = ' '.join(words) + "\n"
                                     linecount += 1
                             # Inside the subcircuit clause -> copy all lines except comments
@@ -181,11 +184,11 @@ class spice_module(thesdk):
                     endfound = False
                     lastline = False
                     # Extract the module definition
-                    if not self._postlayout:
+                    if not self.postlayout:
                         for line in subckt:
                             if startmatch.search(line) != None:
                                 startfound = True
-                            elif startfound and len(line) > 0:
+                            if startfound and len(line) > 0:
                                 if self.parent.model == 'eldo' and line[0] != '+':
                                     endfound = True
                                     startfound = False

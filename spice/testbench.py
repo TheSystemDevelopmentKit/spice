@@ -6,13 +6,14 @@ Spice Testbench
 Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
-Last modification by Okko Järvinen, 21.09.2020 15:00
+Last modification by Okko Järvinen, 30.09.2020 16:39
 
 """
 import os
 import sys
 import subprocess
 import shlex
+import fileinput
 from abc import * 
 from thesdk import *
 from spice import *
@@ -198,6 +199,64 @@ class testbench(spice_module):
     @includecmd.deleter
     def includecmd(self,value):
         self._includecmd=None
+
+    # DSPF filepaths
+    @property
+    def dspf(self):
+        if not hasattr(self,'_dspf'):
+            self._dspf = []
+        return self._dspf
+    @dspf.setter
+    def dspf(self,value):
+        self._dspf=value
+    @dspf.deleter
+    def dspf(self,value):
+        self._dspf=None
+
+    # DSPF include commands
+    @property
+    def dspfincludecmd(self):
+        if not hasattr(self,'_dspfincludecmd'):
+            if len(self.parent.dspf) > 0:
+                self.print_log(type='I',msg='Including exctracted parasitics from DSPF.')
+                self.postlayout = True
+                self._dspfincludecmd = "%s Extracted parasitics\n"  % self.parent.syntaxdict["commentchar"]
+                origcellmatch = re.compile(r"DESIGN")
+                for cellname in self.parent.dspf:
+                    dspfpath = '%s/%s.pex.dspf' % (self.parent.spicesrcpath,cellname)
+                    try:    
+                        rename = False
+                        with open(dspfpath) as dspffile:
+                            lines = dspffile.readlines()
+                            for line in lines:
+                                if origcellmatch.search(line) != None:
+                                    words = line.split()
+                                    cellname = words[-1].replace('\"','')
+                                    if cellname == self.origcellname:
+                                        self.print_log(type='I',msg='Found DSPF cell name matching to original top-level cell name.')
+                                        rename = True
+
+                                    break
+                        if rename:
+                            self.print_log(type='I',msg='Renaming DSPF top cell name accordingly from "%s" to "%s".' % (cellname,self.parent.name))
+                            with fileinput.FileInput(dspfpath,inplace=True,backup='.bak') as f:
+                                for line in f:
+                                    print(line.replace(self.origcellname,self.parent.name.upper()),end='')
+                        self.print_log(type='I',msg='Including DSPF-file: %s' % dspfpath)
+                        self._dspfincludecmd += "%s \"%s\"\n" % (self.parent.syntaxdict["dspfinclude"],dspfpath)
+                    except:
+                        self.print_log(type='W',msg='DSPF-file not found: %s' % dspfpath)
+                        self.print_log(type='I',msg=traceback.format_exc())
+            else:
+                self.postlayout = False
+                self._dspfincludecmd = ''
+        return self._dspfincludecmd
+    @dspfincludecmd.setter
+    def dspfincludecmd(self,value):
+        self._dspfincludecmd=value
+    @dspfincludecmd.deleter
+    def dspfincludecmd(self,value):
+        self._dspfincludecmd=None
 
     @property
     def misccmd(self):
@@ -552,10 +611,11 @@ class testbench(spice_module):
                     self.parent.syntaxdict["commentline"]
         libcmd = self.libcmd
         includecmd = self.includecmd
+        subinst = self.subinst
+        dspfincludecmd = self.dspfincludecmd
         ahdlincludecmd = self.ahdlincludecmd
         options = self.options
         params = self.parameters
-        subinst = self.subinst
         dcsourcestr = self.dcsourcestr
         inputsignals = self.inputsignals
         misccmd = self.misccmd
@@ -564,6 +624,7 @@ class testbench(spice_module):
         self.contents = (headertxt + "\n" +
                         libcmd + "\n" +\
                         includecmd + "\n" +
+                        dspfincludecmd + "\n" +
                         ahdlincludecmd + "\n" +
                         options + "\n" +\
                         params + "\n" +
