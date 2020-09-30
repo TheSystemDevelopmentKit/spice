@@ -6,7 +6,7 @@ Spice Testbench
 Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
-Last modification by Okko Järvinen, 30.09.2020 16:39
+Last modification by Kalle Spoof, kalle.spoof@aalto.fi, 30.09.2020 17:40
 
 """
 import os
@@ -419,16 +419,20 @@ class testbench(spice_module):
                             self._simcmdstr += '.noisetran fmin=%s fmax=%s nbrun=1 NONOM %s\n' % \
                                     (str(val.fmin),str(val.fmax),'seed=%d'%(val.seed) if val.seed is not None else '')
                     elif self.parent.model=='spectre':
-                        self._simcmdstr += 'TRAN_analysis %s pstep=%s stop=%s %s' % \
+                        self._simcmdstr += 'TRAN_analysis %s pstep=%s stop=%s %s ' % \
                                 (sim,str(val.tprint),str(val.tstop) if val.tstop is not None else str(self._trantime) \
                                 ,'UIC' if val.uic else '') #TODO initial conditions
                                 #(sim,str(val.tprint),str(val.tstop) if val.tstop is not None else str(self._trantime+2e-9) \
                         if val.noise:
                             if val.seed==0:
                                 self.print_log(type='E',msg='spectre disables noise if noiseseed=0')
-                            self._simcmdstr += 'trannoisemethod=default noisefmin=%s noisefmax=%s %s\n' % \
+                            self._simcmdstr += 'trannoisemethod=default noisefmin=%s noisefmax=%s %s ' % \
                                     (str(val.fmin),str(val.fmax),'noiseseed=%d'%(val.seed) if val.seed is not None else '')
-                        self._simcmdstr += '\n' 
+                        if val.method is not None:
+                            self._simcmdstr += 'method=%s ' %  (str(val.method))
+                        if val.cmin is not None:
+                            self._simcmdstr += 'cmin=%s ' %  (str(val.cmin))
+                        self._simcmdstr += '\n\n' 
                 else:
                     self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
         return self._simcmdstr

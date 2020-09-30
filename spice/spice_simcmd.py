@@ -7,7 +7,7 @@ Class for spice simulation commands.
 
 Initially written for eldo-module by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 29.05.2020 19:06
+Last modification by Kalle Spoof, kalle.spoof@aalto.fi, 30.09.2020 17:36
 
 """
 
@@ -58,6 +58,10 @@ class spice_simcmd(thesdk):
                 Maximum noise frequency. Default 5e9.
             seed : int
                 Random generator seed for noise transient. Default None (random).
+            method : str
+                Transient integration method. Default None (spectre takes method from errpreset)
+            cmin : float
+                Spectre cmin parameter: this much cap from each node to ground. Might speed up simulation. Default None (not used)
     """
 
     @property
@@ -75,6 +79,8 @@ class spice_simcmd(thesdk):
             self._fmin=kwargs.get('fmin',1)
             self._fmax=kwargs.get('fmax',5e9)
             self._seed=kwargs.get('seed',None)
+            self._method=kwargs.get('method',None)
+            self._cmin=kwargs.get('cmin',None)
 
         except:
             self.print_log(type='F', msg="Eldo simulation command definition failed.")
@@ -171,3 +177,24 @@ class spice_simcmd(thesdk):
     def seed(self,value):
         self._seed=value
 
+    @property
+    def method(self):
+        if hasattr(self,'_method'):
+            return self._method
+        else:
+            self._method=None
+        return self._method
+    @method.setter
+    def method(self,value):
+        self._method=value
+
+    @property
+    def cmin(self):
+        if hasattr(self,'_cmin'):
+            return self._cmin
+        else:
+            self._cmin=None
+        return self._cmin
+    @cmin.setter
+    def cmin(self,value):
+        self._cmin=value
