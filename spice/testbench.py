@@ -6,7 +6,7 @@ Spice Testbench
 Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
-Last modification by Okko Järvinen, 30.09.2020 18:44
+Last modification by Okko Järvinen, 01.10.2020 18:33
 
 """
 import os
@@ -579,7 +579,7 @@ class testbench(spice_module):
                 module_file.write(self.contents)
 
     def export_subckt(self,**kwargs):
-        if self.postlayout:
+        if len(self.parent.dspf) == 0 and self.postlayout:
             return
         if not os.path.isfile(self.parent.spicesubcktsrc):
             self.print_log(type='I',msg='Exporting spice subcircuit to %s.' %(self.parent.spicesubcktsrc))

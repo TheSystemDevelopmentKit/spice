@@ -108,7 +108,7 @@ class spice_module(thesdk):
                                             words[1] = self.parent.name.upper()
                                             line = ' '.join(words) + "\n"
                                     sys.stdout.write(line)
-                                if not cellname == self.parent.name:
+                                if cellname != self.parent.name:
                                     self.print_log(type='I',msg='Renaming design cell %s to %s.' % (cellname,self.parent.name))
                                 self._subckt = ''
                                 # Notice the return here
@@ -125,7 +125,7 @@ class spice_module(thesdk):
                                 if words[1].lower() == cellname.lower():
                                     self._subckt+="\n%s Subcircuit definition for %s module\n" % (self.parent.syntaxdict["commentchar"],self.parent.name)
                                     words[1] = self.parent.name.upper()
-                                    if not cellname == self.parent.name:
+                                    if cellname != self.parent.name:
                                         self.print_log(type='I',msg='Renaming design cell "%s" to "%s".' % (cellname,self.parent.name))
                                     line = ' '.join(words) + "\n"
                                     linecount += 1
@@ -144,7 +144,7 @@ class spice_module(thesdk):
                                         self._subckt=self._subckt+line
                                         linecount += 1
                             # Calibre places an include statement above the first subcircuit -> grab that
-                            if self.postlayout and not startfound:
+                            if len(self.parent.dspf) == 0 and self.postlayout and not startfound:
                                 words = line.split()
                                 if words[0].lower() == self.parent.syntaxdict["include"]:
                                     self._subckt=self._subckt+line
