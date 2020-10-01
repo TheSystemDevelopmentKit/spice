@@ -6,7 +6,7 @@ Spice Testbench
 Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
-Last modification by Kalle Spoof, kalle.spoof@aalto.fi, 30.09.2020 17:40
+Last modification by Okko Järvinen, 30.09.2020 18:44
 
 """
 import os
@@ -199,19 +199,6 @@ class testbench(spice_module):
     @includecmd.deleter
     def includecmd(self,value):
         self._includecmd=None
-
-    # DSPF filepaths
-    @property
-    def dspf(self):
-        if not hasattr(self,'_dspf'):
-            self._dspf = []
-        return self._dspf
-    @dspf.setter
-    def dspf(self,value):
-        self._dspf=value
-    @dspf.deleter
-    def dspf(self,value):
-        self._dspf=None
 
     # DSPF include commands
     @property

@@ -108,7 +108,8 @@ class spice_module(thesdk):
                                             words[1] = self.parent.name.upper()
                                             line = ' '.join(words) + "\n"
                                     sys.stdout.write(line)
-                                self.print_log(type='I',msg='Renaming design cell %s to %s.' % (cellname,self.parent.name))
+                                if not cellname == self.parent.name:
+                                    self.print_log(type='I',msg='Renaming design cell %s to %s.' % (cellname,self.parent.name))
                                 self._subckt = ''
                                 # Notice the return here
                                 return self._subckt
@@ -124,7 +125,8 @@ class spice_module(thesdk):
                                 if words[1].lower() == cellname.lower():
                                     self._subckt+="\n%s Subcircuit definition for %s module\n" % (self.parent.syntaxdict["commentchar"],self.parent.name)
                                     words[1] = self.parent.name.upper()
-                                    self.print_log(type='I',msg='Renaming design cell "%s" to "%s".' % (cellname,self.parent.name))
+                                    if not cellname == self.parent.name:
+                                        self.print_log(type='I',msg='Renaming design cell "%s" to "%s".' % (cellname,self.parent.name))
                                     line = ' '.join(words) + "\n"
                                     linecount += 1
                             # Inside the subcircuit clause -> copy all lines except comments

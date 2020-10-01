@@ -206,6 +206,19 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def errpreset(self,value):
         self._errpreset=value
 
+    # DSPF filenames
+    @property
+    def dspf(self):
+        if not hasattr(self,'_dspf'):
+            self._dspf = []
+        return self._dspf
+    @dspf.setter
+    def dspf(self,value):
+        self._dspf=value
+    @dspf.deleter
+    def dspf(self,value):
+        self._dspf=None
+
     @property
     def iofile_bundle(self):
         """ 
@@ -279,19 +292,13 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """
         if not hasattr(self, '_spice_submission'):
             try:
-                #self._spice_submission=thesdk.GLOBALS['LSFSUBMISSION']+' '
-
-                #temporary fix
-                #self._spice_submission=' '
-                #self._spice_submission='sleep 10;'+thesdk.GLOBALS['LSFSUBMISSION']+' -q "CentOS6" -o %s/bsublog.txt ' %self.spicesimpath
-                #self._spice_submission=thesdk.GLOBALS['LSFSUBMISSION']+' -R "rusage[spectre=1||spectre_mm=%d]" -q "CentOS7" -o %s/bsublog.txt ' % (1,self.spicesimpath)
-                self._spice_submission=thesdk.GLOBALS['LSFSUBMISSION']+' -q "CentOS7" -o %s/bsublog.txt ' % (self.spicesimpath)
+                if self.interactive_spice:
+                    self._spice_submission = thesdk.GLOBALS['LSFINTERACTIVE'] + ' '
+                else:
+                    self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
             except:
-                self.print_log(type='W',msg='Variable thesdk.GLOBALS incorrectly defined. _spice_submission defaults to empty string and simulation is ran in localhost.')
+                self.print_log(type='W',msg='Error while defining spice submission command. Running locally.')
                 self._spice_submission=''
-
-        if hasattr(self,'_interactive_spice'):
-            return self._spice_submission
 
         return self._spice_submission
 
@@ -516,7 +523,8 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 elif self.model=='spectre':
                     #plottingprogram = "-ezwave"
                     plottingprogram = ''
-                submission=""
+                #submission=""
+                submission=self.spice_submission
             else:
                 plottingprogram = ""
                 submission=self.spice_submission
