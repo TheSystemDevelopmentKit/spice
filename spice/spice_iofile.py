@@ -8,7 +8,7 @@ for TheSDK spice
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 16.06.2020 16:27
+Last modification by Okko Järvinen, 06.10.2020 17:27
 
 """
 import os
@@ -354,7 +354,8 @@ class spice_iofile(iofile):
         for i in range(len(self.file)):
             try:
                 if self.iotype=='event' or self.iotype=='vsample':
-                    arr = genfromtxt(self.file[i],delimiter=', ',skip_header=self.parent.syntaxdict["csvskip"])
+                    arr = genfromtxt(self.file[i],delimiter=self.parent.syntaxdict['eventoutdelim'], \
+                            skip_header=self.parent.syntaxdict['csvskip'])
                     if self.Data is None: 
                         self.Data = np.array(arr)
                     else:
@@ -514,18 +515,19 @@ class spice_iofile(iofile):
                         else:
                             if len(self.Data[:,-1]) > len(nparr):
                                 # Old max length is bigger -> padding new array
-                                nans = np.empty(self.Data[:,-1].shape).reshape(-1,1)
-                                nans.fill(np.nan)
+                                nans = np.empty(self.Data[:,-1].shape,dtype='S%s' % buswidth).reshape(-1,1)
+                                nans.fill('U' * buswidth)
+                                nans = nans.astype(str)
                                 nans[:nparr.shape[0],:nparr.shape[1]] = nparr
                                 nparr = nans
                             elif len(self.Data[:,-1]) < len(nparr):
                                 # Old max length is smaller -> padding old array
-                                nans = np.empty((nparr.shape[0],self.Data.shape[1]))
-                                nans.fill(np.nan)
+                                nans = np.empty(self.Data[:,-1].shape,dtype='S%s' % buswidth).reshape(-1,1)
+                                nans.fill('U' * buswidth)
+                                nans = nans.astype(str)
                                 nans[:self.Data.shape[0],:self.Data.shape[1]] = self.Data
                                 self.Data = nans
                             self.Data = np.hstack((self.Data,nparr))
-
                 else:
                     self.print_log(type='F',msg='Couldn\'t read file for input type \'%s\'.'%self.iotype)
             except:

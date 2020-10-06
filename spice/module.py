@@ -71,6 +71,7 @@ class spice_module(thesdk):
             # Extract the module definition
             if os.path.isfile(self._dutfile):
                 try:
+                    self.print_log(type='I',msg='Parsing source netlist %s.' % self._dutfile)
                     with open(self._dutfile) as infile:
                         wholefile=infile.readlines()
                         startfound=False
@@ -80,7 +81,8 @@ class spice_module(thesdk):
                             if not startfound and cellnamematch.search(line) != None:
                                 words = line.split()
                                 cellname = words[-1]
-                                self.print_log(type='I',msg='Found cell-name definition ("%s").' % cellname)
+                                self.print_log(type='I',msg='Found top-level cell name "%s".' % cellname)
+                                self.origcellname = cellname
                             # First subcircuit not started, finding Calibre xRC written program name
                             if not startfound and prognamematch.search(line) != None:
                                 self.print_log(type='I',msg='Post-layout netlist detected (%s).' % (' '.join(line.split()[2:])))
@@ -106,7 +108,8 @@ class spice_module(thesdk):
                                             words[1] = self.parent.name.upper()
                                             line = ' '.join(words) + "\n"
                                     sys.stdout.write(line)
-                                self.print_log(type='I',msg='Renaming design cell %s to %s.' % (cellname,self.parent.name))
+                                if cellname != self.parent.name:
+                                    self.print_log(type='I',msg='Renaming design cell %s to %s.' % (cellname,self.parent.name))
                                 self._subckt = ''
                                 # Notice the return here
                                 return self._subckt
@@ -122,6 +125,8 @@ class spice_module(thesdk):
                                 if words[1].lower() == cellname.lower():
                                     self._subckt+="\n%s Subcircuit definition for %s module\n" % (self.parent.syntaxdict["commentchar"],self.parent.name)
                                     words[1] = self.parent.name.upper()
+                                    if cellname != self.parent.name:
+                                        self.print_log(type='I',msg='Renaming design cell "%s" to "%s".' % (cellname,self.parent.name))
                                     line = ' '.join(words) + "\n"
                                     linecount += 1
                             # Inside the subcircuit clause -> copy all lines except comments
@@ -139,7 +144,7 @@ class spice_module(thesdk):
                                         self._subckt=self._subckt+line
                                         linecount += 1
                             # Calibre places an include statement above the first subcircuit -> grab that
-                            if self.postlayout and not startfound:
+                            if len(self.parent.dspf) == 0 and self.postlayout and not startfound:
                                 words = line.split()
                                 if words[0].lower() == self.parent.syntaxdict["include"]:
                                     self._subckt=self._subckt+line
@@ -171,6 +176,7 @@ class spice_module(thesdk):
                 elif self.parent.model=='spectre':
                     startmatch=re.compile(r"\SUBCKT %s " % self.parent.name.upper(),re.IGNORECASE)
                 subckt = self.subckt.split('\n')
+
                 if len(subckt) <= 3 and not self.postlayout:
                     self.print_log(type='W',msg='No subcircuit found.')
                     self._subinst = "%s Empty subcircuit\n" % (self.parent.syntaxdict["commentchar"])
@@ -180,15 +186,19 @@ class spice_module(thesdk):
                     endfound = False
                     lastline = False
                     # Extract the module definition
-                    if not self._postlayout:
+                    if not self.postlayout:
                         for line in subckt:
-                            if startmatch.search(line) != None:
-                                startfound = True
-                            if startfound and len(line) > 0:
-                                if self.parent.model == 'eldo' and line[0] != '+':
-                                    endfound = True
-                                    startfound = False
-                                elif self.parent.model == 'spectre':
+                            if self.parent.model == 'eldo':
+                                if startmatch.search(line) != None:
+                                    startfound = True
+                                elif startfound and len(line) > 0:
+                                    if line[0] != '+':
+                                        endfound = True
+                                        startfound = False
+                            elif self.parent.model == 'spectre':
+                                if startmatch.search(line) != None:
+                                    startfound = True
+                                if startfound and len(line) > 0:
                                     if lastline:
                                         endfound = True
                                         startfound = False
@@ -197,11 +207,14 @@ class spice_module(thesdk):
                             if startfound and not endfound:
                                 words = line.split(" ")
                                 if words[0].lower() == self.parent.syntaxdict["subckt"]:
-                                    words[0] = "X%s%s" % (self.parent.name.upper(),'' if self.parent.model == 'eldo' else ' (')
+                                    if self.parent.model == 'eldo':
+                                        words[0] = "X%s%s" % (self.parent.name.upper(),'')  
+                                    else:
+                                        words[0] = "X%s%s" % (self.parent.name.upper(), ' (')
                                     words.pop(1)
                                     line = ' '.join(words)
                                 self._subinst += line + "%s\n" % ('\\' if lastline else '')
-                        self._subinst += '+' if self.parent.model == 'eldo' else ') '  + self.parent.name.upper()
+                        self._subinst += ('+' if self.parent.model == 'eldo' else ') ' )  + self.parent.name.upper()
                     else:
                         # This part is the above copy-pasted, only difference is that its read from a file
                         # TODO: needs obvious refactoring

@@ -7,7 +7,7 @@ Class for ELDO DC sources.
 
 Initially written for eldo-module by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 03.06.2020 14:11
+Last modification by Okko Järvinen, 28.09.2020 09:31
 
 """
 
@@ -59,7 +59,7 @@ class spice_dcsource(thesdk):
                         Time to start extracting average transient power consumption.
                         Default is 0.
                     ext_stop : float
-                        Time to start extracting average transient power consumption.
+                        Time to stop extracting average transient power consumption.
                         Default is simulation end time.
                     pos : str
                         Name of the positive node in the ELDO netlist.

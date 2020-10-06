@@ -6,13 +6,14 @@ Spice Testbench
 Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
-Last modification by Okko Järvinen, 25.06.2020 15:19
+Last modification by Okko Järvinen, 01.10.2020 18:33
 
 """
 import os
 import sys
 import subprocess
 import shlex
+import fileinput
 from abc import * 
 from thesdk import *
 from spice import *
@@ -112,7 +113,7 @@ class testbench(spice_module):
         if not hasattr(self,'_parameters'):
             self._parameters = "%s Parameters\n" % self.parent.syntaxdict["commentchar"]
             for parname,parval in self.parent.spiceparameters.items():
-                self._parameters += self.parent.syntaxdict["parameter"] + parname + "=" + parval + "\n"
+                self._parameters += self.parent.syntaxdict["parameter"] + str(parname) + "=" + str(parval) + "\n"
         return self._parameters
     @parameters.setter
     def parameters(self,value):
@@ -198,6 +199,51 @@ class testbench(spice_module):
     @includecmd.deleter
     def includecmd(self,value):
         self._includecmd=None
+
+    # DSPF include commands
+    @property
+    def dspfincludecmd(self):
+        if not hasattr(self,'_dspfincludecmd'):
+            if len(self.parent.dspf) > 0:
+                self.print_log(type='I',msg='Including exctracted parasitics from DSPF.')
+                self.postlayout = True
+                self._dspfincludecmd = "%s Extracted parasitics\n"  % self.parent.syntaxdict["commentchar"]
+                origcellmatch = re.compile(r"DESIGN")
+                for cellname in self.parent.dspf:
+                    dspfpath = '%s/%s.pex.dspf' % (self.parent.spicesrcpath,cellname)
+                    try:    
+                        rename = False
+                        with open(dspfpath) as dspffile:
+                            lines = dspffile.readlines()
+                            for line in lines:
+                                if origcellmatch.search(line) != None:
+                                    words = line.split()
+                                    cellname = words[-1].replace('\"','')
+                                    if cellname == self.origcellname:
+                                        self.print_log(type='I',msg='Found DSPF cell name matching to original top-level cell name.')
+                                        rename = True
+
+                                    break
+                        if rename:
+                            self.print_log(type='I',msg='Renaming DSPF top cell name accordingly from "%s" to "%s".' % (cellname,self.parent.name))
+                            with fileinput.FileInput(dspfpath,inplace=True,backup='.bak') as f:
+                                for line in f:
+                                    print(line.replace(self.origcellname,self.parent.name.upper()),end='')
+                        self.print_log(type='I',msg='Including DSPF-file: %s' % dspfpath)
+                        self._dspfincludecmd += "%s \"%s\"\n" % (self.parent.syntaxdict["dspfinclude"],dspfpath)
+                    except:
+                        self.print_log(type='W',msg='DSPF-file not found: %s' % dspfpath)
+                        self.print_log(type='I',msg=traceback.format_exc())
+            else:
+                self.postlayout = False
+                self._dspfincludecmd = ''
+        return self._dspfincludecmd
+    @dspfincludecmd.setter
+    def dspfincludecmd(self,value):
+        self._dspfincludecmd=value
+    @dspfincludecmd.deleter
+    def dspfincludecmd(self,value):
+        self._dspfincludecmd=None
 
     @property
     def misccmd(self):
@@ -360,16 +406,20 @@ class testbench(spice_module):
                             self._simcmdstr += '.noisetran fmin=%s fmax=%s nbrun=1 NONOM %s\n' % \
                                     (str(val.fmin),str(val.fmax),'seed=%d'%(val.seed) if val.seed is not None else '')
                     elif self.parent.model=='spectre':
-                        self._simcmdstr += 'TRAN_analysis %s pstep=%s stop=%s %s' % \
+                        self._simcmdstr += 'TRAN_analysis %s pstep=%s stop=%s %s ' % \
                                 (sim,str(val.tprint),str(val.tstop) if val.tstop is not None else str(self._trantime) \
                                 ,'UIC' if val.uic else '') #TODO initial conditions
                                 #(sim,str(val.tprint),str(val.tstop) if val.tstop is not None else str(self._trantime+2e-9) \
                         if val.noise:
                             if val.seed==0:
                                 self.print_log(type='E',msg='spectre disables noise if noiseseed=0')
-                            self._simcmdstr += 'trannoisemethod=default noisefmin=%s noisefmax=%s %s\n' % \
+                            self._simcmdstr += 'trannoisemethod=default noisefmin=%s noisefmax=%s %s ' % \
                                     (str(val.fmin),str(val.fmax),'noiseseed=%d'%(val.seed) if val.seed is not None else '')
-                        self._simcmdstr += '\n' 
+                        if val.method is not None:
+                            self._simcmdstr += 'method=%s ' %  (str(val.method))
+                        if val.cmin is not None:
+                            self._simcmdstr += 'cmin=%s ' %  (str(val.cmin))
+                        self._simcmdstr += '\n\n' 
                 else:
                     self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
         return self._simcmdstr
@@ -529,7 +579,7 @@ class testbench(spice_module):
                 module_file.write(self.contents)
 
     def export_subckt(self,**kwargs):
-        if self.postlayout:
+        if len(self.parent.dspf) == 0 and self.postlayout:
             return
         if not os.path.isfile(self.parent.spicesubcktsrc):
             self.print_log(type='I',msg='Exporting spice subcircuit to %s.' %(self.parent.spicesubcktsrc))
@@ -552,10 +602,11 @@ class testbench(spice_module):
                     self.parent.syntaxdict["commentline"]
         libcmd = self.libcmd
         includecmd = self.includecmd
+        subinst = self.subinst
+        dspfincludecmd = self.dspfincludecmd
         ahdlincludecmd = self.ahdlincludecmd
         options = self.options
         params = self.parameters
-        subinst = self.subinst
         dcsourcestr = self.dcsourcestr
         inputsignals = self.inputsignals
         misccmd = self.misccmd
@@ -564,6 +615,7 @@ class testbench(spice_module):
         self.contents = (headertxt + "\n" +
                         libcmd + "\n" +\
                         includecmd + "\n" +
+                        dspfincludecmd + "\n" +
                         ahdlincludecmd + "\n" +
                         options + "\n" +\
                         params + "\n" +

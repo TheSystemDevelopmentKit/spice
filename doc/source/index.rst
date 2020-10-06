@@ -6,27 +6,27 @@
    :maxdepth: 3
    :caption: Contents:
 
-.. automodule:: eldo
+.. automodule:: spice
    :members:
    :undoc-members:
 
-.. automodule:: eldo.module
+.. automodule:: spice.module
    :members:
    :undoc-members:
 
-.. automodule:: eldo.eldo_iofile
+.. automodule:: spice.spice_iofile
    :members:
    :undoc-members:
 
-.. automodule:: eldo.eldo_simcmd
+.. automodule:: spice.spice_simcmd
    :members:
    :undoc-members:
 
-.. automodule:: eldo.eldo_dcsource
+.. automodule:: spice.spice_dcsource
    :members:
    :undoc-members:
 
-.. automodule:: eldo.testbench
+.. automodule:: spice.testbench
    :members:
    :undoc-members:
 

@@ -1,13 +1,15 @@
 """
 =======
-ELDO
+Spice
 =======
-Simulation interface package for The System Development Kit 
+Analog simulation interface package for The System Development Kit 
 
-Provides utilities to import spice modules to python environment and
+Provides utilities to import spice-like modules to python environment and
 automatically generate testbenches for the most common simulation cases.
 
 Initially written by Okko Järvinen, 2019
+
+Release 1.4 , Jun 2020 supports Eldo and Spectre
 """
 import os
 import sys
@@ -54,8 +56,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     "parameter" : '.param ',
                     "option" : '.option ',
                     "include" : '.include',
+                    "dspfinclude" : '.include',
                     "subckt" : '.subckt',
                     "lastline" : '.end',
+                    "eventoutdelim" : ' ',
                     "csvskip" : 2
                     }
         elif self.model=='spectre':
@@ -70,8 +74,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     "parameter" : 'parameters ',
                     "option" : 'options ',
                     "include" : 'include ',
+                    "dspfinclude" : 'dspf_include ',
                     "subckt" : 'subckt',
                     "lastline" : '///', #needed?
+                    "eventoutdelim" : ',',
                     "csvskip" : 0
                     }
         return self._syntaxdict
@@ -202,6 +208,19 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def errpreset(self,value):
         self._errpreset=value
 
+    # DSPF filenames
+    @property
+    def dspf(self):
+        if not hasattr(self,'_dspf'):
+            self._dspf = []
+        return self._dspf
+    @dspf.setter
+    def dspf(self,value):
+        self._dspf=value
+    @dspf.deleter
+    def dspf(self,value):
+        self._dspf=None
+
     @property
     def iofile_bundle(self):
         """ 
@@ -224,7 +243,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 self.print_log(type="I", msg="Preserving files for %s." % val.name)
             else:
                 val.remove()
-        if (not self.preserve_iofiles):
+        if not self.preserve_iofiles:
             if self.interactive_spice:
                 simpathname = self.spicesimpath
             else:
@@ -275,20 +294,22 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """
         if not hasattr(self, '_spice_submission'):
             try:
-                #self._spice_submission=thesdk.GLOBALS['LSFSUBMISSION']+' '
-
-                #temporary fix
-                #self._spice_submission=' '
-                #self._spice_submission='sleep 10;'+thesdk.GLOBALS['LSFSUBMISSION']+' -q "CentOS6" -o %s/bsublog.txt ' %self.spicesimpath
-                self._spice_submission=thesdk.GLOBALS['LSFSUBMISSION']+' -q "CentOS7" -o %s/bsublog.txt ' %self.spicesimpath
+                if self.interactive_spice:
+                    self._spice_submission = thesdk.GLOBALS['LSFINTERACTIVE'] + ' '
+                else:
+                    self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
             except:
-                self.print_log(type='W',msg='Variable thesdk.GLOBALS incorrectly defined. _spice_submission defaults to empty string and simulation is ran in localhost.')
+                self.print_log(type='W',msg='Error while defining spice submission command. Running locally.')
                 self._spice_submission=''
 
-        if hasattr(self,'_interactive_spice'):
-            return self._spice_submission
-
         return self._spice_submission
+    @spice_submission.setter
+    def spice_submission(self,value):
+        self._spice_submission=value
+    @spice_submission.deleter
+    def spice_submission(self):
+        for name, val in self.spice_submission.Members.items():
+            val.remove()
 
     @property
     def spiceparameters(self): 
@@ -421,19 +442,19 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @property
     def eldowdbsrc(self):
         if not hasattr(self, '_eldowdbsrc'):
-            if self.interactive_eldo:
-                self._eldowdbsrc=self.eldosrcpath + '/tb_' + self.name + '.wdb'
+            if self.interactive_spice:
+                self._eldowdbsrc=self.spicesrcpath + '/tb_' + self.name + '.wdb'
             else:
-                self._eldowdbsrc=self.eldosimpath + '/tb_' + self.name + '.wdb'
+                self._eldowdbsrc=self.spicesimpath + '/tb_' + self.name + '.wdb'
         return self._eldowdbsrc
 
     @property
     def eldochisrc(self):
         if not hasattr(self, '_eldochisrc'):
-            if self.interactive_eldo:
-                self._eldochisrc=self.eldosrcpath + '/tb_' + self.name + '.chi'
+            if self.interactive_spice:
+                self._eldochisrc=self.spicesrcpath + '/tb_' + self.name + '.chi'
             else:
-                self._eldochisrc=self.eldosimpath + '/tb_' + self.name + '.chi'
+                self._eldochisrc=self.spicesimpath + '/tb_' + self.name + '.chi'
         return self._eldochisrc
 
     @property
@@ -448,17 +469,18 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @property
     def spicesimpath(self):
         #self._eldosimpath  = self.entitypath+'/Simulations/eldosim'
-        self._spicesimpath = self.entitypath+'/Simulations/spicesim/'+self.runname
-        try:
-            if not (os.path.exists(self._spicesimpath)):
-                os.makedirs(self._spicesimpath)
-                self.print_log(type='I',msg='Creating %s.' % self._spicesimpath)
-        except:
-            self.print_log(type='E',msg='Failed to create %s.' % self._spicesimpath)
+        if not hasattr(self,'_spicesimpath'):
+            self._spicesimpath = self.entitypath+'/Simulations/spicesim/'+self.runname
+            try:
+                if not (os.path.exists(self._spicesimpath)):
+                    os.makedirs(self._spicesimpath)
+                    self.print_log(type='I',msg='Creating %s.' % self._spicesimpath)
+            except:
+                self.print_log(type='E',msg='Failed to create %s.' % self._spicesimpath)
         return self._spicesimpath
     @spicesimpath.deleter
     def spicesimpath(self):
-        if (not self.interactive_spice) and (not self.preserve_spicefiles):
+        if not self.interactive_spice and not self.preserve_spicefiles:
             # Removing generated files
             filelist = [
                 #self.eldochisrc,
@@ -476,68 +498,70 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     pass
 
             # Cleaning up extra files
-            remaining = os.listdir(self.spicesimpath)
-            for f in remaining:
-                try:
-                    fpath = '%s/%s' % (self.spicesimpath,f)
-                    if f.startswith('tb_%s' % self.name):
-                        os.remove(fpath)
-                        self.print_log(type='I',msg='Removing %s.' % fpath)
-                except:
-                    self.print_log(type='W',msg='Could not remove %s.' % fpath)
+            if os.path.exists(self.spicesimpath):
+                remaining = os.listdir(self.spicesimpath)
+                for f in remaining:
+                    try:
+                        fpath = '%s/%s' % (self.spicesimpath,f)
+                        if f.startswith('tb_%s' % self.name):
+                            os.remove(fpath)
+                            self.print_log(type='I',msg='Removing %s.' % fpath)
+                    except:
+                        self.print_log(type='W',msg='Could not remove %s.' % fpath)
 
             #TODO currently always remove everything 
             # IO files were also removed -> remove the directory
-            if not self.preserve_iofiles:
-                # I need to save this here to prevent the directory from being re-created
-                simpathname = self._spicesimpath
+            if os.path.exists(self.spicesimpath) and not self.preserve_iofiles:
                 try:
-                    # This fails now because of .nfs files
-                    shutil.rmtree(simpathname)
-                    self.print_log(type='I',msg='Removing %s.' % simpathname)
+                    # This fails sometimes because of .nfs files
+                    shutil.rmtree(self.spicesimpath)
+                    self.print_log(type='I',msg='Removing %s.' % self.spicesimpath)
                 except:
-                    self.print_log(type='W',msg='Could not remove %s.' % simpathname)
+                    self.print_log(type='W',msg='Could not remove %s.' % self.spicesimpath)
         else:
-            # Using the private variable here to prevent the re-creation of the dir?
-            self.print_log(type='I',msg='Preserving spice files in %s.' % self._spicesrcpath)
+            self.print_log(type='I',msg='Preserving spice files in %s.' % self.spicesrcpath)
 
 
     @property
     def spicecmd(self):
-        if self.interactive_spice:
+        if not hasattr(self,'_spicecmd'):
+            if self.interactive_spice:
+                if self.model=='eldo':
+                    plottingprogram = "-ezwave"
+                elif self.model=='spectre':
+                    #plottingprogram = "-ezwave"
+                    plottingprogram = ''
+                #submission=""
+                submission=self.spice_submission
+            else:
+                plottingprogram = ""
+                submission=self.spice_submission
+
+            if self.nproc:
+                nprocflag = "%s%d" % (self.syntaxdict["nprocflag"],self.nproc)
+                self.print_log(type='I',msg='Enabling multithreading \'%s\'.' % nprocflag)
+            else:
+                nprocflag = ""
+
+            if self.tb.postlayout:
+                plflag = '+postlayout=upa'
+                self.print_log(type='I',msg='Enabling post-layout optimization \'%s\'.' % plflag)
+            else:
+                plflag = ''
+
             if self.model=='eldo':
-                plottingprogram = "-ezwave"
+                spicesimcmd = "eldo -64b %s %s " % (plottingprogram,nprocflag)
             elif self.model=='spectre':
-                #plottingprogram = "-ezwave"
-                plottingprogram = ''
-            submission=""
-        else:
-            plottingprogram = ""
-            submission=self.spice_submission
+                #spicesimcmd = "\"sleep 10; spectre %s %s \"" % (plottingprogram,nprocflag)
+                #spicesimcmd = "spectre %s %s " % (plottingprogram,nprocflag)
+                spicesimcmd = "spectre -64 +lqtimeout=0 ++aps=%s %s %s %s " % (self.errpreset,plflag,plottingprogram,nprocflag)
 
-        if self.nproc:
-            nprocflag = "%s%d" % (self.syntaxdict["nprocflag"],self.nproc)
-        else:
-            nprocflag = ""
-
-        if self.tb.postlayout:
-            plflag = '+postlayout=upa'
-        else:
-            plflag = ''
-
-        if self.model=='eldo':
-            spicesimcmd = "eldo -64b %s %s " % (plottingprogram,nprocflag)
-        elif self.model=='spectre':
-            #spicesimcmd = "\"sleep 10; spectre %s %s \"" % (plottingprogram,nprocflag)
-            #spicesimcmd = "spectre %s %s " % (plottingprogram,nprocflag)
-            spicesimcmd = "spectre -64 ++aps=%s %s %s %s " % (self.errpreset,plflag,plottingprogram,nprocflag)
-        #spicesimcmd = "%s %s %s " % (self.syntaxdict["simulatorcmd"],plottingprogram,nprocflag)
-        spicetbfile = self.spicetbsrc
-        self._spicecmd = submission +\
-                        spicesimcmd +\
-                        spicetbfile
+            #spicesimcmd = "%s %s %s " % (self.syntaxdict["simulatorcmd"],plottingprogram,nprocflag)
+            spicetbfile = self.spicetbsrc
+            self._spicecmd = submission +\
+                            spicesimcmd +\
+                            spicetbfile
         return self._spicecmd
-
     # Just to give the freedom to set this if needed
     @spicecmd.setter
     def spicecmd(self,value):
@@ -577,20 +601,23 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         # Call spice here
         self.print_log(type='I', msg="Running external command %s\n" %(self.spicecmd) )
     
-        # This is some experimental stuff
-        count = 0
-        while True:
-            status = int(os.system(self.spicecmd)/256)
-            # Status code 9 seems to result from failed licensing in LSF runs
-            # Let's not try to restart if in interactive mode
-            if status != 9 or count == 10 or self.interactive_eldo:
-                break
-            else:
-                count += 1
-                self.print_log(type='W',msg='License error, trying again... (%d/10)' % count)
-                time.sleep(5)
-        if status > 0:
-            self.print_log(type='F',msg='Eldo encountered an error (%d).' % status)
+        if self.model == 'eldo':
+            # This is some experimental stuff
+            count = 0
+            while True:
+                status = int(os.system(self.spicecmd)/256)
+                # Status code 9 seems to result from failed licensing in LSF runs
+                # Let's not try to restart if in interactive mode
+                if status != 9 or count == 10 or self.interactive_spice:
+                    break
+                else:
+                    count += 1
+                    self.print_log(type='W',msg='License error, trying again... (%d/10)' % count)
+                    time.sleep(5)
+            if status > 0:
+                self.print_log(type='F',msg='Eldo encountered an error (%d).' % status)
+        else:
+            os.system(self.spicecmd)
 
     def extract_powers(self):
         self.powers = {}
@@ -618,10 +645,13 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     if val.extract and val.sourcetype.lower() == 'v':
                         arr = genfromtxt(val._extfile,delimiter=', ',skip_header=self.syntaxdict["csvskip"])
                         if val.ext_start is not None:
-                            arr = arr[np.where(arr[:,0] >= val.ext_start)[0],1]
+                            arr = arr[np.where(arr[:,0] >= val.ext_start)[0],:]
                         if val.ext_stop is not None:
-                            arr = arr[np.where(arr[:,0] <= val.ext_stop)[0],1]
-                        meancurr = np.mean(np.abs(arr))
+                            arr = arr[np.where(arr[:,0] <= val.ext_stop)[0],:]
+                        # The time points are non-uniform -> use deltas as weights
+                        dt = np.diff(arr[:,0])
+                        totaltime = arr[-1,0]-arr[0,0]
+                        meancurr = np.sum(np.abs(arr[1:,1])*dt)/totaltime
                         meanpwr = meancurr*val.value
                         sourcename = '%s%s' % (val.sourcetype.upper(),val.name.upper())
                         self.currents[sourcename] = meancurr
@@ -693,5 +723,5 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     self.extract_powers()
             except:
                 self.print_log(type='I',msg=traceback.format_exc())
-                self.print_log(type='F',msg='Failed while loading results from %s.' % self._eldosimpath)
+                self.print_log(type='F',msg='Failed while loading results from %s.' % self._spicesimpath)
 
