@@ -59,6 +59,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     "dspfinclude" : '.include',
                     "subckt" : '.subckt',
                     "lastline" : '.end',
+                    "eventoutdelim" : ' ',
                     "csvskip" : 2
                     }
         elif self.model=='spectre':
@@ -76,6 +77,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     "dspfinclude" : 'dspf_include ',
                     "subckt" : 'subckt',
                     "lastline" : '///', #needed?
+                    "eventoutdelim" : ',',
                     "csvskip" : 0
                     }
         return self._syntaxdict
@@ -241,7 +243,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 self.print_log(type="I", msg="Preserving files for %s." % val.name)
             else:
                 val.remove()
-        if (not self.preserve_iofiles):
+        if not self.preserve_iofiles:
             if self.interactive_spice:
                 simpathname = self.spicesimpath
             else:
@@ -301,6 +303,13 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 self._spice_submission=''
 
         return self._spice_submission
+    @spice_submission.setter
+    def spice_submission(self,value):
+        self._spice_submission=value
+    @spice_submission.deleter
+    def spice_submission(self):
+        for name, val in self.spice_submission.Members.items():
+            val.remove()
 
     @property
     def spiceparameters(self): 
@@ -460,17 +469,18 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @property
     def spicesimpath(self):
         #self._eldosimpath  = self.entitypath+'/Simulations/eldosim'
-        self._spicesimpath = self.entitypath+'/Simulations/spicesim/'+self.runname
-        try:
-            if not (os.path.exists(self._spicesimpath)):
-                os.makedirs(self._spicesimpath)
-                self.print_log(type='I',msg='Creating %s.' % self._spicesimpath)
-        except:
-            self.print_log(type='E',msg='Failed to create %s.' % self._spicesimpath)
+        if not hasattr(self,'_spicesimpath'):
+            self._spicesimpath = self.entitypath+'/Simulations/spicesim/'+self.runname
+            try:
+                if not (os.path.exists(self._spicesimpath)):
+                    os.makedirs(self._spicesimpath)
+                    self.print_log(type='I',msg='Creating %s.' % self._spicesimpath)
+            except:
+                self.print_log(type='E',msg='Failed to create %s.' % self._spicesimpath)
         return self._spicesimpath
     @spicesimpath.deleter
     def spicesimpath(self):
-        if (not self.interactive_spice) and (not self.preserve_spicefiles):
+        if not self.interactive_spice and not self.preserve_spicefiles:
             # Removing generated files
             filelist = [
                 #self.eldochisrc,
@@ -488,30 +498,28 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     pass
 
             # Cleaning up extra files
-            remaining = os.listdir(self.spicesimpath)
-            for f in remaining:
-                try:
-                    fpath = '%s/%s' % (self.spicesimpath,f)
-                    if f.startswith('tb_%s' % self.name):
-                        os.remove(fpath)
-                        self.print_log(type='I',msg='Removing %s.' % fpath)
-                except:
-                    self.print_log(type='W',msg='Could not remove %s.' % fpath)
+            if os.path.exists(self.spicesimpath):
+                remaining = os.listdir(self.spicesimpath)
+                for f in remaining:
+                    try:
+                        fpath = '%s/%s' % (self.spicesimpath,f)
+                        if f.startswith('tb_%s' % self.name):
+                            os.remove(fpath)
+                            self.print_log(type='I',msg='Removing %s.' % fpath)
+                    except:
+                        self.print_log(type='W',msg='Could not remove %s.' % fpath)
 
             #TODO currently always remove everything 
             # IO files were also removed -> remove the directory
-            if not self.preserve_iofiles:
-                # I need to save this here to prevent the directory from being re-created
-                simpathname = self._spicesimpath
+            if os.path.exists(self.spicesimpath) and not self.preserve_iofiles:
                 try:
-                    # This fails now because of .nfs files
-                    shutil.rmtree(simpathname)
-                    self.print_log(type='I',msg='Removing %s.' % simpathname)
+                    # This fails sometimes because of .nfs files
+                    shutil.rmtree(self.spicesimpath)
+                    self.print_log(type='I',msg='Removing %s.' % self.spicesimpath)
                 except:
-                    self.print_log(type='W',msg='Could not remove %s.' % simpathname)
+                    self.print_log(type='W',msg='Could not remove %s.' % self.spicesimpath)
         else:
-            # Using the private variable here to prevent the re-creation of the dir?
-            self.print_log(type='I',msg='Preserving spice files in %s.' % self._spicesrcpath)
+            self.print_log(type='I',msg='Preserving spice files in %s.' % self.spicesrcpath)
 
 
     @property

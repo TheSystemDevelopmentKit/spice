@@ -188,13 +188,17 @@ class spice_module(thesdk):
                     # Extract the module definition
                     if not self.postlayout:
                         for line in subckt:
-                            if startmatch.search(line) != None:
-                                startfound = True
-                            if startfound and len(line) > 0:
-                                if self.parent.model == 'eldo' and line[0] != '+':
-                                    endfound = True
-                                    startfound = False
-                                elif self.parent.model == 'spectre':
+                            if self.parent.model == 'eldo':
+                                if startmatch.search(line) != None:
+                                    startfound = True
+                                elif startfound and len(line) > 0:
+                                    if line[0] != '+':
+                                        endfound = True
+                                        startfound = False
+                            elif self.parent.model == 'spectre':
+                                if startmatch.search(line) != None:
+                                    startfound = True
+                                if startfound and len(line) > 0:
                                     if lastline:
                                         endfound = True
                                         startfound = False

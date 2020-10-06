@@ -8,7 +8,7 @@ for TheSDK spice
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 03.10.2020 15:04
+Last modification by Okko Järvinen, 06.10.2020 17:27
 
 """
 import os
@@ -354,7 +354,8 @@ class spice_iofile(iofile):
         for i in range(len(self.file)):
             try:
                 if self.iotype=='event' or self.iotype=='vsample':
-                    arr = genfromtxt(self.file[i],delimiter=', ',skip_header=self.parent.syntaxdict["csvskip"])
+                    arr = genfromtxt(self.file[i],delimiter=self.parent.syntaxdict['eventoutdelim'], \
+                            skip_header=self.parent.syntaxdict['csvskip'])
                     if self.Data is None: 
                         self.Data = np.array(arr)
                     else:
