@@ -6,7 +6,7 @@ Spice Testbench
 Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
-Last modification by Okko Järvinen, 01.10.2020 18:33
+Last modification by Okko Järvinen, 07.10.2020 11:47
 
 """
 import os
@@ -55,11 +55,13 @@ class testbench(spice_module):
                 #self._dutfile=self.parent.spicesimpath + '/subckt_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
                 self._subcktfile=self.parent.spicesimpath + '/subckt_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
             self._dutfile=self.parent.spicesrcpath + '/' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
+
+            # This variable holds duration of longest input vector after reading input files
             self._trantime=0
         except:
-            self.print_log(type='F', msg="Eldo Testbench file definition failed")
+            self.print_log(type='F', msg="Spice Testbench file definition failed")
         
-        #The methods for these are derived from eldo_module
+        #The methods for these are derived from spice_module
         self._name=''
         self.iofiles=Bundle()
         self.dcsources=Bundle()
@@ -376,12 +378,15 @@ class testbench(spice_module):
                                         (busname,str(val.vhi),str(val.vlo),str(val.tfall),str(val.trise),str(1/val.rs),'0','bin',pattstr)
                         elif self.parent.model == 'spectre':
                             for i in range(len(val.ionames)):
+                                if float(self._trantime) < len(val.Data)/val.rs:
+                                    self._trantime = len(val.Data)/val.rs
                                 self._inputsignals += 'vec_include "%s"\n' % val.file[i]
                     else:
                         self.print_log(type='F',msg='Input type \'%s\' undefined.' % val.iotype)
 
             if self._trantime == 0:
-                self._trantime = "simtime"
+                self._trantime = "UNDEFINED"
+                self.print_log(type='E',msg='Failed to specify transient duration. Please provide parameter tstop in the spice_simcmd arguments.')
         return self._inputsignals
     @inputsignals.setter
     def inputsignals(self,value):
