@@ -8,7 +8,7 @@ for TheSDK spice.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 07.10.2020 13:48
+Last modification by Okko Järvinen, 07.10.2020 14:40
 
 """
 import os

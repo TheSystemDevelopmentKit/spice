@@ -6,7 +6,7 @@ Spice Testbench
 Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
-Last modification by Okko Järvinen, 07.10.2020 14:17
+Last modification by Okko Järvinen, 07.10.2020 14:35
 
 """
 import os
@@ -383,8 +383,11 @@ class testbench(spice_module):
                                 pattstr = ''
                                 for d in val.Data[:,i]:
                                     pattstr += '%s ' % str(d)
-                                if float(self._trantime) < len(val.Data)/val.rs:
-                                    self._trantime = len(val.Data)/val.rs
+                                try:
+                                    if float(self._trantime) < len(val.Data)/val.rs:
+                                        self._trantime = len(val.Data)/val.rs
+                                except:
+                                    pass
                                 # Checking if the given bus is actually a 1-bit signal
                                 if ('<' not in val.ionames[i]) and ('>' not in val.ionames[i]) and len(str(val.Data[0,i])) == 1:
                                     busname = '%s_BUS' % val.ionames[i]
@@ -396,8 +399,12 @@ class testbench(spice_module):
                                         (busname,str(val.vhi),str(val.vlo),str(val.tfall),str(val.trise),str(1/val.rs),'0','bin',pattstr)
                         elif self.parent.model == 'spectre':
                             for i in range(len(val.ionames)):
-                                if float(self._trantime) < len(val.Data)/val.rs:
-                                    self._trantime = len(val.Data)/val.rs
+                                # This is a lazy way to handle non-list val.Data
+                                try:
+                                    if float(self._trantime) < len(val.Data)/val.rs:
+                                        self._trantime = len(val.Data)/val.rs
+                                except:
+                                    pass
                                 self._inputsignals += 'vec_include "%s"\n' % val.file[i]
                     else:
                         self.print_log(type='F',msg='Input type \'%s\' undefined.' % val.iotype)
