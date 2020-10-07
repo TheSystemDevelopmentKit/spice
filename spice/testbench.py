@@ -6,7 +6,7 @@ Spice Testbench
 Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
-Last modification by Okko Järvinen, 07.10.2020 11:47
+Last modification by Okko Järvinen, 07.10.2020 14:17
 
 """
 import os
@@ -25,24 +25,21 @@ import pandas as pd
 from functools import reduce
 import textwrap
 from datetime import datetime
-## Some guidelines:
-## DUT is parsed from the eldo file.
-## Simparams are parsed to header from the parent
-## All io's are read from a file? (Is this good)
-## Code injection should be possible
-## at least between blocks
-## Default structure during initialization?
 
 # Utilizes logging method from thesdk
-# Is extendsd eldo module with some additional properties
 class testbench(spice_module):
+    """
+    This class generates all testbench contents.
+    This class is utilized by the main spice class.
+
+    """
     @property
     def _classfile(self):
         return os.path.dirname(os.path.realpath(__file__)) + "/"+__name__
 
     def __init__(self, parent=None, **kwargs):
         if parent==None:
-            self.print_log(type='F', msg="Parent of Eldo testbench not given")
+            self.print_log(type='F', msg="Parent of spice testbench not given")
         else:
             self.parent=parent
         try:  
@@ -69,27 +66,25 @@ class testbench(spice_module):
         
     @property
     def file(self):
+        """String
+        
+        Filepath to the testbench file (i.e. './spice/tb_entityname.scs').
+        """
         if not hasattr(self,'_file'):
             self._file=None
         return self._file
-
     @file.setter
     def file(self,value):
             self._file=value
 
-    @property
-    def dut_instance(self):
-        if not hasattr(self,'_dut_instance'):
-            self._dut_instance=spice_module(**{'file':self._dutfile})
-        return self._dut_instance
-
-    @dut_instance.setter
-    def dut_instance(self,value):
-        self._dut_instance=value
-
     # Generating spice options string
     @property
     def options(self):
+        """String
+        
+        Spice options string parsed from self.spiceoptions -dictionary in the
+        parent entity.
+        """
         if not hasattr(self,'_options'):
             self._options = "%s Options\n" % self.parent.syntaxdict["commentchar"]
             i=0
@@ -112,6 +107,11 @@ class testbench(spice_module):
     # Generating eldo/spectre parameters string
     @property
     def parameters(self):
+        """String
+        
+        Spice parameters string parsed from self.spiceparameters -dictionary in
+        the parent entity.
+        """
         if not hasattr(self,'_parameters'):
             self._parameters = "%s Parameters\n" % self.parent.syntaxdict["commentchar"]
             for parname,parval in self.parent.spiceparameters.items():
@@ -127,6 +127,12 @@ class testbench(spice_module):
     # Generating eldo/spectre library inclusion string
     @property
     def libcmd(self):
+        """String
+        
+        Library inclusion string. Parsed from self.spicecorner -dictionary in
+        the parent entity, as well as 'ELDOLIBFILE' or 'SPECTRELIBFILE' global
+        variables in TheSDK.config.
+        """
         if not hasattr(self,'_libcmd'):
             libfile = ""
             corner = "top_tt"
@@ -170,27 +176,13 @@ class testbench(spice_module):
     def libcmd(self,value):
         self._libcmd=None
 
-    # Generating eldo/spectre device model string
-    @property
-    def corner(self):
-        if not hasattr(self,'_corner'):
-            self._corner = "*** Device models\n"
-            for optname,optval in self.parent.eldocorner.items():
-                if optname == "temp":
-                    self._corner += "." + optname + " " + optval + "\n"
-                if optname == "process":
-                    self._process = optval
-        return self._corner
-    @corner.setter
-    def corner(self,value):
-        self._corner=value
-    @corner.deleter
-    def corner(self,value):
-        self._corner=None
-
     # Generating netlist inclusion string
     @property
     def includecmd(self):
+        """String
+        
+        Subcircuit inclusion string pointing to generated subckt_* -file.
+        """
         if not hasattr(self,'_includecmd'):
             self._includecmd = "%s Subcircuit file\n"  % self.parent.syntaxdict["commentchar"]
             self._includecmd += "%s \"%s\"\n" % (self.parent.syntaxdict["include"],self._subcktfile)
@@ -205,6 +197,11 @@ class testbench(spice_module):
     # DSPF include commands
     @property
     def dspfincludecmd(self):
+        """String
+        
+        DSPF-file inclusion string pointing to files corresponding to self.dspf
+        in the parent entity.
+        """
         if not hasattr(self,'_dspfincludecmd'):
             if len(self.parent.dspf) > 0:
                 self.print_log(type='I',msg='Including exctracted parasitics from DSPF.')
@@ -249,6 +246,11 @@ class testbench(spice_module):
 
     @property
     def misccmd(self):
+        """String
+        
+        Miscellaneous command string corresponding to self.spicemisc -list in
+        the parent entity.
+        """
         if not hasattr(self,'_misccmd'):
             self._misccmd="%s Manual commands\n" % (self.parent.syntaxdict["commentchar"])
             mcmd = self.parent.spicemisc
@@ -264,6 +266,12 @@ class testbench(spice_module):
 
     @property
     def ahdlincludecmd(self):
+        """String
+        
+        Verilog-A inclusion string pointing to file-IO utility blocks, as well
+        as manually added Verilog-A files defined in self.ahdlpath in the
+        parent entity.
+        """
         if not hasattr(self,'_ahdlincludecmd'):
             if self.parent.model == 'spectre':
                 self._ahdlincludecmd="%s VerilogA block includes\n" % (self.parent.syntaxdict["commentchar"])
@@ -283,9 +291,14 @@ class testbench(spice_module):
     def ahdlincludecmd(self,value):
         self._ahdlincludecmd=None
 
-    # Generating eldo dcsources string
+    # Generating spice dcsources string
     @property
     def dcsourcestr(self):
+        """String
+        
+        DC source definitions parsed from spice_dcsource objects instantiated
+        in the parent entity.
+        """
         if not hasattr(self,'_dcsourcestr'):
             self._dcsourcestr = "%s DC sources\n" % self.parent.syntaxdict["commentchar"]
             for name, val in self.dcsources.Members.items():
@@ -340,6 +353,11 @@ class testbench(spice_module):
     # Generating inputsignals string
     @property
     def inputsignals(self):
+        """String
+        
+        Input signal definitions parsed from spice_iofile objects instantiated
+        in the parent entity.
+        """
         if not hasattr(self,'_inputsignals'):
             self._inputsignals = "%s Input signals\n" % self.parent.syntaxdict["commentchar"]
             for name, val in self.iofiles.Members.items():
@@ -398,6 +416,11 @@ class testbench(spice_module):
     # Generating simcmds string
     @property
     def simcmdstr(self):
+        """String
+        
+        Simulation command definition parsed from spice_simcmd object
+        instantiated in the parent entity.
+        """
         if not hasattr(self,'_simcmdstr'):
             self._simcmdstr = "%s Simulation commands\n" % self.parent.syntaxdict["commentchar"]
             for sim, val in self.simcmds.Members.items():
@@ -435,8 +458,11 @@ class testbench(spice_module):
     def simcmdstr(self,value):
         self._simcmdstr=None
     
-    # Helper function to escape bus characters for spectre bus<3:0> --> bus\<3:0\>
     def esc_bus(self,name):
+        """
+        Helper function to escape bus characters for Spectre simulations
+        bus<3:0> --> bus\<3:0\>.
+        """
         if self.parent.model == 'spectre':
             return name.replace('<','\\<').replace('>','\\>').replace('[','\\[').replace(']','\\]').replace(':','\\:')
         else:
@@ -445,6 +471,11 @@ class testbench(spice_module):
     # Generating plot and print commands
     @property
     def plotcmd(self):
+        """String
+        
+        Manual plot commands corresponding to self.plotlist defined in the
+        parent entity.
+        """
         if not hasattr(self,'_plotcmd'):
             self._plotcmd = "" 
             if len(self.parent.plotlist) > 0:
@@ -570,6 +601,9 @@ class testbench(spice_module):
 
 
     def export(self,**kwargs):
+        """
+        Internally called function to write the testbench to a file.
+        """
         if not os.path.isfile(self.file):
             self.print_log(type='I',msg='Exporting spice testbench to %s.' %(self.file))
             with open(self.file, "w") as module_file:
@@ -584,6 +618,10 @@ class testbench(spice_module):
                 module_file.write(self.contents)
 
     def export_subckt(self,**kwargs):
+        """
+        Internally called function to write the parsed subcircuit definitions
+        to a file.
+        """
         if len(self.parent.dspf) == 0 and self.postlayout:
             return
         if not os.path.isfile(self.parent.spicesubcktsrc):
@@ -600,6 +638,9 @@ class testbench(spice_module):
                 module_file.write(self.subckt)
 
     def generate_contents(self):
+        """
+        Internally called function to generate testbench contents.
+        """
         date_object = datetime.now()
         headertxt = self.parent.syntaxdict["commentline"] +\
                     "%s Testbench for %s\n" % (self.parent.syntaxdict["commentchar"],self.parent.name) +\

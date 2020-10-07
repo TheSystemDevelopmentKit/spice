@@ -5,9 +5,9 @@ Spice Simulation Command
 
 Class for spice simulation commands.
 
-Initially written for eldo-module by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
+Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Kalle Spoof, kalle.spoof@aalto.fi, 30.09.2020 17:36
+Last modification by Okko Järvinen, 07.10.2020 13:56
 
 """
 
@@ -22,46 +22,48 @@ import pdb
 
 class spice_simcmd(thesdk):
     """
-    Class to provide DC source definitions to ELDO testbench.
+    Class to provide simulation command parameters to spice testbench.
     When instantiated in the parent class, this class automatically
-    attaches eldo_simcmd objects to simcmd_bundle -bundle in testbench.
+    attaches spice_simcmd objects to simcmd_bundle -bundle in testbench.
 
-    Example
-    -------
-    Initiated in parent as: 
-        _=eldo_simcmd(self,type='tran',tprint=1e-12,tstop='10n',uic=True,noise=True,fmin=1,fmax=5e9,seed=0)
+    Examples
+    --------
+    Initiated in parent as:: 
 
-    For a simple transient:
-        _=eldo_simcmd(self,type='tran')
+        _=spice_simcmd(self,sim='tran',tprint=1e-12,tstop='10n',uic=True,noise=True,fmin=1,fmax=5e9)
+
+    For a simple transient with inferred simulation duration::
+
+        _=spice_simcmd(self,sim='tran')
     
     Parameters
     -----------
     parent : object 
         The parent object initializing the 
-        eldo_simcmd instance. Default None
+        spice_simcmd instance. Default None
     
     **kwargs :  
-            sim : str  
+            sim (str)
                 Simulation type. Currently only 'tran' supported.
-            tprint : float/str  
+            tprint (float/str)
                 Print interval. Default '1p' or 1e-12.
-            tstop : float/str  
+            tstop (float/str)
                 Transient simulation duration. When not defined, the simulation time
                 is the duration of the longest input signal.
-            uic : bool
+            uic (bool)
                 Use initial conditions flag. Default False.
-            noise : bool
+            noise (bool)
                 Noise transient flag. Default False.
-            fmin : float/str
+            fmin (float/str)
                 Minimum noise frequency. Default 1 (Hz).
-            fmax : float/str
+            fmax (float/str)
                 Maximum noise frequency. Default 5e9.
-            seed : int
+            seed (int)
                 Random generator seed for noise transient. Default None (random).
-            method : str
-                Transient integration method. Default None (spectre takes method from errpreset)
-            cmin : float
-                Spectre cmin parameter: this much cap from each node to ground. Might speed up simulation. Default None (not used)
+            method (str)
+                Transient integration method. Default None (spectre takes method from errpreset).
+            cmin (float)
+                Spectre cmin parameter: this much cap from each node to ground. Might speed up simulation. Default None (not used).
     """
 
     @property
@@ -91,6 +93,7 @@ class spice_simcmd(thesdk):
 
     @property
     def sim(self):
+        """Set by argument 'sim'."""
         if hasattr(self,'_sim'):
             return self._sim
         else:
@@ -102,6 +105,7 @@ class spice_simcmd(thesdk):
 
     @property
     def tprint(self):
+        """Set by argument 'tprint'."""
         if hasattr(self,'_tprint'):
             return self._tprint
         else:
@@ -113,6 +117,7 @@ class spice_simcmd(thesdk):
 
     @property
     def tstop(self):
+        """Set by argument 'tstop'."""
         if hasattr(self,'_tstop'):
             return self._tstop
         else:
@@ -124,6 +129,7 @@ class spice_simcmd(thesdk):
 
     @property
     def uic(self):
+        """Set by argument 'uic'."""
         if hasattr(self,'_uic'):
             return self._uic
         else:
@@ -135,6 +141,7 @@ class spice_simcmd(thesdk):
 
     @property
     def noise(self):
+        """Set by argument 'noise'."""
         if hasattr(self,'_noise'):
             return self._noise
         else:
@@ -146,6 +153,7 @@ class spice_simcmd(thesdk):
 
     @property
     def fmin(self):
+        """Set by argument 'fmin'."""
         if hasattr(self,'_fmin'):
             return self._fmin
         else:
@@ -157,6 +165,7 @@ class spice_simcmd(thesdk):
 
     @property
     def fmax(self):
+        """Set by argument 'fmax'."""
         if hasattr(self,'_fmax'):
             return self._fmax
         else:
@@ -168,6 +177,7 @@ class spice_simcmd(thesdk):
 
     @property
     def seed(self):
+        """Set by argument 'seed'."""
         if hasattr(self,'_seed'):
             return self._seed
         else:
@@ -179,6 +189,7 @@ class spice_simcmd(thesdk):
 
     @property
     def method(self):
+        """Set by argument 'method'."""
         if hasattr(self,'_method'):
             return self._method
         else:
@@ -190,6 +201,7 @@ class spice_simcmd(thesdk):
 
     @property
     def cmin(self):
+        """Set by argument 'cmin'."""
         if hasattr(self,'_cmin'):
             return self._cmin
         else:

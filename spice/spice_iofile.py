@@ -1,14 +1,14 @@
 """
-======================
-spice_iofile package 
-======================
+=============
+Spice IO-file
+=============
 
-Provides spice- file-io related attributes and methods 
-for TheSDK spice
+Provides spice file IO related attributes and methods 
+for TheSDK spice.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 06.10.2020 17:27
+Last modification by Okko Järvinen, 07.10.2020 13:48
 
 """
 import os
@@ -29,11 +29,36 @@ class spice_iofile(iofile):
     adds a spice_iofile object to the parents iofile_bundle attribute.
     Accessible as iofile_bundle.Members['name'].
 
-    Example
-    -------
-    Initiated in parent as: 
+    Examples
+    --------
+    Initiated in parent as::
+
         _=spice_iofile(self,name='foobar')
-    
+
+    Defining analog input voltage signals from python to spice::
+
+        _=spice_iofile(self,name='inp',dir='in',iotype='event',sourcetype='V',ionames='INP')
+        _=spice_iofile(self,name='inn',dir='in',iotype='event',sourcetype='V',ionames='INN')
+
+    Defining time-domain output signal containing rising edge threshold
+    crossing timestamps of an analog clock signal::
+
+        _=spice_iofile(self,name='clk_rise',dir='out',iotype='time',sourcetype='V',
+                       ionames='CLK',edgetype='rising',vth=self.vdd/2)
+
+    Defining digital output signal triggered with a falling edge of the analog clock::
+
+        _=spice_iofile(self,name='dout',dir='out',iotype='sample',sourcetype='V',
+                       ionames='DOUT<7:0>',edgetype='falling',vth=self.vdd/2,trigger='CLK')
+
+    Defining digital input signal with decimal format. The input vector is a
+    list of integers, which get converted to binary bus of 4-bits (inferred
+    from 'CTRL<3:0>'). The values are changed at 1 MHz interval in this
+    example.::
+
+        _=spice_iofile(self,name='ctrl',dir='in',iotype='sample',ionames='CTRL<3:0>',rs=1e6,
+                       vhi=self.vdd,trise=5e-12,tfall=5e-12,ioformat='dec')
+        
     Parameters
     -----------
     parent : object 
@@ -41,56 +66,56 @@ class spice_iofile(iofile):
         spice_iofile instance. Default None
     
     **kwargs :  
-            name : str  
+            name (str)
                 Name of the IO.
-            ioformat : str
-                Formatting of the IO signal.
-                Not yet implemented.
-            dir : str
+            ioformat (str)
+                Formatting of the IO signal: 'dec'/'bin'.
+                Default 'dec'.
+            dir (str)
                 Direction of the IO: 'in'/'out'.
-            iotype : str
+            iotype (str)
                 Type of the IO signal: 'event'/'sample'/'time'.
                 Event type signals are time-value pairs (analog signal),
                 while sample type signals are sampled by a clock signal (digital bus).
                 Time type signals return a vector of timestamps corresponding
                 to threshold crossings.
-            datatype : str
+            datatype (str)
                 Datatype, not yet implemented.
-            trigger : str or list<str>
+            trigger (str or list<str>)
                 Name of the clock signal node in the Spice netlist.
                 If a single string is given, the same clock signal is used for all bits/buses.
                 If a list is given, and the length matches ionames list length, each ioname will
                 be assigned its own clock.
                 Applies only to sample type outputs.
-            vth : float
+            vth (float)
                 Threshold voltage of the trigger signal and the bit rounding.
                 Applies only to sample type outputs.
-            edgetype : str
+            edgetype (str)
                 Type of triggering edge: 'rising'/'falling'/'both'.
                 When time type signal is used, the edgetype values can define the
                 extraction type as: 'rising'/'falling'/'both'/'risetime'/'falltime'.
                 Default 'rising'.
-            after : float
+            after (float)
                 Time to wait before starting the extraction (useful for ignoring inital settling).
                 Applies only to sample type outputs.
                 Default 0.
-            big_endian : bool
+            big_endian (bool)
                 Flag to read the extracted bus as big-endian.
                 Applies only to sample type outputs.
                 Default False.
-            rs : float
+            rs (float)
                 Sample rate of the sample type input.
                 Default None.
-            vhi : float
+            vhi (float)
                 High bit value of sample type input.
                 Default 1.0.
-            vlo : float
+            vlo (float)
                 Low bit value of sample type input.
                 Default 0.
-            tfall : float
+            tfall (float)
                 Falltime of sample type input.
                 Default 5e-12.
-            trise : float
+            trise (float)
                 Risetime of sample type input.
                 Default 5e-12.
     """
@@ -100,9 +125,7 @@ class spice_iofile(iofile):
         try:  
             super(spice_iofile,self).__init__(parent=parent,**kwargs)
             self.paramname=kwargs.get('param','-g g_file_')
-
-            self._ioformat=kwargs.get('ioformat','%d') #by default, the io values are decimal integer numbers
-
+            self._ioformat=kwargs.get('ioformat','dec') #by default, the io values are decimal integer numbers
             self._trigger=kwargs.get('trigger','')
             self._vth=kwargs.get('vth',0.5)
             self._edgetype=kwargs.get('edgetype','rising')
@@ -113,16 +136,16 @@ class spice_iofile(iofile):
             self._vlo=kwargs.get('vlo',0)
             self._tfall=kwargs.get('tfall',5e-12)
             self._trise=kwargs.get('trise',5e-12)
-
         except:
             self.print_log(type='F', msg="spice IO file definition failed.")
 
     @property
     def ioformat(self):
+        """Set by argument 'ioformat'."""
         if hasattr(self,'_ioformat'):
             return self._ioformat
         else:
-            self._ioformat='%d'
+            self._ioformat='dec'
         return self._ioformat
     @ioformat.setter
     def ioformat(self,value):
@@ -130,6 +153,7 @@ class spice_iofile(iofile):
 
     @property
     def trigger(self):
+        """Set by argument 'trigger'."""
         if hasattr(self,'_trigger'):
             return self._trigger
         else:
@@ -142,6 +166,7 @@ class spice_iofile(iofile):
 
     @property
     def vth(self):
+        """Set by argument 'vth'."""
         if hasattr(self,'_vth'):
             return self._vth
         else:
@@ -153,6 +178,7 @@ class spice_iofile(iofile):
 
     @property
     def edgetype(self):
+        """Set by argument 'edgetype'."""
         if hasattr(self,'_edgetype'):
             return self._edgetype
         else:
@@ -164,6 +190,7 @@ class spice_iofile(iofile):
 
     @property
     def after(self):
+        """Set by argument 'after'."""
         if hasattr(self,'_after'):
             return self._after
         else:
@@ -175,6 +202,7 @@ class spice_iofile(iofile):
 
     @property
     def big_endian(self):
+        """Set by argument 'big_endian'."""
         if hasattr(self,'_big_endian'):
             return self._big_endian
         else:
@@ -186,6 +214,7 @@ class spice_iofile(iofile):
 
     @property
     def rs(self):
+        """Set by argument 'rs'."""
         if hasattr(self,'_rs'):
             return self._rs
         else:
@@ -197,6 +226,7 @@ class spice_iofile(iofile):
 
     @property
     def vhi(self):
+        """Set by argument 'vhi'."""
         if hasattr(self,'_vhi'):
             return self._vhi
         else:
@@ -208,6 +238,7 @@ class spice_iofile(iofile):
 
     @property
     def vlo(self):
+        """Set by argument 'vlo'."""
         if hasattr(self,'_vlo'):
             return self._vlo
         else:
@@ -219,6 +250,7 @@ class spice_iofile(iofile):
 
     @property
     def tfall(self):
+        """Set by argument 'tfall'."""
         if hasattr(self,'_tfall'):
             return self._tfall
         else:
@@ -230,6 +262,7 @@ class spice_iofile(iofile):
 
     @property
     def trise(self):
+        """Set by argument 'trise'."""
         if hasattr(self,'_trise'):
             return self._trise
         else:
@@ -240,7 +273,8 @@ class spice_iofile(iofile):
         self._trise=value
 
     @property
-    def sourcetype(self): # Type of source for inputs (V or I)
+    def sourcetype(self):
+        """Set by argument 'sourcetype'."""
         if hasattr(self,'_sourcetype'):
             return self._sourcetype
         else:
@@ -253,6 +287,13 @@ class spice_iofile(iofile):
     # Overloading file property to contain a list
     @property
     def file(self):
+        """List<str>
+
+        List containing filepaths to files associated with this spice_iofile.
+        For digital buses or arrays of signals, the list contains multiple
+        files which are automatically handled together. These filepaths are set
+        automatically.
+        """
         self._file = []
         for ioname in self.ionames:
             filename = '%s/%s_%s_%s%s.txt' % (self.parent.spicesimpath,self.parent.runname,ioname.replace('<','').replace('>','').replace('.','_'),self.iotype,('_%s' % self.edgetype if self.iotype is not 'event' else ''))
@@ -266,6 +307,11 @@ class spice_iofile(iofile):
     # Overloading ionames property to contain a list
     @property
     def ionames(self):
+        """List<str>
+
+        Set by argument 'ionames'. This property casts the given argument to a
+        list if needed.
+        """
         if isinstance(self._ionames,str):
             self._ionames = [self._ionames]
         return self._ionames
@@ -276,6 +322,9 @@ class spice_iofile(iofile):
 
     # Overloading the remove functionality to remove tmp files
     def remove(self):
+        """
+        Function to remove files associated with this spice_iofile.
+        """
         if self.preserve:
             self.print_log(type='I', msg='Preserving files for %s.' % self.name)
         else:
@@ -290,6 +339,9 @@ class spice_iofile(iofile):
 
     # Overloaded write from thesdk.iofile
     def write(self,**kwargs):
+        """
+        Function to write files associated with this spice_iofile.
+        """
         if self.iotype == 'event':
             try:
                 data = self.Data
@@ -351,6 +403,9 @@ class spice_iofile(iofile):
 
     # Overloaded read from thesdk.iofile
     def read(self,**kwargs):
+        """
+        Function to read files associated with this spice_iofile.
+        """
         for i in range(len(self.file)):
             try:
                 if self.iotype=='event' or self.iotype=='vsample':
@@ -535,10 +590,11 @@ class spice_iofile(iofile):
                 self.print_log(type='F',msg='Failed while reading files for %s.' % self.name)
 
     def interp_crossings(self,data,vth,nint,edgetype):
-        """ Helper function that is called for 'time' type outputs.
-            Interpolates the requested threshold crossings (rising or falling)
-            from the 'event' type input signal.
-            Returns the time-stamps of the crossing instants in a 1-d vector.
+        """ 
+        Helper function that is called for 'time' type outputs.
+        Interpolates the requested threshold crossings (rising or falling)
+        from the 'event' type input signal.
+        Returns the time-stamps of the crossing instants in a 1-d vector.
         """
         if edgetype.lower() == 'rising':
             edges = np.flatnonzero((data[:-1,1]<vth) & (data[1:,1]>=vth))+1

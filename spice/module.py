@@ -1,5 +1,13 @@
-# Written by Marko Kosunen 20190109
-# marko.kosunen@aalto.fi
+"""
+============
+Spice Module
+============
+
+Class for Spice netlist parsing.
+
+Last modification by Okko Järvinen, 07.10.2020 13:10
+
+"""
 import os
 import pdb
 import shutil
@@ -11,6 +19,12 @@ from copy import deepcopy
 import traceback
 
 class spice_module(thesdk):
+    """
+    This class parses source netlist for subcircuits and handles the generation
+    of a separate pruned subckt_* -file. This class is internally utilized by
+    the spice_testbench module.
+
+    """
     @property
     def _classfile(self):
         return os.path.dirname(os.path.realpath(__file__)) + "/"+__name__
@@ -19,28 +33,27 @@ class spice_module(thesdk):
         # No need to propertize these yet
         self.file=kwargs.get('file','')
         self._name=kwargs.get('name','')
-        self._instname=kwargs.get('instname',self.name)
         if not self.file and not self._name:
             self.print_log(type='F', msg='Either name or file must be defined')
     
-    
     @property
     def name(self):
+        """String
+        
+        Entity name."""
         if not self._name:
             self._name=os.path.splitext(os.path.basename(self.file))[0]
         return self._name
 
     @property
-    def instname(self):
-        if not hasattr(self,'_instname'):
-            self._instname=self.name+'_DUT'
-        return self._instname
-    @instname.setter
-    def instname(self,value):
-            self._instname=value
-
-    @property
     def postlayout(self):
+        """Boolean
+        
+        Flag for detected post-layout netlists. This will enable post-layout
+        optimizations in the simulator command options. Automatically detected
+        from given netlist for Calibre extracted netlists, or when 'dspf'
+        attribute is defined.
+        """
         if not hasattr(self,'_postlayout'):
             self._postlayout=False
         return self._postlayout
@@ -51,9 +64,14 @@ class spice_module(thesdk):
     def postlayout(self,value):
         self._postlayout=None
 
-    # Parsing the subcircuit definition from input netlist
     @property
     def subckt(self):
+        """String
+        
+        String containing the contents of the subckt_* -file. This attribute
+        parses the source netlist when called, and generates the contents to be
+        written to the subckt-file.
+        """
         if not hasattr(self,'_subckt'):
             if self.parent.model=='eldo':
                 cellnamematch=re.compile(r"\*\*\* Design cell name:",re.IGNORECASE)
@@ -166,9 +184,14 @@ class spice_module(thesdk):
     def subckt(self,value):
         self._subckt=None
 
-    # Generating subcircuit instance from the definition
     @property
     def subinst(self):
+        """String
+        
+        String containing the subcircuit instance to be placed in the
+        testbench. The instance is parsed from the previously generated
+        subckt_* -file.
+        """
         try:
             if not hasattr(self,'_subinst'):
                 if self.parent.model=='eldo':

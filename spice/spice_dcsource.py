@@ -1,13 +1,15 @@
 """
-======================
-Eldo DC Source
-======================
+===============
+Spice DC Source
+===============
 
-Class for ELDO DC sources.
+Class for generating DC voltage/current sources in the Spectre or Eldo
+testbench.
 
-Initially written for eldo-module by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
+Initially written for eldo-module by Okko Järvinen, okko.jarvinen@aalto.fi,
+9.1.2020
 
-Last modification by Okko Järvinen, 28.09.2020 09:31
+Last modification by Okko Järvinen, 07.10.2020 14:00
 
 """
 
@@ -21,14 +23,58 @@ import pandas as pd
 
 class spice_dcsource(thesdk):
     """
-    Class to provide DC source definitions to ELDO testbench.
-    When instantiated in the parent class, this class automatically
-    attaches eldo_dcsource objects to dcsource_bundle -bundle in testbench.
+    Class to provide DC source definitions to spice testbench.  When
+    instantiated in the parent class, this class automatically attaches
+    spice_dcsource objects to dcsource_bundle -bundle in testbench.
 
-    Example
-    -------
-    Initiated in parent as: 
-        `_=eldo_dcsource(self,name='dd',value=1.0,supply=True,pos='VDD',neg='VSS')`
+    Examples
+    --------
+    A voltage source connected between circuit nodes 'VDD' and 'VSS', for which
+    power and current consumptions are extracted in transient simulation.
+    Initiated in parent as::
+
+        _=spice_dcsource(self,name='dd',value=1.0,extract=True,pos='VDD',neg='VSS')
+
+    A bias current flowing from 'VDD' to node 'IBIAS'::
+
+        _=spice_dcsource(self,name='bias',sourcetype='I',value=25e-6,pos='VDD',neg='IBIAS')
+
+    Parameters
+    ----------
+    parent : object 
+        The parent object initializing the 
+        `spice_dcsource` instance. Default None
+    
+    **kwargs :  
+            name (str)
+                Name of the source.
+            value (float)
+                Value of the source.
+            sourcetype (str)
+                Type of the DC source. Either 'V' for voltage
+                or 'I' for current.
+            extract (bool)
+                Flag the source for transient current and power consumption extraction.
+                Extracted currents and powers are accessible through dictionaries 
+                self.currents and self.powers in the parent object.
+                Default False.
+            ext_start (float)
+                Time to start extracting average transient power consumption.
+                Default is 0.
+            ext_stop (float)
+                Time to stop extracting average transient power consumption.
+                Default is simulation end time.
+            pos (str)
+                Name of the positive node in the ELDO netlist.
+            neg (str)
+                Name of the negative node in the ELDO netlist.
+            noise (bool)
+                Enable the noise contribution of this source (only when transient
+                noise is enabled).
+                Default is True.
+            ramp (float)
+                Ramp up the source from 0 to value in ramp seconds.
+                Default is 0 (no ramping).
     
     """
 
@@ -37,44 +83,6 @@ class spice_dcsource(thesdk):
         return os.path.dirname(os.path.realpath(__file__)) + "/"+__name__
 
     def __init__(self,parent,**kwargs):
-        '''
-            Parameters
-            ----------
-            parent : object 
-                The parent object initializing the 
-                `eldo_dcsource` instance. Default None
-            
-            **kwargs :  
-                    name : str  
-                        Name of the source.
-                    value : float  
-                        Value of the source.
-                    sourcetype : str  
-                        Type of the DC source. Either 'V' for voltage
-                        or 'I' for current.
-                    extract : bool
-                        Flag the source for current and power consumption extraction.
-                        Default False.
-                    ext_start : float
-                        Time to start extracting average transient power consumption.
-                        Default is 0.
-                    ext_stop : float
-                        Time to stop extracting average transient power consumption.
-                        Default is simulation end time.
-                    pos : str
-                        Name of the positive node in the ELDO netlist.
-                    neg : str
-                        Name of the negative node in the ELDO netlist.
-                    noise : bool
-                        Enable the noise contribution of this source (only when transient
-                        noise is enabled).
-                        Default is True.
-                    ramp : float
-                        Ramp up the source from 0 to value in ramp seconds.
-                        Default is 0 (no ramping).
-
-        '''
-
         try:  
             self.parent = parent
             self._sourcetype=kwargs.get('sourcetype','V')
@@ -87,7 +95,6 @@ class spice_dcsource(thesdk):
             self._ext_stop=kwargs.get('ext_stop',None)
             self._noise=kwargs.get('noise',True)
             self._ramp=kwargs.get('ramp',0)
-
             self._extfile = ''
 
         except:
@@ -98,6 +105,7 @@ class spice_dcsource(thesdk):
 
     @property
     def sourcetype(self):
+        """Set by argument 'sourcetype'."""
         if hasattr(self,'_sourcetype'):
             return self._sourcetype
         else:
@@ -109,6 +117,7 @@ class spice_dcsource(thesdk):
 
     @property
     def name(self):
+        """Set by argument 'name'."""
         if hasattr(self,'_name'):
             return self._name
         else:
@@ -120,6 +129,7 @@ class spice_dcsource(thesdk):
 
     @property
     def neg(self):
+        """Set by argument 'neg'."""
         if hasattr(self,'_neg'):
             return self._neg
         else:
@@ -131,6 +141,7 @@ class spice_dcsource(thesdk):
 
     @property
     def pos(self):
+        """Set by argument 'pos'."""
         if hasattr(self,'_pos'):
             return self._pos
         else:
@@ -142,6 +153,7 @@ class spice_dcsource(thesdk):
 
     @property
     def value(self):
+        """Set by argument 'value'."""
         if hasattr(self,'_value'):
             return self._value
         else:
@@ -153,6 +165,7 @@ class spice_dcsource(thesdk):
 
     @property
     def extract(self):
+        """Set by argument 'extract'."""
         if hasattr(self,'_extract'):
             # Power transient will be extracted to this file for spectre
             self._extfile = '%s/%s_%s%s_curr.txt' % (self.parent.spicesimpath,self.parent.runname,self.sourcetype.lower(),self.name.lower())
@@ -166,6 +179,7 @@ class spice_dcsource(thesdk):
 
     @property
     def ext_start(self):
+        """Set by argument 'ext_start'."""
         if hasattr(self,'_ext_start'):
             return self._ext_start
         else:
@@ -177,6 +191,7 @@ class spice_dcsource(thesdk):
 
     @property
     def ext_stop(self):
+        """Set by argument 'ext_stop'."""
         if hasattr(self,'_ext_stop'):
             return self._ext_stop
         else:
@@ -188,6 +203,7 @@ class spice_dcsource(thesdk):
 
     @property
     def noise(self):
+        """Set by argument 'noise'."""
         if hasattr(self,'_noise'):
             return self._noise
         else:
@@ -199,6 +215,7 @@ class spice_dcsource(thesdk):
 
     @property
     def ramp(self):
+        """Set by argument 'ramp'."""
         if hasattr(self,'_ramp'):
             return self._ramp
         else:
@@ -210,6 +227,11 @@ class spice_dcsource(thesdk):
 
     @property
     def extfile(self):
+        """String
+        
+        Contains filepath for transient current waveform for current/power
+        extraction.  Only applies to Spectre simulations.
+        """
         if hasattr(self,'_extfile'):
             return self._extfile
         else:
@@ -221,9 +243,7 @@ class spice_dcsource(thesdk):
 
     # Remove the file when no longer needed
     def remove(self):
-        '''Remove the file
-
-        '''
+        """Removes the transient current file."""
         try:
             os.remove(self.extfile)
         except:

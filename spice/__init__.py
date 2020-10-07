@@ -1,13 +1,16 @@
 """
-=======
+=====
 Spice
-=======
+=====
+
 Analog simulation interface package for The System Development Kit 
 
 Provides utilities to import spice-like modules to python environment and
 automatically generate testbenches for the most common simulation cases.
 
 Initially written by Okko Järvinen, 2019
+
+Last modification by Okko Järvinen, 07.10.2020 12:58
 
 Release 1.4 , Jun 2020 supports Eldo and Spectre
 """
@@ -34,7 +37,7 @@ from spice.module import spice_module
 
 class spice(thesdk,metaclass=abc.ABCMeta):
     """Adding this class as a superclass enforces the definitions 
-    for vhdl simulations in the subclasses.
+    for Spice simulations in the subclasses.
     
     """
 
@@ -43,7 +46,14 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         pass
 
     @property
+    @abstractmethod
+    def _classfile(self):
+        return os.path.dirname(os.path.realpath(__file__)) + "/"+__name__
+
+    @property
     def syntaxdict(self):
+        """Internally used dictionary for common syntax conversions between
+        Spectre and Eldo."""
         if self.model=='eldo':
             self._syntaxdict = {
                     "cmdfile_ext" : '.cir',
@@ -87,17 +97,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     #Name derived from the file
 
     @property
-    @abstractmethod
-    def _classfile(self):
-        return os.path.dirname(os.path.realpath(__file__)) + "/"+__name__
-
-    @property
     def preserve_iofiles(self):  
         """True | False (default)
 
-        If True, do not delete file IO files after 
-        simulations. Useful for debugging the file IO"""
-
+        If True, do not delete file IO files after simulations. Useful for
+        debugging the file IO"""
         if hasattr(self,'_preserve_iofiles'):
             return self._preserve_iofiles
         else:
@@ -111,9 +115,8 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def preserve_spicefiles(self):  
         """True | False (default)
 
-        If True, do not delete generated Eldo files (testbench, subcircuit, etc.)
-        after simulations. Useful for debugging."""
-
+        If True, do not delete generated Spice files (testbench, subcircuit,
+        etc.) after simulations.  Useful for debugging."""
         if hasattr(self,'_preserve_spicefiles'):
             return self._preserve_spicefiles
         else:
@@ -125,6 +128,19 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def load_state(self):  
+        """String (Default '')
+
+        Feature for loading results of previous simulation.  The Spice
+        simulation is not re-executed, but the outputs will be read from
+        existing files.
+        
+        Example inputs::
+
+            self.load_state = 'last' # load latest
+            self.load_state = 'latest' # load latest
+            self.load_state = '20201002103638_tmpdbw11nr4' # load results matching this name
+            self.load_state = 'zzzz' (non-existent directory) # list available directories to load
+        """
         if hasattr(self,'_load_state'):
             return self._load_state
         else:
@@ -136,6 +152,20 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def spicecorner(self):  
+        """Dictionary
+
+        Feature for specifying the 'section' of the model library file and
+        simulation temperature. The path to model libraries should be set in
+        TheSDK.config as either ELDOLIBFILE or SPECTRELIBFILE variables.
+
+        Example::
+
+            self.spicecorner = {
+                    'temp': 27,
+                    'corner': 'top_tt'
+                    }
+
+        """
         if hasattr(self,'_spicecorner'):
             return self._spicecorner
         else:
@@ -150,6 +180,23 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def spiceoptions(self):  
+        """Dictionary
+
+        Feature for specifying options for spice simulation. The key is the
+        name of the option (as in simulator manual specifies), and the value is
+        the value given to said option. Valid key-value pairs can be found from
+        the manual of the simulator (Eldo or Spectre).
+
+        Example::
+
+            self.spiceoptions = {
+                       'save': 'lvlpub',
+                       'nestlvl': '1',
+                       'pwr': 'subckts',
+                       'digits': '12'
+                   }
+
+        """
         if hasattr(self,'_spiceoptions'):
             return self._spiceoptions
         else:
@@ -160,7 +207,40 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         self._spiceoptions=value
 
     @property
+    def spiceparameters(self): 
+        """Dictionary
+
+        Feature for specifying simulation parameters for spice simulation. The
+        key is the name of the parameter , and the value is the value given to
+        said parameter.
+
+        Example::
+
+            self.spiceparameters = {
+                       'nf_pmos': 8,
+                       'nf_nmos': 4,
+                       'ibias': 100e-6
+                   }
+
+        """
+        if not hasattr(self, '_spiceparameters'):
+            self._spiceparameters =dict([])
+        return self._spiceparameters
+    @spiceparameters.setter
+    def spiceparameters(self,value): 
+            self._spiceparameters = value
+    @spiceparameters.deleter
+    def spiceparameters(self): 
+            self._spiceparameters = None
+
+    @property
     def runname(self):
+        """String 
+        
+        Automatically generated name for the simulation. 
+        
+        Formatted as timestamp_randomtag, i.e. '20201002103638_tmpdbw11nr4'.
+        Can be overridden by assigning self.runname = 'myname'."""
         if hasattr(self,'_runname'):
             return self._runname
         else:
@@ -175,7 +255,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def interactive_spice(self):
         """ True | False (default)
         
-        Launch simulator in local machine with GUI."""
+        Launch simulator in interactive mode. For Eldo, opens also ezwave."""
 
         if hasattr(self,'_interactive_spice'):
             return self._interactive_spice
@@ -188,6 +268,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def nproc(self):
+        """Integer
+        
+        Requested maximum number of threads for multithreaded simulations. For
+        Eldo, maps to command line parameter '-nproc'. For Spectre, maps to
+        command line parameter '+mt'."""
         if hasattr(self,'_nproc'):
             return self._nproc
         else:
@@ -199,6 +284,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def errpreset(self):
+        """String
+        
+        Global accuracy parameter for Spectre simulations. Options include
+        'liberal', 'moderate' and 'conservative', in order of rising
+        accuracy."""
         if hasattr(self,'_errpreset'):
             return self._errpreset
         else:
@@ -211,6 +301,23 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     # DSPF filenames
     @property
     def dspf(self):
+        """List<String>
+        
+        List containing filenames for DSPF-files to be included for post-layout
+        simulations. The names given in this list are matched to dspf-files in
+        './spice/' -directory. A postfix '.pex.dspf' is automatically appended
+        to the given names (this will probably change later).
+        
+        Example::
+
+            self.dspf = ['inv_v2','switch_v3']
+
+        would include files './spice/inv_v2.pex.dspf' and
+        './spice/switch_v3.pex.dspf' as dspf-files in the testbench. If the
+        dspf-file contains definition matching the original design name of the
+        top-level netlist, it gets also renamed to match the module name
+        (dspf-file for top-level instance is possible).
+        """
         if not hasattr(self,'_dspf'):
             self._dspf = []
         return self._dspf
@@ -224,11 +331,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @property
     def iofile_bundle(self):
         """ 
-        Property of type thesdk.Bundle.
-        This property utilises eldo_iofile class to maintain list of IO-files
-        that  are automatically assigned as arguments to eldocmd.
-        when eldo.eldo_iofile.eldo_iofile(name='<filename>,...) is used to define an IO-file, created file object is automatically
-        appended to this Bundle property as a member. Accessible with self.iofile_bundle.Members['<filename>']
+        A thesdk.Bundle containing spice_iofile objects. The iofile objects
+        are automatically added to this Bundle, nothing should be manually
+        added.
         """
         if not hasattr(self,'_iofile_bundle'):
             self._iofile_bundle=Bundle()
@@ -257,6 +362,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def dcsource_bundle(self):
+        """ 
+        A thesdk.Bundle containing spice_dcsource objects. The dcsource objects
+        are automatically added to this Bundle, nothing should be manually
+        added.
+        """
         if not hasattr(self,'_dcsource_bundle'):
             self._dcsource_bundle=Bundle()
         return self._dcsource_bundle
@@ -274,6 +384,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def simcmd_bundle(self):
+        """ 
+        A thesdk.Bundle containing spice_simcmd objects. The simcmd objects
+        are automatically added to this Bundle, nothing should be manually
+        added.
+        """
         if not hasattr(self,'_simcmd_bundle'):
             self._simcmd_bundle=Bundle()
         return self._simcmd_bundle
@@ -288,9 +403,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @property 
     def spice_submission(self):
         """
-        Defines spice submioddion prefix from thesdk.GLOBALS['LSFSUBMISSION']
+        Defines spice submission prefix from thesdk.GLOBALS['LSFSUBMISSION']
+        and thesdk.GLOBALS['LSFINTERACTIVE'] for LSF submissions.
 
-        Usually something like 'bsub -K'
+        Usually something like 'bsub -K' and 'bsub -I'.
         """
         if not hasattr(self, '_spice_submission'):
             try:
@@ -312,55 +428,19 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             val.remove()
 
     @property
-    def spiceparameters(self): 
-        if not hasattr(self, '_spiceparameters'):
-            self._spiceparameters =dict([])
-        return self._spiceparameters
-    @spiceparameters.setter
-    def spiceparameters(self,value): 
-            self._spiceparameters = value
-    @spiceparameters.deleter
-    def spiceparameters(self): 
-            self._spiceparameters = None
-
-    @property
-    def eldocorner(self): 
-        if not hasattr(self, '_eldocorner'):
-            self._eldocorner =dict([])
-        return self._eldocorner
-    @eldocorner.setter
-    def eldocorner(self,value): 
-            self._eldocorner = value
-    @eldocorner.deleter
-    def eldocorner(self): 
-            self._eldocorner = None
-
-    @property
-    def eldooptions(self): 
-        if not hasattr(self, '_eldooptions'):
-            self._eldooptions =dict([])
-        return self._eldooptions
-    @eldooptions.setter
-    def eldooptions(self,value): 
-            self._eldooptions = value
-    @eldooptions.deleter
-    def eldooptions(self): 
-            self._eldooptions = None
-
-    @property
-    def eldoiofiles(self): 
-        if not hasattr(self, '_eldoiofiles'):
-            self._eldoiofiles =dict([])
-        return self._eldoiofiles
-    @eldoiofiles.setter
-    def eldoiofiles(self,value): 
-            self._eldoiofiles = value
-    @eldoiofiles.deleter
-    def eldoiofiles(self): 
-            self._eldoiofiles = None
-
-    @property
     def plotlist(self): 
+        """List<String>
+
+        List of node names to be plotted. Node names follow simulator syntax.
+
+        For Eldo, the voltage/current specifier is expected::
+
+            self.plotlist = ['v(OUT)','v(CLK)']
+
+        For Spectre, the node name is enough::
+
+            self.plotlist = ['OUT','CLK']
+        """
         if not hasattr(self, '_plotlist'):
             self._plotlist = []
         return self._plotlist
@@ -373,6 +453,18 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def spicemisc(self): 
+        """List<String>
+
+        List of manual commands to be pasted to the testbench. The strings are
+        pasted to their own lines (no linebreaks needed), and the syntax is
+        unchanged.
+
+        Example: setting initial voltages from testbench (Eldo)::
+
+            self.spicemisc = []
+            for i in range(nodes):
+                self.spicemisc.append('.ic NODE<%d> 0' % i)
+        """
         if not hasattr(self, '_spicemisc'):
             self._spicemisc = []
         return self._spicemisc
@@ -382,8 +474,14 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @spicemisc.deleter
     def spicemisc(self): 
             self._spicemisc = None
+
     @property
     def ahdlpath(self): 
+        """List<String>
+
+        List of strings containing file paths to Verilog-A files to be included
+        into a Spectre simulation.
+        """
         if not hasattr(self, '_ahdlpath'):
             self._ahdlpath = []
         return self._ahdlpath
@@ -396,20 +494,30 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def name(self):
+        """String
+
+        Name of the module.
+        """
         if not hasattr(self, '_name'):
             self._name=os.path.splitext(os.path.basename(self._classfile))[0]
         return self._name
-    #No setter, no deleter.
 
     @property
     def entitypath(self):
+        """String
+
+        Path to the entity root.
+        """
         if not hasattr(self, '_entitypath'):
             self._entitypath= os.path.dirname(os.path.dirname(self._classfile))
         return self._entitypath
-    #No setter, no deleter.
 
     @property
     def spicesrcpath(self):
+        """String
+
+        Path to the spice source of the entity ('./spice').
+        """
         self._spicesrcpath  =  self.entitypath + '/spice'
         try:
             if not (os.path.exists(self._spicesrcpath)):
@@ -422,6 +530,19 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def spicesrc(self):
+        """String
+
+        Path to the source netlist (i.e. 'spice/entityname.scs').
+        This shouldn't be set manually.
+
+        .. note::
+
+            Provided netlist name has to match entity name (entityname.scs or entityname.cir).
+
+        .. note::
+            
+            Netlist has to contain the top-level design as a subcircuit definition.
+        """
         if not hasattr(self, '_spicesrc'):
             self._spicesrc=self.spicesrcpath + '/' + self.name + self.syntaxdict["cmdfile_ext"]
 
@@ -431,6 +552,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def spicetbsrc(self):
+        """String
+
+        Path to the spice testbench ('./spice/tb_entityname.scs').
+        This shouldn't be set manually.
+        """
         if not hasattr(self, '_spicetbsrc'):
 
             if self.interactive_spice:
@@ -441,6 +567,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def eldowdbsrc(self):
+        """String
+
+        Path to the Eldo EZwave database ('./spice/tb_entityname.wdb').
+        Only applies to Eldo simulations.
+        This shouldn't be set manually.
+        """
         if not hasattr(self, '_eldowdbsrc'):
             if self.interactive_spice:
                 self._eldowdbsrc=self.spicesrcpath + '/tb_' + self.name + '.wdb'
@@ -450,6 +582,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def eldochisrc(self):
+        """String
+
+        Path to the Eldo chi-file. ('./spice/tb_entityname.chi').
+        Only applies to Eldo simulations.
+        This shouldn't be set manually.
+        """
         if not hasattr(self, '_eldochisrc'):
             if self.interactive_spice:
                 self._eldochisrc=self.spicesrcpath + '/tb_' + self.name + '.chi'
@@ -459,6 +597,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def spicesubcktsrc(self):
+        """String
+
+        Path to the parsed subcircuit file. ('./spice/subckt_entityname.scs').
+        This shouldn't be set manually.
+        """
         if not hasattr(self, '_spicesubcktsrc'):
             if self.interactive_spice:
                 self._spicesubcktsrc=self.spicesrcpath + '/subckt_' + self.name + self.syntaxdict["cmdfile_ext"]
@@ -468,7 +611,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def spicesimpath(self):
-        #self._eldosimpath  = self.entitypath+'/Simulations/eldosim'
+        """String
+
+        Simulation path. (./Simulations/spicesim/<runname>)
+        This shouldn't be set manually.
+        """
         if not hasattr(self,'_spicesimpath'):
             self._spicesimpath = self.entitypath+'/Simulations/spicesim/'+self.runname
             try:
@@ -524,6 +671,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def spicecmd(self):
+        """String
+
+        Simulation command string to be executed on the command line.
+        Automatically generated.
+        """
         if not hasattr(self,'_spicecmd'):
             if self.interactive_spice:
                 if self.model=='eldo':
@@ -571,6 +723,8 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         self._spicecmd=None
 
     def connect_inputs(self):
+        """Automatically called function to connect iofiles (inputs) to top
+        entity IOS Bundle items."""
         for ioname,io in self.IOS.Members.items():
             if ioname in self.iofile_bundle.Members:
                 val=self.iofile_bundle.Members[ioname]
@@ -581,26 +735,29 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     self.iofile_bundle.Members[ioname].Data=self.IOS.Members[ioname].Data
 
     def connect_outputs(self):
+        """Automatically called function to connect iofiles (outputs) to top
+        entity IOS Bundle items."""
         for name,val in self.iofile_bundle.Members.items():
             if val.dir is 'out':
                 self.IOS.Members[name].Data=self.iofile_bundle.Members[name].Data
 
-    # This writes infiles
     def write_infile(self):
+        """Automatically called function to call write() functions of each
+        iofile with direction 'input'."""
         for name, val in self.iofile_bundle.Members.items():
             if val.dir.lower()=='in' or val.dir.lower()=='input':
                 self.iofile_bundle.Members[name].write()
 
-    # Reading output files
     def read_outfile(self):
+        """Automatically called function to call read() functions of each
+        iofile with direction 'output'."""
         for name, val in self.iofile_bundle.Members.items():
             if val.dir.lower()=='out' or val.dir.lower()=='output':
                  self.iofile_bundle.Members[name].read()
     
     def execute_spice_sim(self):
-        # Call spice here
+        """Automatically called function to execute spice simulation."""
         self.print_log(type='I', msg="Running external command %s\n" %(self.spicecmd) )
-    
         if self.model == 'eldo':
             # This is some experimental stuff
             count = 0
@@ -620,6 +777,20 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             os.system(self.spicecmd)
 
     def extract_powers(self):
+        """
+        Automatically called function to extract transient power and current
+        consumptions.
+        
+        Stores the results in two dictionaries and prints the results to the
+        log also.  The consumptions are extracted for spice_dcsource objects
+        with the attribute extract=True.
+        
+        The extracted consumptions are accessible on the top-level after simulation as::
+            
+            self.powers # Dictionary with power consumptions of each supply + total
+            self.currents # Dictionary with current consumptions of each supply + total
+
+        """
         self.powers = {}
         self.currents = {}
         try:
@@ -672,6 +843,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self.print_log(type='W',msg='Something went wrong while extracting power consumptions.')
 
     def run_spice(self):
+        """Externally called function to execute spice simulation."""
         if self.load_state == '': 
             # Normal execution of full simulation
             self.tb = stb(self)
