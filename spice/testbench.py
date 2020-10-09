@@ -6,7 +6,7 @@ Spice Testbench
 Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
-Last modification by Okko Järvinen, 07.10.2020 14:35
+Last modification by Okko Järvinen, 08.10.2020 10:15
 
 """
 import os
@@ -411,7 +411,7 @@ class testbench(spice_module):
 
             if self._trantime == 0:
                 self._trantime = "UNDEFINED"
-                self.print_log(type='E',msg='Failed to specify transient duration. Please provide parameter tstop in the spice_simcmd arguments.')
+                self.print_log(type='I',msg='Transient time could not be inferred from input signals. Make sure to provide tstop argument to spice_simcmd.')
         return self._inputsignals
     @inputsignals.setter
     def inputsignals(self,value):
@@ -432,22 +432,23 @@ class testbench(spice_module):
             self._simcmdstr = "%s Simulation commands\n" % self.parent.syntaxdict["commentchar"]
             for sim, val in self.simcmds.Members.items():
                 if str(sim).lower() == 'tran':
+                    simtime = val.tstop if val.tstop is not None else self._trantime
+                    if val.tstop is None:
+                        self.print_log(type='I',msg='Inferred transient duration is %g s.' % simtime)
                     #TODO could this if-else be avoided?
                     if self.parent.model=='eldo':
                         self._simcmdstr += '.%s %s %s %s\n' % \
-                                (sim,str(val.tprint),str(val.tstop) if val.tstop is not None else str(self._trantime+2e-9) \
-                                ,'UIC' if val.uic else '')
+                                (sim,str(val.tprint),str(simtime),'UIC' if val.uic else '')
                         if val.noise:
                             self._simcmdstr += '.noisetran fmin=%s fmax=%s nbrun=1 NONOM %s\n' % \
                                     (str(val.fmin),str(val.fmax),'seed=%d'%(val.seed) if val.seed is not None else '')
                     elif self.parent.model=='spectre':
+                        #TODO initial conditions
                         self._simcmdstr += 'TRAN_analysis %s pstep=%s stop=%s %s ' % \
-                                (sim,str(val.tprint),str(val.tstop) if val.tstop is not None else str(self._trantime) \
-                                ,'UIC' if val.uic else '') #TODO initial conditions
-                                #(sim,str(val.tprint),str(val.tstop) if val.tstop is not None else str(self._trantime+2e-9) \
+                                (sim,str(val.tprint),str(simtime),'UIC' if val.uic else '')
                         if val.noise:
                             if val.seed==0:
-                                self.print_log(type='E',msg='spectre disables noise if noiseseed=0')
+                                self.print_log(type='W',msg='Spectre disables noise if seed=0.')
                             self._simcmdstr += 'trannoisemethod=default noisefmin=%s noisefmax=%s %s ' % \
                                     (str(val.fmin),str(val.fmax),'noiseseed=%d'%(val.seed) if val.seed is not None else '')
                         if val.method is not None:
