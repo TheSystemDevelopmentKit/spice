@@ -125,10 +125,10 @@ class spice_module(thesdk):
                                         if words[1].lower() == cellname.lower():
                                             words[1] = self.parent.name.upper()
                                             line = ' '.join(words) + "\n"
+                                    self._subckt += line 
                                     sys.stdout.write(line)
                                 if cellname != self.parent.name:
                                     self.print_log(type='I',msg='Renaming design cell %s to %s.' % (cellname,self.parent.name))
-                                self._subckt = ''
                                 # Notice the return here
                                 return self._subckt
                             # First subcircuit not started, starts on this line though
