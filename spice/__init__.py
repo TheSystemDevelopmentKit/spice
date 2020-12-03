@@ -190,11 +190,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def oppts(self):
-        """Dict[Dict[str, Union[str, float]]]
+        """Dict[Dict[str, List[Union[str, float]]]]
         
         Nested dictionary of the DC operating points, device name is the first key.
         The corresponding dictionary gives the operating point name (e.g. ids) and
-        it's value.
+        it's list of values. The value index corresponds to the sweep index.
         """
         if hasattr(self, '_oppts'):
             return self._oppts
@@ -917,36 +917,39 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     if name == 'dc':
                         fname = val.filename.strip('\"')
                         plotlist = val.plotlist
-                fsrc = os.path.join(self.entitypath, self.name, fname) 
-                fdest = os.path.join(self.entitypath, 'Simulations/spicesim', self.runname, fname)
-                if os.path.isfile(fsrc): # Move to results
-                    os.rename(fsrc, fdest)
+                files = glob.glob(fname+'*')
+                fpath = os.path.join(self.entitypath, 'Simulations/spicesim', self.runname)
+                for file in files:
+                    os.rename(file, os.path.join(fpath,file))
                 instname = 'X%s' % self.name.upper()
                 instmatch = re.compile(r"Instance: %s" % instname)
                 instfound=False
-                temp = {}
-                with open(fdest, 'r') as f:
-                    for line in f:
-                        if instmatch.search(line):
-                            if not instfound: # Found new instance
-                                instfound=True
-                                devname = line.split()[1].split('.')[1]
-                                continue
-                            else: # The next instance was found before the current one ended.
-                                raise Exception("Instances with no separating line in result file! Failed to read operating points!") 
-                        if instfound:
-                            parts = line.split('=')
-                            if len(parts) == 2:
-                                paramname = parts[0].strip(' ')
-                                if paramname in plotlist:
-                                    paramval = self.si_string_to_float(parts[1])
-                                    key = instname + '.' + devname
-                                    try: # If instance already exists in dict, do not overwrite
-                                        self.oppts[key].update({paramname:paramval})
-                                    except KeyError:
-                                        self.oppts.update({key : {paramname: paramval}})
-                        if line == '\n': # End of instance is marked with empty line 
-                            instfound = False
+                files = glob.glob(os.path.join(fpath,'%s*' % fname))
+                for fdest in files:
+                    with open(fdest, 'r') as f:
+                        for line in f:
+                            if instmatch.search(line):
+                                if not instfound: # Found new instance
+                                    instfound=True
+                                    devname = line.split()[1].split('.')[1]
+                                    continue
+                                else: # The next instance was found before the current one ended.
+                                    raise Exception("Instances with no separating line in result file! Failed to read operating points!") 
+                            if instfound:
+                                parts = line.split('=')
+                                if len(parts) == 2:
+                                    paramname = parts[0].strip(' ')
+                                    if paramname in plotlist:
+                                        paramval = self.si_string_to_float(parts[1])
+                                        key = instname + '.' + devname
+                                        if key in self.oppts and paramname in self.oppts[key]:
+                                            self.oppts[key][paramname].append(paramval)
+                                        elif key in self.oppts and paramname not in self.oppts[key]:
+                                            self.oppts[key].update({paramname: [paramval]})
+                                        else:
+                                            self.oppts.update({key : {paramname: [paramval]}})
+                            if line == '\n': # End of instance is marked with empty line 
+                                instfound = False
             elif self.model == 'eldo':
                 raise Exception('DC optpoint extraction not supported for Eldo.')
             else:

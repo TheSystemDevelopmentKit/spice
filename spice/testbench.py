@@ -460,10 +460,28 @@ class testbench(spice_module):
                     if self.parent.model=='eldo':
                         self._simcmdstr='.op'
                     elif self.parent.model=='spectre':
-                        if val.where == 'file':
-                            self._simcmdstr+='DC_analysis info where=%s file=%s save=all\n\n' % (val.where, val.filename)
+                        if val.sweep == '': # This is not a sweep analysis
+                            if val.where == 'file':
+                                self._simcmdstr+='DC_analysis info where=%s file=%s save=all\n\n' % (val.where, val.filename)
+                            else:
+                                self._simcmdstr='DC_analysis info where=%s save=all\n\n' % val.where
                         else:
-                            self._simcmdstr='DC_analysis info where=%s save=all\n\n' % val.where
+                            if val.subcktswp != '':    
+                                self._simcmdstr+='%sSweep sweep param=%s sub=%s start=%s stop=%s step=%s { \n' \
+                                        % (val.sweep, val.sweep, val.subcktswp, val.swpstart, val.swpstop, val.swpstep)
+                            elif val.deviceswp != '':
+                                self._simcmdstr+='%sSweep sweep param=%s dev=%s start=%s stop=%s step=%s { \n' \
+                                        % (val.sweep, val.sweep, val.deviceswp, val.swpstart, val.swpstop, val.swpstep)
+                            else:
+                                self._simcmdstr+='%sSweep sweep param=%s start=%s stop=%s step=%s { \n' \
+                                        % (val.sweep, val.sweep, val.swpstart, val.swpstop, val.swpstep)
+                            if val.where == 'file':
+                                fname = val.filename[0:-1] # Strip last quotation mark
+                                fname += '.%A\"' # Add format specifier to avoid overwriting results
+                                self._simcmdstr+='\tDC_analysis info where=%s file=%s save=all\n}\n\n' % (val.where, fname)
+                            else:
+                                self._simcmdstr='\tDC_analysis info where=%s save=all\n}\n\n' % val.where
+
                     else:
                         self.print_log(type='E',msg='Unsupported model %s.' % self.parent.model)
                 else:

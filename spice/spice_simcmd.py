@@ -61,15 +61,22 @@ class spice_simcmd(thesdk):
                 DC & Spectre models only. If set as True, extracts the values specified in the plotlist, and sets them
                 in self.parent.oppts property for convenient access.
             sweep (str)
-                DC & Spectre models only. If given, sweeps the DC operating point about the parameter given. For example,
-                if sweep is given as: sweep='temp', the opearting point will be calculated for a different temperatures. For
-                an exhaustive list of allowed sweep parameters, run 'spectre -h sweep'. The 
-                temperature points are specified by swpstart, swpstop and step.
-            swpstart (union(int, float))
+                DC & Spectre models only. If given, sweeps the top-level parameter given as value. For example, 
+                _spice_simcmd(sim='dc', sweep='temp', swpstart=27, swpstop=87) sweeps the top-level parameter
+                temp (temperature) from 27 to 87 at 10 degree increments.
+            subcktswp (str)
+                If given, sweeps the parameter defined by property sweep from the subcircuit given by this property.
+                For example, _=spice_simcmd(sim='dc', sweep='Vb', subcktname='XSUBCKT', swpstart=0.1, swpstop=1.5, step=0.05)
+                sweeps the Vb parameter from subcircuit XSUBCKT from 0.1 volts to 1.5 volts with 0.05 volt increments.
+            deviceswp
+                If given, sweeps the parameter defined by property sweep from the device given by this property.
+                For example, _=spice_simcmd(sim='dc', sweep='w', deviceswp='XSUBCKT.XNMOS', swpstart=10u, swpstop=14u, step=0.1u)
+                sweeps the width of transistor XNMOS of subckt XSUBCKT from 10u to 14u in 0.1u increments.
+            swpstart (union(int, float, str))
                 Starting point of DC sweep. Default: 0.
-            swpstop (union(int, flaot))
+            swpstop (union(int, float, str))
                 Stop point of DC sweep. Default: 0.
-            swpstep (int)
+            swpstep (union(int, float, str))
                 Step size of the sweep simulation. Default: 10  
             subscktswp (bool)
                 Is this a subcircuit sweep? Default: False
@@ -107,10 +114,11 @@ class spice_simcmd(thesdk):
             self._filename=kwargs.get('filename', '\"oppoint.log\"')
             self._as_prop=kwargs.get('as_prop', False)
             self._sweep=kwargs.get('sweep', '')
+            self._subcktswp=kwargs.get('subcktswp', '')
+            self._deviceswp=kwargs.get('deviceswp', '')
             self._swpstart=kwargs.get('swpstart', 0)
-            self._swpstart=kwargs.get('swpstop', 0)
+            self._swpstop=kwargs.get('swpstop', 0)
             self._swpstep=kwargs.get('swpstep', 10)
-            self._subcktswp=kwargs.get('subcktswp', False)
             self._tprint=kwargs.get('tprint','1p')
             self._tstop=kwargs.get('tstop',None)
             self._uic=kwargs.get('uic',False)
@@ -127,6 +135,10 @@ class spice_simcmd(thesdk):
             self.parent.simcmd_bundle.new(name=self.sim,val=self)
         if self.as_prop:
             self.parent.oppts_flag=True
+        if self.subcktswp != '' and self.deviceswp != '':
+            self.print_log(type='F', msg='Cannot specify subckt sweep and device sweep in the same simcmd instance!')
+        #if self.subcktswp:
+        #    self.parent.subcktswp_flag=True
 
     @property
     def sim(self):
@@ -174,7 +186,6 @@ class spice_simcmd(thesdk):
         return self._filename
     @filename.setter
     def filename(self,value):
-        pdb.set_trace()
         if value[0] == '\"' and value[-1] == '\"': 
             self._filename=value
         else:
@@ -198,11 +209,35 @@ class spice_simcmd(thesdk):
         if hasattr(self,'_sweep'):
             return self._sweep
         else:
-            self._sweep=0
+            self._sweep=''
         return self._sweep
     @sweep.setter
     def sweep(self,value):
         self._sweep=value
+
+    @property
+    def subcktswp(self):
+        """Set by argument 'subcktswp'."""
+        if hasattr(self,'_subcktswp'):
+            return self._subcktswp
+        else:
+            self._subcktswp=''
+        return self._subcktswp
+    @subcktswp.setter
+    def subcktswp(self,value):
+        self._subcktswp=value
+
+    @property
+    def deviceswp(self):
+        """Set by argument 'deviceswp'."""
+        if hasattr(self,'_deviceswp'):
+            return self._deviceswp
+        else:
+            self._deviceswp=''
+        return self._deviceswp
+    @deviceswp.setter
+    def deviceswp(self,value):
+        self._deviceswp=value
 
     @property
     def swpstart(self):
