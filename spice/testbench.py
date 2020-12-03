@@ -456,6 +456,16 @@ class testbench(spice_module):
                         if val.cmin is not None:
                             self._simcmdstr += 'cmin=%s ' %  (str(val.cmin))
                         self._simcmdstr += '\n\n' 
+                elif str(sim).lower() == 'dc':
+                    if self.parent.model=='eldo':
+                        self._simcmdstr='.op'
+                    elif self.parent.model=='spectre':
+                        if val.where == 'file':
+                            self._simcmdstr+='DC_analysis info where=%s file=%s save=all\n\n' % (val.where, val.filename)
+                        else:
+                            self._simcmdstr='DC_analysis info where=%s save=all\n\n' % val.where
+                    else:
+                        self.print_log(type='E',msg='Unsupported model %s.' % self.parent.model)
                 else:
                     self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
         return self._simcmdstr
@@ -483,15 +493,21 @@ class testbench(spice_module):
         
         Manual plot commands corresponding to self.plotlist defined in the
         parent entity.
+
+        
+        Apparently, the there is no good way to save individual plots for individual analyses
+        in Spectre. Thus all 'save' statements can be grouped into one. For Eldo, the situation
+        is different and we need to figure out a way for this to work with Eldo also.
         """
         if not hasattr(self,'_plotcmd'):
             self._plotcmd = "" 
-            if len(self.parent.plotlist) > 0:
-                self._plotcmd = "%s Manually probed signals\n" % self.parent.syntaxdict["commentchar"]
-                self._plotcmd += '.plot ' if self.parent.model == 'eldo' else 'save '
-                for i in self.parent.plotlist:
-                    self._plotcmd += self.esc_bus(i) + " "
-                self._plotcmd += "\n\n"
+            for name, val in self.simcmds.Members.items():
+                if len(val.plotlist) > 0 and name.lower() != 'dc':
+                    self._plotcmd = "%s Manually probed signals\n" % self.parent.syntaxdict["commentchar"]
+                    self._plotcmd += '.plot ' if self.parent.model == 'eldo' else 'save '
+                    for i in val.plotlist:
+                        self._plotcmd += self.esc_bus(i) + " "
+                    self._plotcmd += "\n\n"
             self._plotcmd += "%s Output signals\n" % self.parent.syntaxdict["commentchar"]
             for name, val in self.iofiles.Members.items():
                 # Output iofile becomes an extract command

@@ -44,7 +44,35 @@ class spice_simcmd(thesdk):
     
     **kwargs :  
             sim (str)
-                Simulation type. Currently only 'tran' supported.
+                Simulation type. Currently only 'tran' and 'dc' supported.
+            plotlist List(str)
+                List of node names to be plotted. Node names follow simulator syntax.
+                For Eldo, the voltage/current specifier is expected:
+                    self.plotlist = ['v(OUT)','v(CLK)']
+                For Spectre, the node name is enough:
+                    self.plotlist = ['OUT','CLK']
+            where (str)
+                DC only. Where to save DC operating point results. 'file', 'screen' and 'logfile'
+                are valid options. In case 'file' is specified, the filename is set by
+                'filename' property.
+            filename (str)
+                DC only. The filename of the DC operating point result file, if where == 'file'.
+            as_prop (bool)
+                DC & Spectre models only. If set as True, extracts the values specified in the plotlist, and sets them
+                in self.parent.oppts property for convenient access.
+            sweep (str)
+                DC & Spectre models only. If given, sweeps the DC operating point about the parameter given. For example,
+                if sweep is given as: sweep='temp', the opearting point will be calculated for a different temperatures. For
+                an exhaustive list of allowed sweep parameters, run 'spectre -h sweep'. The 
+                temperature points are specified by swpstart, swpstop and step.
+            swpstart (union(int, float))
+                Starting point of DC sweep. Default: 0.
+            swpstop (union(int, flaot))
+                Stop point of DC sweep. Default: 0.
+            swpstep (int)
+                Step size of the sweep simulation. Default: 10  
+            subscktswp (bool)
+                Is this a subcircuit sweep? Default: False
             tprint (float/str)
                 Print interval. Default '1p' or 1e-12.
             tstop (float/str)
@@ -71,9 +99,18 @@ class spice_simcmd(thesdk):
         return os.path.dirname(os.path.realpath(__file__)) + "/"+__name__
 
     def __init__(self,parent,**kwargs):
-        try:  
+        try:
             self.parent = parent
             self._sim=kwargs.get('sim','tran')
+            self._plotlist=kwargs.get('plotlist', [])
+            self._where=kwargs.get('where', 'file') 
+            self._filename=kwargs.get('filename', '\"oppoint.log\"')
+            self._as_prop=kwargs.get('as_prop', False)
+            self._sweep=kwargs.get('sweep', '')
+            self._swpstart=kwargs.get('swpstart', 0)
+            self._swpstart=kwargs.get('swpstop', 0)
+            self._swpstep=kwargs.get('swpstep', 10)
+            self._subcktswp=kwargs.get('subcktswp', False)
             self._tprint=kwargs.get('tprint','1p')
             self._tstop=kwargs.get('tstop',None)
             self._uic=kwargs.get('uic',False)
@@ -83,13 +120,13 @@ class spice_simcmd(thesdk):
             self._seed=kwargs.get('seed',None)
             self._method=kwargs.get('method',None)
             self._cmin=kwargs.get('cmin',None)
-
         except:
-            self.print_log(type='F', msg="Eldo simulation command definition failed.")
-
+            self.print_log(type='F', msg="Simulation command definition failed.")
         if hasattr(self.parent,'simcmd_bundle'):
             # This limits it to 1 of each simulation type. Is this ok?
             self.parent.simcmd_bundle.new(name=self.sim,val=self)
+        if self.as_prop:
+            self.parent.oppts_flag=True
 
     @property
     def sim(self):
@@ -102,6 +139,118 @@ class spice_simcmd(thesdk):
     @sim.setter
     def sim(self,value):
         self._sim=value
+
+    @property
+    def plotlist(self):
+        """Set by argument 'plotlist'."""
+        if hasattr(self,'_plotlist'):
+            return self._plotlist
+        else:
+            self._plotlist=[]
+        return self._plotlist
+    @plotlist.setter
+    def plotlist(self,value):
+        self._plotlist=value
+
+    @property
+    def where(self):
+        """Set by argument 'where'."""
+        if hasattr(self,'_where'):
+            return self._where
+        else:
+            self._where='file'
+        return self._where
+    @where.setter
+    def where(self,value):
+        self._where=value
+
+    @property
+    def filename(self):
+        """Set by argument 'filename'."""
+        if hasattr(self,'_filename'):
+            return self._filename
+        else:
+            self._filename='\"oppoint.log\"'
+        return self._filename
+    @filename.setter
+    def filename(self,value):
+        pdb.set_trace()
+        if value[0] == '\"' and value[-1] == '\"': 
+            self._filename=value
+        else:
+            self._filename=value
+
+    @property
+    def as_prop(self):
+        """Set by argument 'as_prop'."""
+        if hasattr(self,'_as_prop'):
+            return self._as_prop
+        else:
+            self._as_prop=False
+        return self._as_prop
+    @as_prop.setter
+    def as_prop(self,value):
+        self._as_prop=value
+
+    @property
+    def sweep(self):
+        """Set by argument 'sweep'."""
+        if hasattr(self,'_sweep'):
+            return self._sweep
+        else:
+            self._sweep=0
+        return self._sweep
+    @sweep.setter
+    def sweep(self,value):
+        self._sweep=value
+
+    @property
+    def swpstart(self):
+        """Set by argument 'swpstart'."""
+        if hasattr(self,'_swpstart'):
+            return self._swpstart
+        else:
+            self._swpstart=0
+        return self._swpstart
+    @swpstart.setter
+    def swpstart(self,value):
+        self._swpstart=value
+
+    @property
+    def swpstop(self):
+        """Set by argument 'swpstop'."""
+        if hasattr(self,'_swpstop'):
+            return self._swpstop
+        else:
+            self._swpstop=0
+        return self._swpstop
+    @swpstop.setter
+    def swpstop(self,value):
+        self._swpstop=value
+
+    @property
+    def swpstep(self):
+        """Set by argument 'swpstep'."""
+        if hasattr(self,'_swpstep'):
+            return self._swpstep
+        else:
+            self._swpstep=10
+        return self._swpstep
+    @swpstep.setter
+    def swpstep(self,value):
+        self._swpstep=value
+
+    @property
+    def subcktswp(self):
+        """Set by argument 'subcktswp'."""
+        if hasattr(self,'_subcktswp'):
+            return self._subcktswp
+        else:
+            self._subcktswp=False
+        return self._subcktswp
+    @subcktswp.setter
+    def subcktswp(self,value):
+        self._subcktswp=value
 
     @property
     def tprint(self):

@@ -51,6 +51,28 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         return os.path.dirname(os.path.realpath(__file__)) + "/"+__name__
 
     @property
+    def si_prefix_mult(self):
+        """ Dictionary mapping SI-prefixes to multipliers """
+        if hasattr(self, '_si_prefix_mult'):
+            return self._si_prefix_mult
+        else:
+            self._si_prefix_mult = {
+                    'E':1e18,
+                    'P':1e15,
+                    'T':1e12,
+                    'G':1e9,
+                    'M':1e6,
+                    'k':1e3,
+                    'm':1e-3,
+                    'u':1e-6,
+                    'n':1e-9,
+                    'p':1e-12,
+                    'f':1e-15,
+                    'a':1e-18,
+                    }
+        return self._si_prefix_mult
+
+    @property
     def syntaxdict(self):
         """Internally used dictionary for common syntax conversions between
         Spectre and Eldo."""
@@ -149,6 +171,39 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @load_state.setter
     def load_state(self,value):
         self._load_state=value
+
+    @property
+    def oppts_flag(self):
+        """True | False (default)
+        
+        If True, the DC operating points are set in the oppts property.
+        Shouldn't be set manually.
+        """
+        if hasattr(self, '_oppts_flag'):
+            return self._oppts_flag
+        else:
+            self._oppts_flag=False
+        return self._oppts_flag
+    @oppts_flag.setter
+    def oppts_flag(self, value):
+        self._oppts_flag=value
+
+    @property
+    def oppts(self):
+        """Dict[Dict[str, Union[str, float]]]
+        
+        Nested dictionary of the DC operating points, device name is the first key.
+        The corresponding dictionary gives the operating point name (e.g. ids) and
+        it's value.
+        """
+        if hasattr(self, '_oppts'):
+            return self._oppts
+        else:
+            self._oppts={}
+        return self._oppts
+    @oppts.setter
+    def oppts(self, value):
+        self._oppts=value
 
     @property
     def spicecorner(self):  
@@ -429,27 +484,17 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def plotlist(self): 
-        """List<String>
-
-        List of node names to be plotted. Node names follow simulator syntax.
-
-        For Eldo, the voltage/current specifier is expected::
-
-            self.plotlist = ['v(OUT)','v(CLK)']
-
-        For Spectre, the node name is enough::
-
-            self.plotlist = ['OUT','CLK']
         """
-        if not hasattr(self, '_plotlist'):
-            self._plotlist = []
-        return self._plotlist
+            OBSOLETE! RE-LOCATED TO SPICE_SIMCMD.PY
+        """
+        self.print_log(type='W', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
+        return None 
     @plotlist.setter
     def plotlist(self,value): 
-            self._plotlist = value
+        self.print_log(type='W', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
     @plotlist.deleter
     def plotlist(self): 
-            self._plotlist = None
+        self.print_log(type='W', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
 
     @property
     def spicemisc(self): 
@@ -841,7 +886,75 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         except:
             self.print_log(type='W',msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting power consumptions.')
+    
+    def si_string_to_float(self, strval):
+        """ Convert SI-formatted string to float
+            
+            E.g. self.si_string_to_float('3 mV') returns 3e-3.
+        """
+        parts = strval.split()
+        if len(parts) == 2:
+            val = float(parts[0])
+            if len(parts[1]) == 1: # No prefix
+                mult = 1
+            else:
+                try:
+                    mult = self.si_prefix_mult[parts[1][0]]
+                except KeyError: # Could not convert, just return the text value
+                    self.print_log(type='W', msg='Invalid SI-prefix %s, failed to convert.' % parts[1][0])
+                    return strval
+            return val*mult
+        else:
+            return strval # Was a text value
 
+    def read_oppts(self):
+        """ Internally called function to read the DC operating points of the circuit
+            TODO: Implement for Eldo as well.
+        """
+        try:
+            if self.model=='spectre':
+                for name, val in self.simcmd_bundle.Members.items():
+                    if name == 'dc':
+                        fname = val.filename.strip('\"')
+                        plotlist = val.plotlist
+                fsrc = os.path.join(self.entitypath, self.name, fname) 
+                fdest = os.path.join(self.entitypath, 'Simulations/spicesim', self.runname, fname)
+                if os.path.isfile(fsrc): # Move to results
+                    os.rename(fsrc, fdest)
+                instname = 'X%s' % self.name.upper()
+                instmatch = re.compile(r"Instance: %s" % instname)
+                instfound=False
+                temp = {}
+                with open(fdest, 'r') as f:
+                    for line in f:
+                        if instmatch.search(line):
+                            if not instfound: # Found new instance
+                                instfound=True
+                                devname = line.split()[1].split('.')[1]
+                                continue
+                            else: # The next instance was found before the current one ended.
+                                raise Exception("Instances with no separating line in result file! Failed to read operating points!") 
+                        if instfound:
+                            parts = line.split('=')
+                            if len(parts) == 2:
+                                paramname = parts[0].strip(' ')
+                                if paramname in plotlist:
+                                    paramval = self.si_string_to_float(parts[1])
+                                    key = instname + '.' + devname
+                                    try: # If instance already exists in dict, do not overwrite
+                                        self.oppts[key].update({paramname:paramval})
+                                    except KeyError:
+                                        self.oppts.update({key : {paramname: paramval}})
+                        if line == '\n': # End of instance is marked with empty line 
+                            instfound = False
+            elif self.model == 'eldo':
+                raise Exception('DC optpoint extraction not supported for Eldo.')
+            else:
+                raise Exception('Unrecognized model %s.' % self.model)
+        except:
+            self.print_log(type='W', msg=traceback.format_exc())
+            self.print_log(type='W',msg='Something went wrong while extracting DC operating points.')
+        
     def run_spice(self):
         """Externally called function to execute spice simulation."""
         if self.load_state == '': 
@@ -859,7 +972,8 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self.extract_powers()
             self.read_outfile()
             self.connect_outputs()
-
+            if self.oppts_flag:
+                self.read_oppts()
             # Calling deleter of iofiles
             del self.dcsource_bundle
             del self.iofile_bundle
@@ -893,6 +1007,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     self.read_outfile()
                     self.connect_outputs()
                     self.extract_powers()
+                    self.read_oppts()
             except:
                 self.print_log(type='I',msg=traceback.format_exc())
                 self.print_log(type='F',msg='Failed while loading results from %s.' % self._spicesimpath)
