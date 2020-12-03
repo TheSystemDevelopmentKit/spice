@@ -6,10 +6,9 @@ Spice DC Source
 Class for generating DC voltage/current sources in the Spectre or Eldo
 testbench.
 
-Initially written for eldo-module by Okko Järvinen, okko.jarvinen@aalto.fi,
-9.1.2020
+Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 07.10.2020 14:00
+Last modification by Okko Järvinen, 03.12.2020 19:14
 
 """
 
@@ -33,48 +32,49 @@ class spice_dcsource(thesdk):
     power and current consumptions are extracted in transient simulation.
     Initiated in parent as::
 
-        _=spice_dcsource(self,name='dd',value=1.0,extract=True,pos='VDD',neg='VSS')
+        _=spice_dcsource(self,name='dd',value=1.0,extract=True,
+                         pos='VDD',neg='VSS')
 
     A bias current flowing from 'VDD' to node 'IBIAS'::
 
-        _=spice_dcsource(self,name='bias',sourcetype='I',value=25e-6,pos='VDD',neg='IBIAS')
+        _=spice_dcsource(self,name='bias',sourcetype='I',value=25e-6,
+                         pos='VDD',neg='IBIAS')
 
     Parameters
     ----------
     parent : object 
-        The parent object initializing the 
-        `spice_dcsource` instance. Default None
+        The parent object initializing the `spice_dcsource` instance. Default
+        None.
     
     **kwargs :  
-            name (str)
+            name: str
                 Name of the source.
-            value (float)
+            value: float
                 Value of the source.
-            sourcetype (str)
-                Type of the DC source. Either 'V' for voltage
-                or 'I' for current.
-            extract (bool)
-                Flag the source for transient current and power consumption extraction.
-                Extracted currents and powers are accessible through dictionaries 
-                self.currents and self.powers in the parent object.
-                Default False.
-            ext_start (float)
+            sourcetype: str
+                Type of the DC source. Either 'V' for voltage or 'I' for
+                current.
+            extract: bool
+                Flag the source for transient current and power consumption
+                extraction. Extracted currents and powers are accessible
+                through dictionaries self.currents and self.powers in the
+                parent object. Default False.
+            ext_start: float
                 Time to start extracting average transient power consumption.
                 Default is 0.
-            ext_stop (float)
+            ext_stop: float
                 Time to stop extracting average transient power consumption.
                 Default is simulation end time.
-            pos (str)
+            pos: str
                 Name of the positive node in the ELDO netlist.
-            neg (str)
+            neg: str
                 Name of the negative node in the ELDO netlist.
-            noise (bool)
-                Enable the noise contribution of this source (only when transient
-                noise is enabled).
-                Default is True.
-            ramp (float)
-                Ramp up the source from 0 to value in ramp seconds.
-                Default is 0 (no ramping).
+            noise: bool
+                Enable the noise contribution of this source (only when
+                transient noise is enabled). Default is True.
+            ramp: float
+                Ramp up the source from 0 to value in ramp seconds. Default is
+                0 (no ramping).
     
     """
 
