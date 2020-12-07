@@ -7,7 +7,7 @@ Class for spice simulation commands.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 07.10.2020 13:56
+Last modification by Okko Järvinen, 03.12.2020 19:10
 
 """
 
@@ -30,64 +30,84 @@ class spice_simcmd(thesdk):
     --------
     Initiated in parent as:: 
 
-        _=spice_simcmd(self,sim='tran',tprint=1e-12,tstop='10n',uic=True,noise=True,fmin=1,fmax=5e9)
+        _=spice_simcmd(self,sim='tran',tprint=1e-12,tstop='10n',
+                       uic=True,noise=True,fmin=1,fmax=5e9)
 
-    For a simple transient with inferred simulation duration::
+    For a simple transient with inferred simulation duration:
 
         _=spice_simcmd(self,sim='tran')
     
     Parameters
     -----------
     parent : object 
-        The parent object initializing the 
-        spice_simcmd instance. Default None
+        The parent object initializing the spice_simcmd instance. Default None
     
     **kwargs :  
-            sim (str)
+            sim: str
                 Simulation type. Currently only 'tran' and 'dc' supported.
-            plotlist List(str)
-                List of node names to be plotted. Node names follow simulator syntax.
-                For Eldo, the voltage/current specifier is expected:
+            plotlist: list(str)
+                List of node names to be plotted. Node names follow simulator
+                syntax.  For Eldo, the voltage/current specifier is expected::
+
                     self.plotlist = ['v(OUT)','v(CLK)']
-                For Spectre, the node name is enough:
+                
+                For Spectre, the node name is enough::
+
                     self.plotlist = ['OUT','CLK']
-            sweep (str)
-                DC & Spectre models only. If given, sweeps the top-level parameter given as value. For example, 
-                _spice_simcmd(sim='dc', sweep='temp', swpstart=27, swpstop=87) sweeps the top-level parameter
-                temp (temperature) from 27 to 87 at 10 degree increments.
-            subcktname (str)
-                If given, sweeps the parameter defined by property sweep from the subcircuit given by this property.
-                For example, _=spice_simcmd(sim='dc', sweep='Vb', subcktname='XSUBCKT', swpstart=0.1, swpstop=1.5, step=0.05)
-                sweeps the Vb parameter from subcircuit XSUBCKT from 0.1 volts to 1.5 volts with 0.05 volt increments.
-            devname
-                If given, sweeps the parameter defined by property sweep from the device given by this property.
-                For example, _=spice_simcmd(sim='dc', sweep='w', devname='XSUBCKT.XNMOS', swpstart=10u, swpstop=14u, step=0.1u)
-                sweeps the width of transistor XNMOS of subckt XSUBCKT from 10u to 14u in 0.1u increments.
-            swpstart (union(int, float, str))
+            sweep: str
+                DC & Spectre models only. If given, sweeps the top-level
+                parameter given as value. For example::
+                
+                    _spice_simcmd(sim='dc',sweep='temp',swpstart=27,swpstop=87)
+                
+                sweeps the top-level parameter temp (temperature) from 27 to 87
+                at 10 degree increments.
+            subcktname: str
+                If given, sweeps the parameter defined by property sweep from
+                the subcircuit given by this property.  For example::
+                
+                    _=spice_simcmd(sim='dc',sweep='Vb',subcktname='XSUBCKT',
+                                   swpstart=0.1,swpstop=1.5,step=0.05)
+                
+                sweeps the Vb parameter from subcircuit XSUBCKT from 0.1 volts
+                to 1.5 volts with 0.05 volt increments.
+            devname: str
+                If given, sweeps the parameter defined by property sweep from
+                the device given by this property.  For example::
+                
+                    _=spice_simcmd(sim='dc', sweep='w', deviceswp='XSUBCKT.XNMOS',
+                                   swpstart=10u, swpstop=14u, step=0.1u)
+                
+                sweeps the width of transistor XNMOS of subckt XSUBCKT from 10u
+                to 14u in 0.1u increments.
+            swpstart: union(int, float, str)
                 Starting point of DC sweep. Default: 0.
-            swpstop (union(int, float, str))
+            swpstop: union(int, float, str)
                 Stop point of DC sweep. Default: 0.
-            swpstep (union(int, float, str))
+            swpstep: union(int, float, str)
                 Step size of the sweep simulation. Default: 10  
-            tprint (float/str)
+            tprint: float/str
                 Print interval. Default '1p' or 1e-12.
-            tstop (float/str)
-                Transient simulation duration. When not defined, the simulation time
-                is the duration of the longest input signal.
-            uic (bool)
+            tstop: float/str
+                Transient simulation duration. When not defined, the simulation
+                time is the duration of the longest input signal.
+            uic: bool
                 Use initial conditions flag. Default False.
-            noise (bool)
+            noise: bool
                 Noise transient flag. Default False.
-            fmin (float/str)
+            fmin: float/str
                 Minimum noise frequency. Default 1 (Hz).
-            fmax (float/str)
+            fmax: float/str
                 Maximum noise frequency. Default 5e9.
-            seed (int)
+            seed: int
                 Random generator seed for noise transient. Default None (random).
-            method (str)
-                Transient integration method. Default None (spectre takes method from errpreset).
-            cmin (float)
-                Spectre cmin parameter: this much cap from each node to ground. Might speed up simulation. Default None (not used).
+            method: str
+                Transient integration method. Default None (spectre takes
+                method from errpreset).
+            cmin: float
+                Spectre cmin parameter: this much cap from each node to ground.
+                Might speed up simulation. Default None (not used).
+
     """
 
     @property
