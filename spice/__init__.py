@@ -793,18 +793,19 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         Automatically called function to extract transient power and current
         consumptions.
         
-        Stores the results in two dictionaries and prints the results to the
-        log also.  The consumptions are extracted for spice_dcsource objects
+        Stores the results in two dictionaries, which are appended to self.IOS
+        and prints the results to the log also.
+        The consumptions are extracted for spice_dcsource objects
         with the attribute extract=True.
         
         The extracted consumptions are accessible on the top-level after simulation as::
             
-            self.powers # Dictionary with power consumptions of each supply + total
-            self.currents # Dictionary with current consumptions of each supply + total
+            self.IOS.Members['powers'] # Dictionary with power consumptions of each supply + total
+            self.IOS.Members['currents'] # Dictionary with current consumptions of each supply + total
 
         """
-        self.powers = {}
-        self.currents = {}
+        self.IOS.Members['powers'] = {}
+        self.IOS.Members['currents'] = {}
         try:
             if self.model == 'eldo':
                 currentmatch = re.compile(r"\* CURRENT_")
@@ -816,12 +817,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                             words = line.split()
                             sourcename = words[1].replace('CURRENT_','')
                             extval = float(words[3])
-                            self.currents[sourcename] = extval
+                            self.IOS.Members['currents'][sourcename] = extval
                         elif powermatch.search(line):
                             words = line.split()
                             sourcename = words[1].replace('POWER_','')
                             extval = float(words[3])
-                            self.powers[sourcename] = extval
+                            self.IOS.Members['powers'][sourcename] = extval
             elif self.model == 'spectre':
                 for name, val in self.tb.dcsources.Members.items():
                     # Read transient power consumption of the extracted source
@@ -837,19 +838,19 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                         meancurr = np.sum(np.abs(arr[1:,1])*dt)/totaltime
                         meanpwr = meancurr*val.value
                         sourcename = '%s%s' % (val.sourcetype.upper(),val.name.upper())
-                        self.currents[sourcename] = meancurr
-                        self.powers[sourcename] = meanpwr
+                        self.IOS.Members['currents'][sourcename] = meancurr
+                        self.IOS.Members['powers'][sourcename] = meanpwr
             self.print_log(type='I',msg='Extracted power consumption from transient:')
             # This is newer Python syntax
-            maxlen = len(max([*self.powers,'total'],key=len))
-            for name,val in self.currents.items():
+            maxlen = len(max([*self.IOS.Members['powers'],'total'],key=len))
+            for name,val in self.IOS.Members['currents'].items():
                 self.print_log(type='I',msg='%s%s current = %.06f mA'%(name,' '*(maxlen-len(name)),1e3*val))
-            if len(self.currents.items()) > 0:
-                self.print_log(type='I',msg='Total%s current = %.06f mA'%(' '*(maxlen-5),1e3*sum(self.currents.values())))
-            for name,val in self.powers.items():
+            if len(self.IOS.Members['currents'].items()) > 0:
+                self.print_log(type='I',msg='Total%s current = %.06f mA'%(' '*(maxlen-5),1e3*sum(self.IOS.Members['currents'].values())))
+            for name,val in self.IOS.Members['powers'].items():
                 self.print_log(type='I',msg='%s%s power   = %.06f mW'%(name,' '*(maxlen-len(name)),1e3*val))
-            if len(self.powers.items()) > 0:
-                self.print_log(type='I',msg='Total%s power   = %.06f mW'%(' '*(maxlen-5),1e3*sum(self.powers.values())))
+            if len(self.IOS.Members['powers'].items()) > 0:
+                self.print_log(type='I',msg='Total%s power   = %.06f mW'%(' '*(maxlen-5),1e3*sum(self.IOS.Members['powers'].values())))
         except:
             self.print_log(type='W',msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting power consumptions.')
