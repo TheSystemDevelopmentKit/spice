@@ -51,26 +51,17 @@ class spice_simcmd(thesdk):
                     self.plotlist = ['v(OUT)','v(CLK)']
                 For Spectre, the node name is enough:
                     self.plotlist = ['OUT','CLK']
-            where (str)
-                DC only. Where to save DC operating point results. 'file', 'screen' and 'logfile'
-                are valid options. In case 'file' is specified, the filename is set by
-                'filename' property.
-            filename (str)
-                DC only. The filename of the DC operating point result file, if where == 'file'.
-            as_prop (bool)
-                DC & Spectre models only. If set as True, extracts the values specified in the plotlist, and sets them
-                in self.parent.oppts property for convenient access.
             sweep (str)
                 DC & Spectre models only. If given, sweeps the top-level parameter given as value. For example, 
                 _spice_simcmd(sim='dc', sweep='temp', swpstart=27, swpstop=87) sweeps the top-level parameter
                 temp (temperature) from 27 to 87 at 10 degree increments.
-            subcktswp (str)
+            subcktname (str)
                 If given, sweeps the parameter defined by property sweep from the subcircuit given by this property.
                 For example, _=spice_simcmd(sim='dc', sweep='Vb', subcktname='XSUBCKT', swpstart=0.1, swpstop=1.5, step=0.05)
                 sweeps the Vb parameter from subcircuit XSUBCKT from 0.1 volts to 1.5 volts with 0.05 volt increments.
-            deviceswp
+            devname
                 If given, sweeps the parameter defined by property sweep from the device given by this property.
-                For example, _=spice_simcmd(sim='dc', sweep='w', deviceswp='XSUBCKT.XNMOS', swpstart=10u, swpstop=14u, step=0.1u)
+                For example, _=spice_simcmd(sim='dc', sweep='w', devname='XSUBCKT.XNMOS', swpstart=10u, swpstop=14u, step=0.1u)
                 sweeps the width of transistor XNMOS of subckt XSUBCKT from 10u to 14u in 0.1u increments.
             swpstart (union(int, float, str))
                 Starting point of DC sweep. Default: 0.
@@ -78,8 +69,6 @@ class spice_simcmd(thesdk):
                 Stop point of DC sweep. Default: 0.
             swpstep (union(int, float, str))
                 Step size of the sweep simulation. Default: 10  
-            subscktswp (bool)
-                Is this a subcircuit sweep? Default: False
             tprint (float/str)
                 Print interval. Default '1p' or 1e-12.
             tstop (float/str)
@@ -110,12 +99,9 @@ class spice_simcmd(thesdk):
             self.parent = parent
             self._sim=kwargs.get('sim','tran')
             self._plotlist=kwargs.get('plotlist', [])
-            self._where=kwargs.get('where', 'file') 
-            self._filename=kwargs.get('filename', '\"oppoint.log\"')
-            self._as_prop=kwargs.get('as_prop', False)
             self._sweep=kwargs.get('sweep', '')
-            self._subcktswp=kwargs.get('subcktswp', '')
-            self._deviceswp=kwargs.get('deviceswp', '')
+            self._subcktname=kwargs.get('subcktname', '')
+            self._devname=kwargs.get('devname', '')
             self._swpstart=kwargs.get('swpstart', 0)
             self._swpstop=kwargs.get('swpstop', 0)
             self._swpstep=kwargs.get('swpstep', 10)
@@ -133,12 +119,8 @@ class spice_simcmd(thesdk):
         if hasattr(self.parent,'simcmd_bundle'):
             # This limits it to 1 of each simulation type. Is this ok?
             self.parent.simcmd_bundle.new(name=self.sim,val=self)
-        if self.as_prop:
-            self.parent.oppts_flag=True
-        if self.subcktswp != '' and self.deviceswp != '':
+        if self.subcktname != '' and self.devname != '':
             self.print_log(type='F', msg='Cannot specify subckt sweep and device sweep in the same simcmd instance!')
-        #if self.subcktswp:
-        #    self.parent.subcktswp_flag=True
 
     @property
     def sim(self):
@@ -165,45 +147,6 @@ class spice_simcmd(thesdk):
         self._plotlist=value
 
     @property
-    def where(self):
-        """Set by argument 'where'."""
-        if hasattr(self,'_where'):
-            return self._where
-        else:
-            self._where='file'
-        return self._where
-    @where.setter
-    def where(self,value):
-        self._where=value
-
-    @property
-    def filename(self):
-        """Set by argument 'filename'."""
-        if hasattr(self,'_filename'):
-            return self._filename
-        else:
-            self._filename='\"oppoint.log\"'
-        return self._filename
-    @filename.setter
-    def filename(self,value):
-        if value[0] == '\"' and value[-1] == '\"': 
-            self._filename=value
-        else:
-            self._filename=value
-
-    @property
-    def as_prop(self):
-        """Set by argument 'as_prop'."""
-        if hasattr(self,'_as_prop'):
-            return self._as_prop
-        else:
-            self._as_prop=False
-        return self._as_prop
-    @as_prop.setter
-    def as_prop(self,value):
-        self._as_prop=value
-
-    @property
     def sweep(self):
         """Set by argument 'sweep'."""
         if hasattr(self,'_sweep'):
@@ -216,28 +159,28 @@ class spice_simcmd(thesdk):
         self._sweep=value
 
     @property
-    def subcktswp(self):
-        """Set by argument 'subcktswp'."""
-        if hasattr(self,'_subcktswp'):
-            return self._subcktswp
+    def subcktname(self):
+        """Set by argument 'subcktname'."""
+        if hasattr(self,'_subcktname'):
+            return self._subcktname
         else:
-            self._subcktswp=''
-        return self._subcktswp
-    @subcktswp.setter
-    def subcktswp(self,value):
-        self._subcktswp=value
+            self._subcktname=''
+        return self._subcktname
+    @subcktname.setter
+    def subcktname(self,value):
+        self._subcktname=value
 
     @property
-    def deviceswp(self):
-        """Set by argument 'deviceswp'."""
-        if hasattr(self,'_deviceswp'):
-            return self._deviceswp
+    def devname(self):
+        """Set by argument 'devname'."""
+        if hasattr(self,'_devname'):
+            return self._devname
         else:
-            self._deviceswp=''
-        return self._deviceswp
-    @deviceswp.setter
-    def deviceswp(self,value):
-        self._deviceswp=value
+            self._devname=''
+        return self._devname
+    @devname.setter
+    def devname(self,value):
+        self._devname=value
 
     @property
     def swpstart(self):
@@ -274,18 +217,6 @@ class spice_simcmd(thesdk):
     @swpstep.setter
     def swpstep(self,value):
         self._swpstep=value
-
-    @property
-    def subcktswp(self):
-        """Set by argument 'subcktswp'."""
-        if hasattr(self,'_subcktswp'):
-            return self._subcktswp
-        else:
-            self._subcktswp=False
-        return self._subcktswp
-    @subcktswp.setter
-    def subcktswp(self,value):
-        self._subcktswp=value
 
     @property
     def tprint(self):

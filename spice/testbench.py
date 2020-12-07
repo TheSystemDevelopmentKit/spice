@@ -46,7 +46,6 @@ class testbench(spice_module):
             if self.parent.interactive_spice:
                 self._file=self.parent.spicesrcpath + '/tb_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
                 self._subcktfile=self.parent.spicesrcpath + '/subckt_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
-                #pdb.set_trace()
             else:
                 self._file=self.parent.spicesimpath + '/tb_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
                 #self._dutfile=self.parent.spicesimpath + '/subckt_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
@@ -461,26 +460,18 @@ class testbench(spice_module):
                         self._simcmdstr='.op'
                     elif self.parent.model=='spectre':
                         if val.sweep == '': # This is not a sweep analysis
-                            if val.where == 'file':
-                                self._simcmdstr+='DC_analysis info where=%s file=%s save=all\n\n' % (val.where, val.filename)
-                            else:
-                                self._simcmdstr='DC_analysis info where=%s save=all\n\n' % val.where
+                            self._simcmdstr+='oppoint dc oppoint=rawfile\n\n'
                         else:
-                            if val.subcktswp != '':    
+                            if val.subcktname != '': # Sweep subckt parameter
                                 self._simcmdstr+='%sSweep sweep param=%s sub=%s start=%s stop=%s step=%s { \n' \
-                                        % (val.sweep, val.sweep, val.subcktswp, val.swpstart, val.swpstop, val.swpstep)
-                            elif val.deviceswp != '':
+                                        % (val.sweep, val.sweep, val.subcktname, val.swpstart, val.swpstop, val.swpstep)
+                            elif val.devname != '': # Sweep device parameter
                                 self._simcmdstr+='%sSweep sweep param=%s dev=%s start=%s stop=%s step=%s { \n' \
-                                        % (val.sweep, val.sweep, val.deviceswp, val.swpstart, val.swpstop, val.swpstep)
-                            else:
+                                        % (val.sweep, val.sweep, val.devname, val.swpstart, val.swpstop, val.swpstep)
+                            else: # Sweep top-level netlist parameter
                                 self._simcmdstr+='%sSweep sweep param=%s start=%s stop=%s step=%s { \n' \
                                         % (val.sweep, val.sweep, val.swpstart, val.swpstop, val.swpstep)
-                            if val.where == 'file':
-                                fname = val.filename[0:-1] # Strip last quotation mark
-                                fname += '.%A\"' # Add format specifier to avoid overwriting results
-                                self._simcmdstr+='\tDC_analysis info where=%s file=%s save=all\n}\n\n' % (val.where, fname)
-                            else:
-                                self._simcmdstr='\tDC_analysis info where=%s save=all\n}\n\n' % val.where
+                            self._simcmdstr+='\toppoint dc oppoint=rawfile\n}\n\n'
 
                     else:
                         self.print_log(type='E',msg='Unsupported model %s.' % self.parent.model)

@@ -173,39 +173,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         self._load_state=value
 
     @property
-    def oppts_flag(self):
-        """True | False (default)
-        
-        If True, the DC operating points are set in the oppts property.
-        Shouldn't be set manually.
-        """
-        if hasattr(self, '_oppts_flag'):
-            return self._oppts_flag
-        else:
-            self._oppts_flag=False
-        return self._oppts_flag
-    @oppts_flag.setter
-    def oppts_flag(self, value):
-        self._oppts_flag=value
-
-    @property
-    def oppts(self):
-        """Dict[Dict[str, List[Union[str, float]]]]
-        
-        Nested dictionary of the DC operating points, device name is the first key.
-        The corresponding dictionary gives the operating point name (e.g. ids) and
-        it's list of values. The value index corresponds to the sweep index.
-        """
-        if hasattr(self, '_oppts'):
-            return self._oppts
-        else:
-            self._oppts={}
-        return self._oppts
-    @oppts.setter
-    def oppts(self, value):
-        self._oppts=value
-
-    @property
     def spicecorner(self):  
         """Dictionary
 
@@ -913,43 +880,95 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """
         try:
             if self.model=='spectre':
+                self.IOS.Members.update({'oppts': {}})
+                plotlist = []
+                # Get all dc simulation files
                 for name, val in self.simcmd_bundle.Members.items():
                     if name == 'dc':
-                        fname = val.filename.strip('\"')
                         plotlist = val.plotlist
-                files = glob.glob(fname+'*')
-                fpath = os.path.join(self.entitypath, 'Simulations/spicesim', self.runname)
+                        if val.sweep != '':
+                            fname = '%sSweep*.info' % val.sweep
+                        else:
+                            fname = 'oppoint*.info'
+                # Move to spicesim
+                fpath = os.path.join(self.entitypath, 'spice/tb_%s.raw' % self.name, fname)
+                destpath = os.path.join(self.entitypath, 'Simulations/spicesim', self.runname)
+                files = glob.glob(fpath)
                 for file in files:
-                    os.rename(file, os.path.join(fpath,file))
-                instname = 'X%s' % self.name.upper()
-                instmatch = re.compile(r"Instance: %s" % instname)
-                instfound=False
-                files = glob.glob(os.path.join(fpath,'%s*' % fname))
-                for fdest in files:
-                    with open(fdest, 'r') as f:
+                    os.rename(file, os.path.join(destpath, file.split('/')[-1]))
+                #descmatch = re.compile(r"TYPE")
+                descrbegin = 'TYPE\n'
+                valbegin = 'VALUE\n'
+                eofline = 'END\n'
+                structbeginmatch = re.compile(r"STRUCT")
+                structendmatch = re.compile(r"\) PROP\(")
+
+                # Read the files one by one
+                files = sorted(glob.glob(os.path.join(destpath, fname)))
+                parsedescr=False
+                parsestruct=False
+                parsevals=False
+                res = {}
+                saveall = True if plotlist == [] else False
+                for file in files:
+                    with open(file, 'r') as f:
                         for line in f:
-                            if instmatch.search(line):
-                                if not instfound: # Found new instance
-                                    instfound=True
-                                    devname = line.split()[1].split('.')[1]
+                            if line == eofline:
+                                parsevals = False
+                            if line == descrbegin:
+                                parsedescr = True 
+                                while parsedescr:
+                                    if structbeginmatch.search(line):
+                                        modelname = line.split()[0].strip('\"')
+                                        paramnames = []
+                                        parsestruct = True
+                                        line = next(f)
+                                        while parsestruct:
+                                            parts = line.split()
+                                            if structendmatch.search(line):
+                                                parsestruct=False
+                                                res.update({modelname : paramnames})
+                                                break
+                                            if parts[-1] == 'PROP(':
+                                                paramname = parts[0].strip('\"')
+                                                paramnames.append(paramname)
+                                            line = next(f)
+                                    if line == valbegin:
+                                        parsedescr=False 
+                                        parsevals=True
+                                    else:
+                                        line = next(f)
+                            if parsevals:
+                                line = line.replace('\"', '')
+                                parts = line.split()
+                                if structendmatch.search(line): # Skip the prop futile struct
+                                    next(f)
+                                    next(f)
                                     continue
-                                else: # The next instance was found before the current one ended.
-                                    raise Exception("Instances with no separating line in result file! Failed to read operating points!") 
-                            if instfound:
-                                parts = line.split('=')
-                                if len(parts) == 2:
-                                    paramname = parts[0].strip(' ')
-                                    if paramname in plotlist:
-                                        paramval = self.si_string_to_float(parts[1])
-                                        key = instname + '.' + devname
-                                        if key in self.oppts and paramname in self.oppts[key]:
-                                            self.oppts[key][paramname].append(paramval)
-                                        elif key in self.oppts and paramname not in self.oppts[key]:
-                                            self.oppts[key].update({paramname: [paramval]})
+                                if len(parts) > 1:
+                                    try:
+                                        paramnames = res[parts[1]]
+                                    except KeyError:
+                                        raise Exception("Invalid model name %s in raw-file!" % parts[1])
+                                    instname = parts[0]
+                                    if instname not in self.IOS.Members['oppts']:
+                                        self.IOS.Members['oppts'].update({instname : {}})
+                                    for label in paramnames:
+                                        line = next(f)
+                                        if saveall:
+                                            if label in self.IOS.Members['oppts'][instname]:
+                                                self.IOS.Members['oppts'][instname][label].append(float(line))
+                                            else:
+                                                self.IOS.Members['oppts'][instname].update({label : [float(line)]})
                                         else:
-                                            self.oppts.update({key : {paramname: [paramval]}})
-                            if line == '\n': # End of instance is marked with empty line 
-                                instfound = False
+                                            if label in plotlist:
+                                                if label in self.IOS.Members['oppts'][instname]:
+                                                    self.IOS.Members['oppts'][instname][label].append(float(line))
+                                                else:
+                                                    self.IOS.Members['oppts'][instname].update({label : [float(line)]})
+                # Remove empty entries (otherwise the dict is huge, especially for postlayout netlists)
+                # Perhaps there could be a flag to disable this?
+                self.IOS.Members['oppts'] = {key : val for key, val in self.IOS.Members['oppts'].items() if val}
             elif self.model == 'eldo':
                 raise Exception('DC optpoint extraction not supported for Eldo.')
             else:
@@ -975,8 +994,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self.extract_powers()
             self.read_outfile()
             self.connect_outputs()
-            if self.oppts_flag:
-                self.read_oppts()
+            self.read_oppts()
             # Calling deleter of iofiles
             del self.dcsource_bundle
             del self.iofile_bundle
