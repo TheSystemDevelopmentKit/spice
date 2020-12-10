@@ -10,7 +10,7 @@ automatically generate testbenches for the most common simulation cases.
 
 Initially written by Okko Järvinen, 2019
 
-Last modification by Okko Järvinen, 07.10.2020 12:58
+Last modification by Marko Kosunen, marko.kosunen@aalto.fi, 10.12.2020 15:03
 
 Release 1.4 , Jun 2020 supports Eldo and Spectre
 """
@@ -455,10 +455,13 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             OBSOLETE! RE-LOCATED TO SPICE_SIMCMD.PY
         """
         self.print_log(type='W', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
-        return None 
+        if not hasattr(self,'_plotlist'):
+            self._plotlist=[]
+        return self._plotlist 
     @plotlist.setter
     def plotlist(self,value): 
         self.print_log(type='W', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
+        self._plotlist=value
     @plotlist.deleter
     def plotlist(self): 
         self.print_log(type='W', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
