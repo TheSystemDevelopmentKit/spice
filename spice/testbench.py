@@ -87,6 +87,11 @@ class testbench(spice_module):
         if not hasattr(self,'_options'):
             self._options = "%s Options\n" % self.parent.syntaxdict["commentchar"]
             i=0
+            if self.parent.model == 'spectre':
+                if self.parent.postlayout and 'savefilter' not in self.parent.spiceoptions:
+                    self.print_log(type='I', msg='Consider using option savefilter=rc for post-layout netlists to reduce output file size!')
+                if self.parent.postlayout and 'save' not in self.parent.spiceoptions:
+                    self.print_log(type='I', msg='Consider using option save=none and specifiying saves with plotlist for post-layout netlists to reduce output file size!')
             for optname,optval in self.parent.spiceoptions.items():
                 if self.parent.model=='spectre':
                     self._options += "Option%d " % i # spectre options need unique names
@@ -460,18 +465,22 @@ class testbench(spice_module):
                         self._simcmdstr='.op'
                     elif self.parent.model=='spectre':
                         if val.sweep == '': # This is not a sweep analysis
-                            self._simcmdstr+='oppoint dc oppoint=rawfile\n\n'
+                            self._simcmdstr+='oppoint dc\n\n'
                         else:
+                            if self.parent.distributed_run:
+                                distributestr = 'distribute=lsf numprocesses=%d' % self.parent.num_processes 
+                            else:
+                                distributestr = ''
                             if val.subcktname != '': # Sweep subckt parameter
-                                self._simcmdstr+='%sSweep sweep param=%s sub=%s start=%s stop=%s step=%s { \n' \
-                                        % (val.sweep, val.sweep, val.subcktname, val.swpstart, val.swpstop, val.swpstep)
+                                self._simcmdstr+='%sSweep sweep param=%s sub=%s start=%s stop=%s step=%s %s { \n' \
+                                    % (val.sweep, val.sweep, val.subcktname, val.swpstart, val.swpstop, val.swpstep, distributestr)
                             elif val.devname != '': # Sweep device parameter
-                                self._simcmdstr+='%sSweep sweep param=%s dev=%s start=%s stop=%s step=%s { \n' \
-                                        % (val.sweep, val.sweep, val.devname, val.swpstart, val.swpstop, val.swpstep)
+                                self._simcmdstr+='%sSweep sweep param=%s dev=%s start=%s stop=%s step=%s %s { \n' \
+                                    % (val.sweep, val.sweep, val.devname, val.swpstart, val.swpstop, val.swpstep, distributestr)
                             else: # Sweep top-level netlist parameter
-                                self._simcmdstr+='%sSweep sweep param=%s start=%s stop=%s step=%s { \n' \
-                                        % (val.sweep, val.sweep, val.swpstart, val.swpstop, val.swpstep)
-                            self._simcmdstr+='\toppoint dc oppoint=rawfile\n}\n\n'
+                                self._simcmdstr+='%sSweep sweep param=%s start=%s stop=%s step=%s %s { \n' \
+                                    % (val.sweep, val.sweep, val.swpstart, val.swpstop, val.swpstep, distributestr)
+                            self._simcmdstr+='\toppoint dc\n}\n\n'
 
                     else:
                         self.print_log(type='E',msg='Unsupported model %s.' % self.parent.model)
@@ -485,13 +494,16 @@ class testbench(spice_module):
     def simcmdstr(self,value):
         self._simcmdstr=None
     
-    def esc_bus(self,name):
+    def esc_bus(self,name, esc_colon=True):
         """
         Helper function to escape bus characters for Spectre simulations
-        bus<3:0> --> bus\<3:0\>.
+        bus<3:0> --> bus\<3\:0\>.
         """
         if self.parent.model == 'spectre':
-            return name.replace('<','\\<').replace('>','\\>').replace('[','\\[').replace(']','\\]').replace(':','\\:')
+            if esc_colon:
+                return name.replace('<','\\<').replace('>','\\>').replace('[','\\[').replace(']','\\]').replace(':','\\:')
+            else: # Cannot escape colon for DC analyses..
+                return name.replace('<','\\<').replace('>','\\>').replace('[','\\[').replace(']','\\]')
         else:
             return name
 
@@ -516,6 +528,17 @@ class testbench(spice_module):
                     self._plotcmd += '.plot ' if self.parent.model == 'eldo' else 'save '
                     for i in val.plotlist:
                         self._plotcmd += self.esc_bus(i) + " "
+                    self._plotcmd += "\n\n"
+                if len(val.plotlist) > 0 and name.lower() == 'dc':
+                    self._plotcmd = "%s DC operating points to be captured:\n" % self.parent.syntaxdict["commentchar"]
+                    self._plotcmd += '.plot ' if self.parent.model == 'eldo' else 'save '
+                    for i in val.plotlist:
+                        self._plotcmd += self.esc_bus(i, esc_colon=False) + " "
+                    if val.excludelist != []:
+                        self._plotcmd += 'exclude=[ '
+                        for i in val.excludelist:
+                            self._plotcmd += i + ' '
+                        self._plotcmd += ']'
                     self._plotcmd += "\n\n"
             self._plotcmd += "%s Output signals\n" % self.parent.syntaxdict["commentchar"]
             for name, val in self.iofiles.Members.items():

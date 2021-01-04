@@ -149,6 +149,36 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         self._preserve_spicefiles=value
 
     @property
+    def distributed_run(self):
+        """ Boolean (default False)
+            If True, distributes applicable simulations (currently DC sweep supported)
+            into the LSF cluster. The number of subprocesses launched is
+            set by self.num_processes.
+        """
+        if hasattr(self, '_distributed_run'):
+            return self._distributed_run
+        else:
+            self._distributed_run=False
+        return self.distributed_run
+    @distributed_run.setter
+    def distributed_run(self, value):
+        self._distributed_run=value
+
+    @property
+    def num_processes(self):
+        """ integer
+            Maximum number of spawned child processes for distributed runs.
+        """
+        if hasattr(self, '_num_processes'):
+            return self._num_processes
+        else:
+            self._num_processes=10
+        return self.num_processes
+    @num_processes.setter
+    def num_processes(self, value):
+        self._num_processes=int(value)
+
+    @property
     def load_state(self):  
         """String (Default '')
 
@@ -433,7 +463,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         if not hasattr(self, '_spice_submission'):
             try:
                 if self.interactive_spice:
-                    self._spice_submission = thesdk.GLOBALS['LSFINTERACTIVE'] + ' '
+                    if not self.distributed_run:
+                        self._spice_submission = thesdk.GLOBALS['LSFINTERACTIVE'] + ' '
+                    else: # Spectre LSF doesn't support interactive queues
+                        self.print_log(type='W', msg='Cannot run in interactive mode if distributed mode is on!')
+                        self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
                 else:
                     self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
             except:
@@ -884,95 +918,57 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """
         try:
             if self.model=='spectre':
-                self.IOS.Members.update({'oppts': {}})
-                plotlist = []
-                # Get all dc simulation files
+                self.IOS.Members.update({'oppts' : {}})
+                # Get dc simulation file name
                 for name, val in self.simcmd_bundle.Members.items():
                     if name == 'dc':
-                        plotlist = val.plotlist
                         if val.sweep != '':
-                            fname = '%sSweep*.info' % val.sweep
+                            fname = '%sSweep*.dc' % val.sweep
+                            break
                         else:
-                            fname = 'oppoint*.info'
+                            fname = 'oppoint*.dc'
+                            break
                 # Move to spicesim
-                fpath = os.path.join(self.entitypath, 'spice/tb_%s.raw' % self.name, fname)
+                if self.distributed_run:
+                    ## NOTA BENE: The pattern [0-9]* matches any path with the first character
+                    # being integer in range 0-9 and any number of trailing characters. Glob doesn't
+                    # support exactly matching ANY number of digits and there shouldn't be any files
+                    # in the simulation result directory mathing this pattern so this is probably good enough.
+                    fpath = os.path.join(self.entitypath, 'spice/tb_%s.raw' % self.name,
+                            '[0-9]*', fname)
+                else:
+                    fpath = os.path.join(self.entitypath, 'spice/tb_%s.raw' % self.name, fname)
                 destpath = os.path.join(self.entitypath, 'Simulations/spicesim', self.runname)
                 files = glob.glob(fpath)
                 for file in files:
                     os.rename(file, os.path.join(destpath, file.split('/')[-1]))
-                #descmatch = re.compile(r"TYPE")
-                descrbegin = 'TYPE\n'
                 valbegin = 'VALUE\n'
-                eofline = 'END\n'
-                structbeginmatch = re.compile(r"STRUCT")
-                structendmatch = re.compile(r"\) PROP\(")
-
-                # Read the files one by one
+                eof = 'END\n'
+                parsevals = False
                 files = sorted(glob.glob(os.path.join(destpath, fname)))
-                parsedescr=False
-                parsestruct=False
-                parsevals=False
-                res = {}
-                saveall = True if plotlist == [] else False
                 for file in files:
                     with open(file, 'r') as f:
                         for line in f:
-                            if line == eofline:
-                                parsevals = False
-                            if line == descrbegin:
-                                parsedescr = True 
-                                while parsedescr:
-                                    if structbeginmatch.search(line):
-                                        modelname = line.split()[0].strip('\"')
-                                        paramnames = []
-                                        parsestruct = True
-                                        line = next(f)
-                                        while parsestruct:
-                                            parts = line.split()
-                                            if structendmatch.search(line):
-                                                parsestruct=False
-                                                res.update({modelname : paramnames})
-                                                break
-                                            if parts[-1] == 'PROP(':
-                                                paramname = parts[0].strip('\"')
-                                                paramnames.append(paramname)
-                                            line = next(f)
-                                    if line == valbegin:
-                                        parsedescr=False 
-                                        parsevals=True
-                                    else:
-                                        line = next(f)
-                            if parsevals:
+                            if line == valbegin: # Scan file until unit descriptions end and values start
+                                parsevals = True
+                            elif line != eof and parsevals: # Scan values from output until EOF
                                 line = line.replace('\"', '')
                                 parts = line.split()
-                                if structendmatch.search(line): # Skip the prop futile struct
-                                    next(f)
-                                    next(f)
-                                    continue
-                                if len(parts) > 1:
-                                    try:
-                                        paramnames = res[parts[1]]
-                                    except KeyError:
-                                        raise Exception("Invalid model name %s in raw-file!" % parts[1])
-                                    instname = parts[0]
-                                    if instname not in self.IOS.Members['oppts']:
-                                        self.IOS.Members['oppts'].update({instname : {}})
-                                    for label in paramnames:
-                                        line = next(f)
-                                        if saveall:
-                                            if label in self.IOS.Members['oppts'][instname]:
-                                                self.IOS.Members['oppts'][instname][label].append(float(line))
-                                            else:
-                                                self.IOS.Members['oppts'][instname].update({label : [float(line)]})
-                                        else:
-                                            if label in plotlist:
-                                                if label in self.IOS.Members['oppts'][instname]:
-                                                    self.IOS.Members['oppts'][instname][label].append(float(line))
-                                                else:
-                                                    self.IOS.Members['oppts'][instname].update({label : [float(line)]})
-                # Remove empty entries (otherwise the dict is huge, especially for postlayout netlists)
-                # Perhaps there could be a flag to disable this?
-                self.IOS.Members['oppts'] = {key : val for key, val in self.IOS.Members['oppts'].items() if val}
+                                if len(parts) >= 3:
+                                    if ':' in parts[0]: # This line contains op point parameter (e.g. vgs)
+                                        dev, param = parts[0].split(':')
+                                    elif ':' not in parts[0] and parts[1] == 'V': # This is a node voltage
+                                        dev = parts[0]
+                                        param = parts[1]
+                                    val = float(parts[2])
+                                    if dev not in self.IOS.Members['oppts']: # Found new device
+                                        self.IOS.Members['oppts'].update({dev : {}}) 
+                                    if param not in self.IOS.Members['oppts'][dev]: # Found new parameter for device
+                                        self.IOS.Members['oppts'][dev].update({param : [val]})
+                                    else: # Parameter already existed, just append value. This can occur in e.g. sweeps
+                                        self.IOS.Members['oppts'][dev][param].append(val)
+                            elif line == eof:
+                                parsevals = False
             elif self.model == 'eldo':
                 raise Exception('DC optpoint extraction not supported for Eldo.')
             else:

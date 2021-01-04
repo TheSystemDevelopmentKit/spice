@@ -46,7 +46,7 @@ class spice_simcmd(thesdk):
             sim: str
                 Simulation type. Currently only 'tran' and 'dc' supported.
             plotlist: list(str)
-                List of node names to be plotted. Node names follow simulator
+                List of node names or operating points to be plotted. Node names follow simulator
                 syntax.  For Eldo, the voltage/current specifier is expected::
 
                     self.plotlist = ['v(OUT)','v(CLK)']
@@ -54,6 +54,38 @@ class spice_simcmd(thesdk):
                 For Spectre, the node name is enough::
 
                     self.plotlist = ['OUT','CLK']
+                
+                NOTE: Below applies only for Spectre!
+                When capturing operating point information with Spectre, adding the
+                instance name to plotlist saves all operating points for the device, e.g:
+                    
+                    self.plotlist = [XTB_NAME.XSUBCKT/M0]
+                
+                saves all operating points defined by the model for the device M0 in
+                subckt XSUBCKT.
+                
+                Wildcards are supported, but should be used with caution as the output
+                file can quickly become excessively large. For example to capture the
+                gm of all transistor use:
+
+                    self.plotlist = [*:gm]
+
+                It is highly recommended to exclude the devices that are not needed from
+                the output to reduce file size. Examples of such devices are RC-parasitics
+                (include option 'savefilter=rc' in self.spiceoptions to exclude them) and
+                dummy transistors. See exclude_list below. 
+            excludelist: list(str)
+                NOTE: Below applies for Spectre only!
+                List of device names NOT to be included in the output report. Wildcards are
+                supported. Exclude list is especially useful for DC simulations when 
+                specifiying outputs with wildcards. 
+
+                For example, when capturing gm for all transistors, use exclude list to
+                exclude all dummy transistors with:
+                    
+                    self.excludelist = [XTB_NAME*DUMMY_ID*],
+
+                where DUMMY_ID is extraction tool / runset specific dummy identifier.
             sweep: str
                 DC & Spectre models only. If given, sweeps the top-level
                 parameter given as value. For example::
@@ -119,6 +151,7 @@ class spice_simcmd(thesdk):
             self.parent = parent
             self._sim=kwargs.get('sim','tran')
             self._plotlist=kwargs.get('plotlist', [])
+            self._excludelist=kwargs.get('excludelist', [])
             self._sweep=kwargs.get('sweep', '')
             self._subcktname=kwargs.get('subcktname', '')
             self._devname=kwargs.get('devname', '')
@@ -165,6 +198,18 @@ class spice_simcmd(thesdk):
     @plotlist.setter
     def plotlist(self,value):
         self._plotlist=value
+
+    @property
+    def excludelist(self):
+        """Set by argument 'excludelist'."""
+        if hasattr(self,'_excludelist'):
+            return self._excludelist
+        else:
+            self._excludelist=[]
+        return self._excludelist
+    @excludelist.setter
+    def excludelist(self,value):
+        self._excludelist=value
 
     @property
     def sweep(self):
