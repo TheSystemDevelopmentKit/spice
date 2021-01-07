@@ -917,7 +917,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             TODO: Implement for Eldo as well.
         """
         try:
-            if self.model=='spectre':
+            if self.model=='spectre' and 'dc' in self.simcmd_bundle.Members.keys():
                 self.IOS.Members.update({'oppts' : {}})
                 # Get dc simulation file name
                 for name, val in self.simcmd_bundle.Members.items():
@@ -969,10 +969,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                                         self.IOS.Members['oppts'][dev][param].append(val)
                             elif line == eof:
                                 parsevals = False
-            elif self.model == 'eldo':
+            elif self.model == 'eldo' and 'dc' in self.simcmd_bundle.Members.keys():
                 raise Exception('DC optpoint extraction not supported for Eldo.')
-            else:
+            elif 'dc' in self.simcmd_bundle.Members.keys(): # Unsupported model
                 raise Exception('Unrecognized model %s.' % self.model)
+            else: # DC analysis not in simcmds, oppts is empty
+                self.IOS.Members.update({'oppts' : {}})
         except:
             self.print_log(type='W', msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting DC operating points.')
