@@ -6,7 +6,7 @@ Spice Testbench
 Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
-Last modification by Okko Järvinen, 08.10.2020 10:15
+Last modification by Okko Järvinen, 15.01.2021 09:58
 
 """
 import os
@@ -88,9 +88,9 @@ class testbench(spice_module):
             self._options = "%s Options\n" % self.parent.syntaxdict["commentchar"]
             i=0
             if self.parent.model == 'spectre':
-                if self.parent.postlayout and 'savefilter' not in self.parent.spiceoptions:
+                if self.postlayout and 'savefilter' not in self.parent.spiceoptions:
                     self.print_log(type='I', msg='Consider using option savefilter=rc for post-layout netlists to reduce output file size!')
-                if self.parent.postlayout and 'save' not in self.parent.spiceoptions:
+                if self.postlayout and 'save' not in self.parent.spiceoptions:
                     self.print_log(type='I', msg='Consider using option save=none and specifiying saves with plotlist for post-layout netlists to reduce output file size!')
             for optname,optval in self.parent.spiceoptions.items():
                 if self.parent.model=='spectre':

@@ -10,7 +10,7 @@ automatically generate testbenches for the most common simulation cases.
 
 Initially written by Okko Järvinen, 2019
 
-Last modification by Marko Kosunen, marko.kosunen@aalto.fi, 10.12.2020 15:03
+Last modification by Okko Järvinen, 12.01.2021 09:43
 
 Release 1.4 , Jun 2020 supports Eldo and Spectre
 """
@@ -837,12 +837,14 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         
         The extracted consumptions are accessible on the top-level after simulation as::
             
-            self.IOS.Members['powers'] # Dictionary with power consumptions of each supply + total
-            self.IOS.Members['currents'] # Dictionary with current consumptions of each supply + total
+            self.IOS.Members['powers'] # Dictionary with averaged power consumptions of each supply + total
+            self.IOS.Members['currents'] # Dictionary with averaged current consumptions of each supply + total
+            self.IOS.Members['curr_tran'] # Dictionary with transient current consumptions of each supply
 
         """
         self.IOS.Members['powers'] = {}
         self.IOS.Members['currents'] = {}
+        self.IOS.Members['curr_tran'] = {}
         try:
             if self.model == 'eldo':
                 currentmatch = re.compile(r"\* CURRENT_")
@@ -877,6 +879,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                         sourcename = '%s%s' % (val.sourcetype.upper(),val.name.upper())
                         self.IOS.Members['currents'][sourcename] = meancurr
                         self.IOS.Members['powers'][sourcename] = meanpwr
+                        self.IOS.Members['curr_tran'][sourcename] = arr
             self.print_log(type='I',msg='Extracted power consumption from transient:')
             # This is newer Python syntax
             maxlen = len(max([*self.IOS.Members['powers'],'total'],key=len))
