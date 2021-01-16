@@ -6,7 +6,7 @@ Spice Testbench
 Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
-Last modification by Okko Järvinen, 07.10.2020 14:35
+Last modification by Okko Järvinen, 15.01.2021 09:58
 
 """
 import os
@@ -46,7 +46,6 @@ class testbench(spice_module):
             if self.parent.interactive_spice:
                 self._file=self.parent.spicesrcpath + '/tb_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
                 self._subcktfile=self.parent.spicesrcpath + '/subckt_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
-                #pdb.set_trace()
             else:
                 self._file=self.parent.spicesimpath + '/tb_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
                 #self._dutfile=self.parent.spicesimpath + '/subckt_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
@@ -88,6 +87,11 @@ class testbench(spice_module):
         if not hasattr(self,'_options'):
             self._options = "%s Options\n" % self.parent.syntaxdict["commentchar"]
             i=0
+            if self.parent.model == 'spectre':
+                if self.postlayout and 'savefilter' not in self.parent.spiceoptions:
+                    self.print_log(type='I', msg='Consider using option savefilter=rc for post-layout netlists to reduce output file size!')
+                if self.postlayout and 'save' not in self.parent.spiceoptions:
+                    self.print_log(type='I', msg='Consider using option save=none and specifiying saves with plotlist for post-layout netlists to reduce output file size!')
             for optname,optval in self.parent.spiceoptions.items():
                 if self.parent.model=='spectre':
                     self._options += "Option%d " % i # spectre options need unique names
@@ -411,7 +415,7 @@ class testbench(spice_module):
 
             if self._trantime == 0:
                 self._trantime = "UNDEFINED"
-                self.print_log(type='E',msg='Failed to specify transient duration. Please provide parameter tstop in the spice_simcmd arguments.')
+                self.print_log(type='I',msg='Transient time could not be inferred from input signals. Make sure to provide tstop argument to spice_simcmd.')
         return self._inputsignals
     @inputsignals.setter
     def inputsignals(self,value):
@@ -432,22 +436,23 @@ class testbench(spice_module):
             self._simcmdstr = "%s Simulation commands\n" % self.parent.syntaxdict["commentchar"]
             for sim, val in self.simcmds.Members.items():
                 if str(sim).lower() == 'tran':
+                    simtime = val.tstop if val.tstop is not None else self._trantime
+                    if val.tstop is None:
+                        self.print_log(type='I',msg='Inferred transient duration is %g s.' % simtime)
                     #TODO could this if-else be avoided?
                     if self.parent.model=='eldo':
                         self._simcmdstr += '.%s %s %s %s\n' % \
-                                (sim,str(val.tprint),str(val.tstop) if val.tstop is not None else str(self._trantime+2e-9) \
-                                ,'UIC' if val.uic else '')
+                                (sim,str(val.tprint),str(simtime),'UIC' if val.uic else '')
                         if val.noise:
                             self._simcmdstr += '.noisetran fmin=%s fmax=%s nbrun=1 NONOM %s\n' % \
                                     (str(val.fmin),str(val.fmax),'seed=%d'%(val.seed) if val.seed is not None else '')
                     elif self.parent.model=='spectre':
+                        #TODO initial conditions
                         self._simcmdstr += 'TRAN_analysis %s pstep=%s stop=%s %s ' % \
-                                (sim,str(val.tprint),str(val.tstop) if val.tstop is not None else str(self._trantime) \
-                                ,'UIC' if val.uic else '') #TODO initial conditions
-                                #(sim,str(val.tprint),str(val.tstop) if val.tstop is not None else str(self._trantime+2e-9) \
+                                (sim,str(val.tprint),str(simtime),'UIC' if val.uic else '')
                         if val.noise:
                             if val.seed==0:
-                                self.print_log(type='E',msg='spectre disables noise if noiseseed=0')
+                                self.print_log(type='W',msg='Spectre disables noise if seed=0.')
                             self._simcmdstr += 'trannoisemethod=default noisefmin=%s noisefmax=%s %s ' % \
                                     (str(val.fmin),str(val.fmax),'noiseseed=%d'%(val.seed) if val.seed is not None else '')
                         if val.method is not None:
@@ -455,6 +460,30 @@ class testbench(spice_module):
                         if val.cmin is not None:
                             self._simcmdstr += 'cmin=%s ' %  (str(val.cmin))
                         self._simcmdstr += '\n\n' 
+                elif str(sim).lower() == 'dc':
+                    if self.parent.model=='eldo':
+                        self._simcmdstr='.op'
+                    elif self.parent.model=='spectre':
+                        if val.sweep == '': # This is not a sweep analysis
+                            self._simcmdstr+='oppoint dc\n\n'
+                        else:
+                            if self.parent.distributed_run:
+                                distributestr = 'distribute=lsf numprocesses=%d' % self.parent.num_processes 
+                            else:
+                                distributestr = ''
+                            if val.subcktname != '': # Sweep subckt parameter
+                                self._simcmdstr+='%sSweep sweep param=%s sub=%s start=%s stop=%s step=%s %s { \n' \
+                                    % (val.sweep, val.sweep, val.subcktname, val.swpstart, val.swpstop, val.swpstep, distributestr)
+                            elif val.devname != '': # Sweep device parameter
+                                self._simcmdstr+='%sSweep sweep param=%s dev=%s start=%s stop=%s step=%s %s { \n' \
+                                    % (val.sweep, val.sweep, val.devname, val.swpstart, val.swpstop, val.swpstep, distributestr)
+                            else: # Sweep top-level netlist parameter
+                                self._simcmdstr+='%sSweep sweep param=%s start=%s stop=%s step=%s %s { \n' \
+                                    % (val.sweep, val.sweep, val.swpstart, val.swpstop, val.swpstep, distributestr)
+                            self._simcmdstr+='\toppoint dc\n}\n\n'
+
+                    else:
+                        self.print_log(type='E',msg='Unsupported model %s.' % self.parent.model)
                 else:
                     self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
         return self._simcmdstr
@@ -465,13 +494,16 @@ class testbench(spice_module):
     def simcmdstr(self,value):
         self._simcmdstr=None
     
-    def esc_bus(self,name):
+    def esc_bus(self,name, esc_colon=True):
         """
         Helper function to escape bus characters for Spectre simulations
-        bus<3:0> --> bus\<3:0\>.
+        bus<3:0> --> bus\<3\:0\>.
         """
         if self.parent.model == 'spectre':
-            return name.replace('<','\\<').replace('>','\\>').replace('[','\\[').replace(']','\\]').replace(':','\\:')
+            if esc_colon:
+                return name.replace('<','\\<').replace('>','\\>').replace('[','\\[').replace(']','\\]').replace(':','\\:')
+            else: # Cannot escape colon for DC analyses..
+                return name.replace('<','\\<').replace('>','\\>').replace('[','\\[').replace(']','\\]')
         else:
             return name
 
@@ -482,15 +514,32 @@ class testbench(spice_module):
         
         Manual plot commands corresponding to self.plotlist defined in the
         parent entity.
+
+        
+        Apparently, the there is no good way to save individual plots for individual analyses
+        in Spectre. Thus all 'save' statements can be grouped into one. For Eldo, the situation
+        is different and we need to figure out a way for this to work with Eldo also.
         """
         if not hasattr(self,'_plotcmd'):
             self._plotcmd = "" 
-            if len(self.parent.plotlist) > 0:
-                self._plotcmd = "%s Manually probed signals\n" % self.parent.syntaxdict["commentchar"]
-                self._plotcmd += '.plot ' if self.parent.model == 'eldo' else 'save '
-                for i in self.parent.plotlist:
-                    self._plotcmd += self.esc_bus(i) + " "
-                self._plotcmd += "\n\n"
+            for name, val in self.simcmds.Members.items():
+                if len(val.plotlist) > 0 and name.lower() != 'dc':
+                    self._plotcmd = "%s Manually probed signals\n" % self.parent.syntaxdict["commentchar"]
+                    self._plotcmd += '.plot ' if self.parent.model == 'eldo' else 'save '
+                    for i in val.plotlist:
+                        self._plotcmd += self.esc_bus(i) + " "
+                    self._plotcmd += "\n\n"
+                if len(val.plotlist) > 0 and name.lower() == 'dc':
+                    self._plotcmd = "%s DC operating points to be captured:\n" % self.parent.syntaxdict["commentchar"]
+                    self._plotcmd += '.plot ' if self.parent.model == 'eldo' else 'save '
+                    for i in val.plotlist:
+                        self._plotcmd += self.esc_bus(i, esc_colon=False) + " "
+                    if val.excludelist != []:
+                        self._plotcmd += 'exclude=[ '
+                        for i in val.excludelist:
+                            self._plotcmd += i + ' '
+                        self._plotcmd += ']'
+                    self._plotcmd += "\n\n"
             self._plotcmd += "%s Output signals\n" % self.parent.syntaxdict["commentchar"]
             for name, val in self.iofiles.Members.items():
                 # Output iofile becomes an extract command

@@ -10,7 +10,7 @@ automatically generate testbenches for the most common simulation cases.
 
 Initially written by Okko Järvinen, 2019
 
-Last modification by Okko Järvinen, 07.10.2020 12:58
+Last modification by Okko Järvinen, 12.01.2021 09:43
 
 Release 1.4 , Jun 2020 supports Eldo and Spectre
 """
@@ -49,6 +49,28 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @abstractmethod
     def _classfile(self):
         return os.path.dirname(os.path.realpath(__file__)) + "/"+__name__
+
+    @property
+    def si_prefix_mult(self):
+        """ Dictionary mapping SI-prefixes to multipliers """
+        if hasattr(self, '_si_prefix_mult'):
+            return self._si_prefix_mult
+        else:
+            self._si_prefix_mult = {
+                    'E':1e18,
+                    'P':1e15,
+                    'T':1e12,
+                    'G':1e9,
+                    'M':1e6,
+                    'k':1e3,
+                    'm':1e-3,
+                    'u':1e-6,
+                    'n':1e-9,
+                    'p':1e-12,
+                    'f':1e-15,
+                    'a':1e-18,
+                    }
+        return self._si_prefix_mult
 
     @property
     def syntaxdict(self):
@@ -125,6 +147,36 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @preserve_spicefiles.setter
     def preserve_spicefiles(self,value):
         self._preserve_spicefiles=value
+
+    @property
+    def distributed_run(self):
+        """ Boolean (default False)
+            If True, distributes applicable simulations (currently DC sweep supported)
+            into the LSF cluster. The number of subprocesses launched is
+            set by self.num_processes.
+        """
+        if hasattr(self, '_distributed_run'):
+            return self._distributed_run
+        else:
+            self._distributed_run=False
+        return self.distributed_run
+    @distributed_run.setter
+    def distributed_run(self, value):
+        self._distributed_run=value
+
+    @property
+    def num_processes(self):
+        """ integer
+            Maximum number of spawned child processes for distributed runs.
+        """
+        if hasattr(self, '_num_processes'):
+            return self._num_processes
+        else:
+            self._num_processes=10
+        return self.num_processes
+    @num_processes.setter
+    def num_processes(self, value):
+        self._num_processes=int(value)
 
     @property
     def load_state(self):  
@@ -411,7 +463,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         if not hasattr(self, '_spice_submission'):
             try:
                 if self.interactive_spice:
-                    self._spice_submission = thesdk.GLOBALS['LSFINTERACTIVE'] + ' '
+                    if not self.distributed_run:
+                        self._spice_submission = thesdk.GLOBALS['LSFINTERACTIVE'] + ' '
+                    else: # Spectre LSF doesn't support interactive queues
+                        self.print_log(type='W', msg='Cannot run in interactive mode if distributed mode is on!')
+                        self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
                 else:
                     self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
             except:
@@ -429,27 +485,20 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def plotlist(self): 
-        """List<String>
-
-        List of node names to be plotted. Node names follow simulator syntax.
-
-        For Eldo, the voltage/current specifier is expected::
-
-            self.plotlist = ['v(OUT)','v(CLK)']
-
-        For Spectre, the node name is enough::
-
-            self.plotlist = ['OUT','CLK']
         """
-        if not hasattr(self, '_plotlist'):
-            self._plotlist = []
-        return self._plotlist
+            OBSOLETE! RE-LOCATED TO SPICE_SIMCMD.PY
+        """
+        self.print_log(type='W', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
+        if not hasattr(self,'_plotlist'):
+            self._plotlist=[]
+        return self._plotlist 
     @plotlist.setter
     def plotlist(self,value): 
-            self._plotlist = value
+        self.print_log(type='W', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
+        self._plotlist=value
     @plotlist.deleter
     def plotlist(self): 
-            self._plotlist = None
+        self.print_log(type='W', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
 
     @property
     def spicemisc(self): 
@@ -781,18 +830,21 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         Automatically called function to extract transient power and current
         consumptions.
         
-        Stores the results in two dictionaries and prints the results to the
-        log also.  The consumptions are extracted for spice_dcsource objects
+        Stores the results in two dictionaries, which are appended to self.IOS
+        and prints the results to the log also.
+        The consumptions are extracted for spice_dcsource objects
         with the attribute extract=True.
         
         The extracted consumptions are accessible on the top-level after simulation as::
             
-            self.powers # Dictionary with power consumptions of each supply + total
-            self.currents # Dictionary with current consumptions of each supply + total
+            self.IOS.Members['powers'] # Dictionary with averaged power consumptions of each supply + total
+            self.IOS.Members['currents'] # Dictionary with averaged current consumptions of each supply + total
+            self.IOS.Members['curr_tran'] # Dictionary with transient current consumptions of each supply
 
         """
-        self.powers = {}
-        self.currents = {}
+        self.IOS.Members['powers'] = {}
+        self.IOS.Members['currents'] = {}
+        self.IOS.Members['curr_tran'] = {}
         try:
             if self.model == 'eldo':
                 currentmatch = re.compile(r"\* CURRENT_")
@@ -804,12 +856,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                             words = line.split()
                             sourcename = words[1].replace('CURRENT_','')
                             extval = float(words[3])
-                            self.currents[sourcename] = extval
+                            self.IOS.Members['currents'][sourcename] = extval
                         elif powermatch.search(line):
                             words = line.split()
                             sourcename = words[1].replace('POWER_','')
                             extval = float(words[3])
-                            self.powers[sourcename] = extval
+                            self.IOS.Members['powers'][sourcename] = extval
             elif self.model == 'spectre':
                 for name, val in self.tb.dcsources.Members.items():
                     # Read transient power consumption of the extracted source
@@ -825,23 +877,111 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                         meancurr = np.sum(np.abs(arr[1:,1])*dt)/totaltime
                         meanpwr = meancurr*val.value
                         sourcename = '%s%s' % (val.sourcetype.upper(),val.name.upper())
-                        self.currents[sourcename] = meancurr
-                        self.powers[sourcename] = meanpwr
+                        self.IOS.Members['currents'][sourcename] = meancurr
+                        self.IOS.Members['powers'][sourcename] = meanpwr
+                        self.IOS.Members['curr_tran'][sourcename] = arr
             self.print_log(type='I',msg='Extracted power consumption from transient:')
             # This is newer Python syntax
-            maxlen = len(max([*self.powers,'total'],key=len))
-            for name,val in self.currents.items():
+            maxlen = len(max([*self.IOS.Members['powers'],'total'],key=len))
+            for name,val in self.IOS.Members['currents'].items():
                 self.print_log(type='I',msg='%s%s current = %.06f mA'%(name,' '*(maxlen-len(name)),1e3*val))
-            if len(self.currents.items()) > 0:
-                self.print_log(type='I',msg='Total%s current = %.06f mA'%(' '*(maxlen-5),1e3*sum(self.currents.values())))
-            for name,val in self.powers.items():
+            if len(self.IOS.Members['currents'].items()) > 0:
+                self.print_log(type='I',msg='Total%s current = %.06f mA'%(' '*(maxlen-5),1e3*sum(self.IOS.Members['currents'].values())))
+            for name,val in self.IOS.Members['powers'].items():
                 self.print_log(type='I',msg='%s%s power   = %.06f mW'%(name,' '*(maxlen-len(name)),1e3*val))
-            if len(self.powers.items()) > 0:
-                self.print_log(type='I',msg='Total%s power   = %.06f mW'%(' '*(maxlen-5),1e3*sum(self.powers.values())))
+            if len(self.IOS.Members['powers'].items()) > 0:
+                self.print_log(type='I',msg='Total%s power   = %.06f mW'%(' '*(maxlen-5),1e3*sum(self.IOS.Members['powers'].values())))
         except:
             self.print_log(type='W',msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting power consumptions.')
+    
+    def si_string_to_float(self, strval):
+        """ Convert SI-formatted string to float
+            
+            E.g. self.si_string_to_float('3 mV') returns 3e-3.
+        """
+        parts = strval.split()
+        if len(parts) == 2:
+            val = float(parts[0])
+            if len(parts[1]) == 1: # No prefix
+                mult = 1
+            else:
+                try:
+                    mult = self.si_prefix_mult[parts[1][0]]
+                except KeyError: # Could not convert, just return the text value
+                    self.print_log(type='W', msg='Invalid SI-prefix %s, failed to convert.' % parts[1][0])
+                    return strval
+            return val*mult
+        else:
+            return strval # Was a text value
 
+    def read_oppts(self):
+        """ Internally called function to read the DC operating points of the circuit
+            TODO: Implement for Eldo as well.
+        """
+        try:
+            if self.model=='spectre' and 'dc' in self.simcmd_bundle.Members.keys():
+                self.IOS.Members.update({'oppts' : {}})
+                # Get dc simulation file name
+                for name, val in self.simcmd_bundle.Members.items():
+                    if name == 'dc':
+                        if val.sweep != '':
+                            fname = '%sSweep*.dc' % val.sweep
+                            break
+                        else:
+                            fname = 'oppoint*.dc'
+                            break
+                # Move to spicesim
+                if self.distributed_run:
+                    ## NOTA BENE: The pattern [0-9]* matches any path with the first character
+                    # being integer in range 0-9 and any number of trailing characters. Glob doesn't
+                    # support exactly matching ANY number of digits and there shouldn't be any files
+                    # in the simulation result directory mathing this pattern so this is probably good enough.
+                    fpath = os.path.join(self.entitypath, 'spice/tb_%s.raw' % self.name,
+                            '[0-9]*', fname)
+                else:
+                    fpath = os.path.join(self.entitypath, 'spice/tb_%s.raw' % self.name, fname)
+                destpath = os.path.join(self.entitypath, 'Simulations/spicesim', self.runname)
+                files = glob.glob(fpath)
+                for file in files:
+                    os.rename(file, os.path.join(destpath, file.split('/')[-1]))
+                valbegin = 'VALUE\n'
+                eof = 'END\n'
+                parsevals = False
+                files = sorted(glob.glob(os.path.join(destpath, fname)))
+                for file in files:
+                    with open(file, 'r') as f:
+                        for line in f:
+                            if line == valbegin: # Scan file until unit descriptions end and values start
+                                parsevals = True
+                            elif line != eof and parsevals: # Scan values from output until EOF
+                                line = line.replace('\"', '')
+                                parts = line.split()
+                                if len(parts) >= 3:
+                                    if ':' in parts[0]: # This line contains op point parameter (e.g. vgs)
+                                        dev, param = parts[0].split(':')
+                                    elif ':' not in parts[0] and parts[1] == 'V': # This is a node voltage
+                                        dev = parts[0]
+                                        param = parts[1]
+                                    val = float(parts[2])
+                                    if dev not in self.IOS.Members['oppts']: # Found new device
+                                        self.IOS.Members['oppts'].update({dev : {}}) 
+                                    if param not in self.IOS.Members['oppts'][dev]: # Found new parameter for device
+                                        self.IOS.Members['oppts'][dev].update({param : [val]})
+                                    else: # Parameter already existed, just append value. This can occur in e.g. sweeps
+                                        self.IOS.Members['oppts'][dev][param].append(val)
+                            elif line == eof:
+                                parsevals = False
+            elif self.model == 'eldo' and 'dc' in self.simcmd_bundle.Members.keys():
+                raise Exception('DC optpoint extraction not supported for Eldo.')
+            elif 'dc' in self.simcmd_bundle.Members.keys(): # Unsupported model
+                raise Exception('Unrecognized model %s.' % self.model)
+            else: # DC analysis not in simcmds, oppts is empty
+                self.IOS.Members.update({'oppts' : {}})
+        except:
+            self.print_log(type='W', msg=traceback.format_exc())
+            self.print_log(type='W',msg='Something went wrong while extracting DC operating points.')
+        
     def run_spice(self):
         """Externally called function to execute spice simulation."""
         if self.load_state == '': 
@@ -859,7 +999,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self.extract_powers()
             self.read_outfile()
             self.connect_outputs()
-
+            self.read_oppts()
             # Calling deleter of iofiles
             del self.dcsource_bundle
             del self.iofile_bundle
@@ -893,6 +1033,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     self.read_outfile()
                     self.connect_outputs()
                     self.extract_powers()
+                    self.read_oppts()
             except:
                 self.print_log(type='I',msg=traceback.format_exc())
                 self.print_log(type='F',msg='Failed while loading results from %s.' % self._spicesimpath)
