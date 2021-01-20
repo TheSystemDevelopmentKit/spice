@@ -136,6 +136,8 @@ class spice_iofile(iofile):
             self._vlo=kwargs.get('vlo',0)
             self._tfall=kwargs.get('tfall',5e-12)
             self._trise=kwargs.get('trise',5e-12)
+            if kwargs.get('dir') == 'out':
+                self.print_log(type='W', msg="The output results will no longer be appended to file (i.e. are overwritten) as of v1.6!")
         except:
             self.print_log(type='F', msg="spice IO file definition failed.")
 

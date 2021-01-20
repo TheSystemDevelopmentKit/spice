@@ -19,7 +19,7 @@ module veriloga_csv_write_allpoints_current(pos,neg);
 
 	analog begin
 		@ (initial_step) begin
-			file = $fopen(filename, "a");
+			file = $fopen(filename, "w");
 		end
 	
 		tran_time = $abstime;
