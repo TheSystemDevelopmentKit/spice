@@ -23,7 +23,7 @@ module veriloga_csv_write_edge (clk, data);
 
 	analog begin
 		@ (initial_step) begin
-			file = $fopen(filename, "a");
+			file = $fopen(filename, "w");
 		end
 	
 		@ (cross(V(clk) - vth, edgetype)) begin
