@@ -80,6 +80,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self._syntaxdict = {
                     "cmdfile_ext" : '.cir',
                     "resultfile_ext" : '.wdb',
+                    'plotprog' : 'ezwave',
                     "commentchar" : '*',
                     "commentline" : '***********************\n',
                     "nprocflag" : '-use_proc ', #space required
@@ -97,6 +98,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         elif self.model=='spectre':
             self._syntaxdict = {
                     "cmdfile_ext" : '.scs',
+                    'plotprog' : 'viva',
                     "resultfile_ext" : '.raw',
                     "commentchar" : '//',
                     "commentline" : '///////////////////////\n',
@@ -728,10 +730,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         if not hasattr(self,'_spicecmd'):
             if self.interactive_spice:
                 if self.model=='eldo':
-                    plottingprogram = "-ezwave"
+                    plottingprogram=self.syntaxdict['plotprog'] 
                 elif self.model=='spectre':
-                    #plottingprogram = "-ezwave"
-                    plottingprogram = ''
+                    plottingprogram = '' # Plotting for spectre handled differently. See self.plotprogcmd
                 #submission=""
                 submission=self.spice_submission
             else:
@@ -770,6 +771,24 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @spicecmd.deleter
     def spicecmd(self):
         self._spicecmd=None
+
+    @property
+    def plotprogcmd(self):
+        """
+        Sets the command to be run for interactive Spectre simulations.
+        """
+        if not hasattr(self, '_plotprogcmd') and self.model=='spectre':
+            path=self.spicesrcpath + '/tb_' + self.name + self.syntaxdict["resultfile_ext"]
+            self._plotprogcmd='%s -datadir %s &' % (self.syntaxdict['plotprog'], path)
+        return self._plotprogcmd
+
+    @plotprogcmd.setter
+    def plotprogcmd(self, value):
+        self._plotprogcmd=value
+
+    @plotprogcmd.deleter
+    def plotprogcmd(self):
+        self._plotprogcmd=None
 
     def connect_inputs(self):
         """Automatically called function to connect iofiles (inputs) to top
@@ -824,6 +843,20 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 self.print_log(type='F',msg='Eldo encountered an error (%d).' % status)
         else:
             os.system(self.spicecmd)
+
+    def run_viva(self):
+        """ Run plotting program for interactive Spectre simulations
+            NOTE: This feature is for Spectre simulations ONLY!
+        """
+        cmd=self.plotprogcmd
+        self.print_log(type='I', msg='Running external command: %s' % cmd)
+        try:
+            ret=os.system(cmd)
+            if ret != 0:
+                self.print_log(type='W', msg='%s returned with exit status %d!' % (self.syntaxdict['plotprog'], ret))
+        except: 
+            self.print_log(type='W',msg='Something went wrong while launcing %s.' % self.syntaxdict['plotprog'])
+            self.print_log(type='W',msg=traceback.format_exc())
 
     def extract_powers(self):
         """
@@ -996,6 +1029,8 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self.tb.export(force=True)
             self.write_infile()
             self.execute_spice_sim()
+            if self.interactive_spice and self.model=='spectre':
+                self.run_viva()
             self.extract_powers()
             self.read_outfile()
             self.connect_outputs()
