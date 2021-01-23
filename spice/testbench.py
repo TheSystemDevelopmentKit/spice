@@ -172,6 +172,19 @@ class testbench(spice_module):
                     self._libcmd = "// Spectre device models (undefined)\n"
                     self._libcmd += "//include " + libfile + " " + corner + "\n"
                 self._libcmd += 'tempOption options temp=%s\n' % str(temp)
+            if self.parent.model == 'ngspice':
+                try:
+                    libfile = thesdk.GLOBALS['NGSPICELIBFILE']
+                    if libfile == '':
+                        raise ValueError
+                    else:
+                        self._libcmd = "*** Ngspice device models\n"
+                        self._libcmd += ".lib " + libfile + " " + corner + "\n"
+                except:
+                    self.print_log(type='W',msg='Global TheSDK variable ELDOLIBPATH not set.')
+                    self._libcmd = "*** Eldo device models (undefined)\n"
+                    self._libcmd += "*.lib " + libfile + " " + corner + "\n"
+                self._libcmd += ".temp " + str(temp) + "\n"
         return self._libcmd
     @libcmd.setter
     def libcmd(self,value):

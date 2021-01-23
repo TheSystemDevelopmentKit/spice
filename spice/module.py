@@ -83,6 +83,11 @@ class spice_module(thesdk):
                 prognamematch=re.compile(r"\/\/ Program",re.IGNORECASE)
                 startmatch=re.compile(r"SUBCKT",re.IGNORECASE)
                 endmatch=re.compile(r"ENDS",re.IGNORECASE)
+            elif self.parent.model=='ngspice':
+                cellnamematch=re.compile(r"\*\*\* Design cell name:",re.IGNORECASE)
+                prognamematch=re.compile(r"\* Program",re.IGNORECASE)
+                startmatch=re.compile(r"\.SUBCKT",re.IGNORECASE)
+                endmatch=re.compile(r"\.ENDS",re.IGNORECASE)
             cellname = ''
             linecount = 0
             self._subckt="%s Subcircuit definitions\n\n" % self.parent.syntaxdict["commentchar"]

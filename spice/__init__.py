@@ -112,7 +112,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     }
         if self.model=='ngspice':
             self._syntaxdict = {
-                    "cmdfile_ext" : '.cir',
+                    "cmdfile_ext" : '.ngcir',
                     "resultfile_ext" : '',
                     'plotprog' : '',
                     "commentchar" : '*',
