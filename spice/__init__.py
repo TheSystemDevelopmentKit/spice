@@ -9,10 +9,6 @@ Provides utilities to import spice-like modules to python environment and
 automatically generate testbenches for the most common simulation cases.
 
 Initially written by Okko Järvinen, 2019
-
-Last modification by Okko Järvinen, 12.01.2021 09:43
-
-Release 1.4 , Jun 2020 supports Eldo and Spectre
 """
 import os
 import sys
@@ -75,7 +71,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @property
     def syntaxdict(self):
         """Internally used dictionary for common syntax conversions between
-        Spectre and Eldo."""
+        Spectre, Eldo, and Ngspice."""
         if self.model=='eldo':
             self._syntaxdict = {
                     "cmdfile_ext" : '.cir',
@@ -113,6 +109,25 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     "lastline" : '///', #needed?
                     "eventoutdelim" : ',',
                     "csvskip" : 0
+                    }
+        if self.model=='ngspice':
+            self._syntaxdict = {
+                    "cmdfile_ext" : '.cir',
+                    "resultfile_ext" : '',
+                    'plotprog' : '',
+                    "commentchar" : '*',
+                    "commentline" : '***********************\n',
+                    "nprocflag" : 'set num_threads=', #Goes to .control section
+                    "simulatorcmd" : 'ngspice -b',
+                    #"dcsource_declaration" : '',
+                    "parameter" : '.param ',
+                    "option" : '.option ',
+                    "include" : '.include',
+                    "dspfinclude" : '.include',
+                    "subckt" : '.subckt',
+                    "lastline" : '.ends',
+                    "eventoutdelim" : ' ',
+                    "csvskip" : 2
                     }
         return self._syntaxdict
     @syntaxdict.setter
@@ -210,7 +225,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
         Feature for specifying the 'section' of the model library file and
         simulation temperature. The path to model libraries should be set in
-        TheSDK.config as either ELDOLIBFILE or SPECTRELIBFILE variables.
+        TheSDK.config as either ELDOLIBFILE, SPECTRELIBFILE or NGSPICELIBFILE variable.
 
         Example::
 
@@ -239,7 +254,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         Feature for specifying options for spice simulation. The key is the
         name of the option (as in simulator manual specifies), and the value is
         the value given to said option. Valid key-value pairs can be found from
-        the manual of the simulator (Eldo or Spectre).
+        the manual of the simulator (Eldo, Spectre or Ngspice).
 
         Example::
 
@@ -490,17 +505,17 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """
             OBSOLETE! RE-LOCATED TO SPICE_SIMCMD.PY
         """
-        self.print_log(type='W', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
+        self.print_log(type='O', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
         if not hasattr(self,'_plotlist'):
             self._plotlist=[]
         return self._plotlist 
     @plotlist.setter
     def plotlist(self,value): 
-        self.print_log(type='W', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
+        self.print_log(type='O', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
         self._plotlist=value
     @plotlist.deleter
     def plotlist(self): 
-        self.print_log(type='W', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
+        self.print_log(type='O', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
 
     @property
     def spicemisc(self): 
@@ -605,7 +620,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def spicetbsrc(self):
         """String
 
-        Path to the spice testbench ('./spice/tb_entityname.scs').
+        Path to the spice testbench ('./spice/tb_entityname.<suffix>').
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicetbsrc'):
@@ -650,7 +665,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def spicesubcktsrc(self):
         """String
 
-        Path to the parsed subcircuit file. ('./spice/subckt_entityname.scs').
+        Path to the parsed subcircuit file. ('./spice/subckt_entityname.<suffix>').
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicesubcktsrc'):
@@ -681,8 +696,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         if not self.interactive_spice and not self.preserve_spicefiles:
             # Removing generated files
             filelist = [
-                #self.eldochisrc,
-                #self.eldowdbsrc,
                 self.spicetbsrc,
                 self.spicesubcktsrc
                 ]
@@ -752,11 +765,15 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 plflag = ''
 
             if self.model=='eldo':
+                # Shouldn't this use self.syntaxdict["simulatorcmd"] ?
                 spicesimcmd = "eldo -64b %s %s " % (plottingprogram,nprocflag)
             elif self.model=='spectre':
-                #spicesimcmd = "\"sleep 10; spectre %s %s \"" % (plottingprogram,nprocflag)
-                #spicesimcmd = "spectre %s %s " % (plottingprogram,nprocflag)
-                spicesimcmd = "spectre -64 +lqtimeout=0 ++aps=%s %s %s %s " % (self.errpreset,plflag,plottingprogram,nprocflag)
+                # Shouldn't this use self.syntaxdict["simulatorcmd"] ?
+                spicesimcmd = ( "spectre -64 +lqtimeout=0 ++aps=%s %s %s %s " 
+                        % (self.errpreset,plflag,plottingprogram,nprocflag)
+                        )
+            elif self.model=='ngspice':
+                spicesimcmd = self.syntaxdict["simulatorcmd"]
 
             #spicesimcmd = "%s %s %s " % (self.syntaxdict["simulatorcmd"],plottingprogram,nprocflag)
             spicetbfile = self.spicetbsrc
