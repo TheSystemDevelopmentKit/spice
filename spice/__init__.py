@@ -118,7 +118,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     "commentchar" : '*',
                     "commentline" : '***********************\n',
                     "nprocflag" : 'set num_threads=', #Goes to .control section
-                    "simulatorcmd" : 'ngspice -b ', #space required
+                    "simulatorcmd" : 'ngspice -b', 
                     #"dcsource_declaration" : '',
                     "parameter" : '.param ',
                     "option" : '.option ',
@@ -786,7 +786,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                         % (self.errpreset,plflag,plottingprogram,nprocflag)
                         )
             elif self.model=='ngspice':
-                spicesimcmd = self.syntaxdict["simulatorcmd"]
+                spicesimcmd = self.syntaxdict["simulatorcmd"] + ' '
 
             #spicesimcmd = "%s %s %s " % (self.syntaxdict["simulatorcmd"],plottingprogram,nprocflag)
             spicetbfile = self.spicetbsrc
