@@ -298,7 +298,12 @@ class spice_iofile(iofile):
         """
         self._file = []
         for ioname in self.ionames:
-            filename = '%s/%s_%s_%s%s.txt' % (self.parent.spicesimpath,self.parent.runname,ioname.replace('<','').replace('>','').replace('.','_'),self.iotype,('_%s' % self.edgetype if self.iotype is not 'event' else ''))
+            filename = self.parent.spicesimpath+'/'
+            if self.parent.model == 'ngspice' and self.dir == 'in':
+                filename += ('%s_%s_%s%s.txt' % (self.parent.runname,ioname.replace('<','').replace('>','').replace('.','_'),self.iotype,('_%s' % self.edgetype if self.iotype is not 'event' else ''))).lower()
+            else:
+                filename += ('%s_%s_%s%s.txt' % (self.parent.runname,ioname.replace('<','').replace('>','').replace('.','_'),self.iotype,('_%s' % self.edgetype if self.iotype is not 'event' else '')))
+
             self._file.append(filename)
         return self._file
     @file.setter

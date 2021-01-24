@@ -359,6 +359,17 @@ class testbench(spice_module):
                         # Writing source current consumption to a file
                         self._dcsourcestr += "pwrout_%s%s (%s_p %s) veriloga_csv_write_allpoints_current filename=\"%s\"\n" % \
                             (val.sourcetype.lower(),val.name.lower().replace('.','_'),self.esc_bus(val.pos),self.esc_bus(val.pos),val._extfile)
+                elif self.parent.model == 'ngspice':
+                    if val.ramp == 0:
+                        self._dcsourcestr += "%s%s %s %s %g %s\n" % \
+                                (val.sourcetype.upper(),val.name.lower(),val.pos,val.neg,val.value, \
+                                'NONOISE' if not val.noise else '')
+                    else:
+                        self._dcsourcestr += "%s%s %s %s %s %s\n" % \
+                                (val.sourcetype.upper(),val.name.lower(),val.pos,val.neg, \
+                                'pulse(0 %g 0 %g)' % (val.value,abs(val.ramp)), \
+                                'NONOISE' if not val.noise else '')
+                    # If the DC source is a supply, the power consumption is extracted for it automatically
         return self._dcsourcestr
     @dcsourcestr.setter
     def dcsourcestr(self,value):
@@ -442,9 +453,10 @@ class testbench(spice_module):
                                         and len(str(val.Data[0,i])) == 1):
                                     self._inputsignals += ( 'a%s [ %s_d ] input_vector_%s\n'
                                             % ( val.ionames[i], val.ionames[i], val.ionames[i]) )
+                                    # Ngsim assumes lowercase filenames
                                     self._inputsignals += (
-                                            '.model input_vector_%s d_source(input_file = "%s")\n'
-                                            % ( val.ionames[i], val.file[0] )) 
+                                            '.model input_vector_%s d_source(input_file = %s)\n'
+                                            % ( val.ionames[i], os.path.basename(val.file[i]).lower() )) 
                                     self._inputsignals += (
                                             'adac_%s [ %s_d ] [ %s ] dac_%s\n' % ( val.ionames[i],
                                                 val.ionames[i], val.ionames[i], val.ionames[i])
@@ -506,6 +518,13 @@ class testbench(spice_module):
                         if val.cmin is not None:
                             self._simcmdstr += 'cmin=%s ' %  (str(val.cmin))
                         self._simcmdstr += '\n\n' 
+                    elif self.parent.model=='ngspice':
+                        self._simcmdstr += '.%s %s %s %s\n' % \
+                                (sim,str(val.tprint),str(simtime),'uic' if val.uic else '')
+                        if val.noise:
+                            self.print_log(type='E', 
+                                    msg= ( 'Noise transient not available for Ngsim. Running regular transient.'))
+
                 elif str(sim).lower() == 'dc':
                     if self.parent.model=='eldo':
                         self._simcmdstr='.op'
@@ -587,6 +606,12 @@ class testbench(spice_module):
                         self._plotcmd += ']'
                     self._plotcmd += "\n\n"
             self._plotcmd += "%s Output signals\n" % self.parent.syntaxdict["commentchar"]
+            if self.parent.model=='ngspice':
+                self._plotcmd += ".control\nset wr_singlescale\nset wr_vecnames\n"
+                if self.parent.nproc: 
+                    self._plotcmd +="%s%d\n" % (self.parent.syntaxdict["nprocflag"],self.parent.nproc)
+                self._plotcmd += "run\n"
+
             for name, val in self.iofiles.Members.items():
                 # Output iofile becomes an extract command
                 if val.dir.lower()=='out' or val.dir.lower()=='output':
@@ -600,6 +625,9 @@ class testbench(spice_module):
                                 self._plotcmd += 'save %s\n' % signame
                                 self._plotcmd += "eventout_%s (%s) veriloga_csv_write_allpoints filename=\"%s\"\n" % \
                                         (val.ionames[i].upper().replace('.','_').replace('<','').replace('>',''),signame,val.file[i])
+                            elif self.parent.model=='ngspice':
+                                self._plotcmd += "wrdata %s %s(%s)\n" % \
+                                        (val.file[i], val.sourcetype,val.ionames[i].upper())
                     elif val.iotype=='sample':
                         for i in range(len(val.ionames)):
                             # Checking the given trigger(s)
@@ -647,6 +675,8 @@ class testbench(spice_module):
                                     #self._plotcmd += 'save %s\n' % bitname
                                     self._plotcmd += "sampleout_%s_%d (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
                                             (signame[0],j,self.esc_bus(trig),bitname,val.file[i].replace('.txt','_%d.txt'%j),val.vth,-1 if val.edgetype.lower() is 'falling' else 1)
+                            elif self.parent.model=='ngspice':
+                                self.print_log(type='F', msg='Sample type output not defined for Ngspice')
 
                     elif val.iotype=='time':
                         for i in range(len(val.ionames)):
@@ -674,6 +704,10 @@ class testbench(spice_module):
                                 #self._plotcmd += 'save %s\n' % signame
                                 self._plotcmd += "timeout_%s_%s (%s) veriloga_csv_write_allpoints filename=\"%s\"\n" % \
                                         (val.edgetype.lower(),val.ionames[i].upper().replace('.','_').replace('<','').replace('>',''),signame,val.file[i])
+                            elif self.parent.model=='ngspice':
+                                self._plotcmd += "wrdata %s %s(%s)\n" % \
+                                        (val.file[i], val.sourcetype,val.ionames[i].upper())
+
                     elif val.iotype=='vsample':
                         for i in range(len(val.ionames)):
                             # Checking the given trigger(s)
@@ -691,8 +725,14 @@ class testbench(spice_module):
                                 #self._plotcmd += 'save %s\n' % val.ionames[i].upper()
                                 self._plotcmd += "vsampleout_%s (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
                                         (val.ionames[i].upper().replace('.','_'),trig,val.ionames[i].upper(),val.file[i],val.vth,-1 if val.edgetype.lower() is 'falling' else 1)
+                            elif self.parent.model=='ngspice':
+                                self.print_log(type='F',msg='Iotype vsample not implemented for Ngspice') #TODO
+                    # Close the control sectin for Ngspice
+
                     else:
                         self.print_log(type='W',msg='Output filetype incorrectly defined.')
+            if self.parent.model=='ngspice':
+                    self._plotcmd += ".endc\n"
         return self._plotcmd
     @plotcmd.setter
     def plotcmd(self,value):
