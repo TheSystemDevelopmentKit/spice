@@ -353,8 +353,7 @@ class spice_iofile(iofile):
             except:
                     self.print_log(type='E',msg=traceback.format_exc())
                     self.print_log(type='E',msg='Failed while writing files for %s.' % self.file[i])
-        elif self.iotype == 'sample' and self.parent.model == 'spectre':
-            # Spectre digital input vector file is written here
+        elif self.iotype == 'sample':
             try:
                 for i in range(len(self.file)):
                     self.print_log(type='I',msg='Writing digital input file: %s.' % self.file[i])
@@ -377,7 +376,8 @@ class spice_iofile(iofile):
                         buswidth = busstart-busstop+1
                     else:
                         buswidth = busstop-busstart+1
-                    with open(self.file[i],'w') as outfile:
+                with open(self.file[i],'w') as outfile:
+                    if self.parent.model == 'spectre':
                         # This is Spectre vector file syntax
                         outfile.write('radix %s\n' % ('1 '*buswidth))
                         outfile.write('io i\n')
@@ -397,6 +397,17 @@ class spice_iofile(iofile):
                                 # Input values  are bits (strings of '1' and '0')
                                 binary = vec[j]
                             outfile.write('%s\n' % binary)
+                    if self.parent.model == 'ngspice':
+                        # This is Ngsim vector file syntax
+                        for j in range(len(vec)):
+                            if self.ioformat == 'dec':
+                                # Input values are integer numbers (TODO: check if its unsigned)
+                                binary = format(vec[j],'0%db' % buswidth)
+                            else:
+                                # Input values  are bits (strings of '1' and '0')
+                                binary = vec[j]
+                            line = str(j/self.rs)+' '+'s '.join(binary)+'s'
+                            outfile.write('%s\n' % line)
             except:
                 self.print_log(type='E',msg=traceback.format_exc())
                 self.print_log(type='E',msg='Failed while writing files for %s.' % self.file[i])

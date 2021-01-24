@@ -380,6 +380,7 @@ class testbench(spice_module):
             for name, val in self.iofiles.Members.items():
                 # Input file becomes a source
                 if val.dir.lower()=='in' or val.dir.lower()=='input':
+                    # Event signals are analog
                     if val.iotype.lower()=='event':
                         for i in range(len(val.ionames)):
                             # Finding the max time instant
@@ -394,6 +395,8 @@ class testbench(spice_module):
                                 self._inputsignals += "%s%s %s 0 %ssource type=pwl file=\"%s\"\n" % \
                                         (val.sourcetype.upper(),self.esc_bus(val.ionames[i].lower()),
                                         self.esc_bus(val.ionames[i].upper()),val.sourcetype.lower(),val.file[i])
+                    # Sample signals are digital
+                    # Presumably these are already converted to bitstrings
                     elif val.iotype.lower()=='sample':
                         if self.parent.model == 'eldo':
                             for i in range(len(val.ionames)):
@@ -434,7 +437,9 @@ class testbench(spice_module):
                                 except:
                                     pass
                                 # Checking if the given bus is actually a 1-bit signal
-                                if ('<' not in val.ionames[i]) and ('>' not in val.ionames[i]) and len(str(val.Data[0,i])) == 1:
+                                if (('<' not in val.ionames[i]) 
+                                        and ('>' not in val.ionames[i]) 
+                                        and len(str(val.Data[0,i])) == 1):
                                     busname = '%s_BUS' % val.ionames[i]
                                     self._inputsignals += '.setbus %s %s\n' % (busname,val.ionames[i])
                                 else:
