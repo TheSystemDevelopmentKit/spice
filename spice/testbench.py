@@ -440,13 +440,22 @@ class testbench(spice_module):
                                 if (('<' not in val.ionames[i]) 
                                         and ('>' not in val.ionames[i]) 
                                         and len(str(val.Data[0,i])) == 1):
-                                    busname = '%s_BUS' % val.ionames[i]
-                                    self._inputsignals += '.setbus %s %s\n' % (busname,val.ionames[i])
+                                    self._inputsignals += ( 'a%s [ %s_d ] input_vector_%s\n'
+                                            % ( val.ionames[i], val.ionames[i], val.ionames[i]) )
+                                    self._inputsignals += (
+                                            '.model input_vector_%s d_source(input_file = "%s")\n'
+                                            % ( val.ionames[i], val.file[0] )) 
+                                    self._inputsignals += (
+                                            'adac_%s [ %s_d ] [ %s ] dac_%s\n' % ( val.ionames[i],
+                                                val.ionames[i], val.ionames[i], val.ionames[i])
+                                                )
+                                    self._inputsignals += (
+                                        '.model dac_%s dac_bridge(out_low = %s out_high = %s out_undef = %s input_load = 5.0e-16 t_rise = %s t_fall = %s' %
+                                        (val.ionames[i], val.vlo, val.vhi, (val.vhi+val.vlo)/2,
+                                            val.trise, val.tfall )
+                                        )
                                 else:
                                     busname = val.ionames[i]
-                                # Adding the source
-                                self._inputsignals += ".sigbus %s vhi=%s vlo=%s tfall=%s trise=%s thold=%s tdelay=%s base=%s PATTERN %s\n" % \
-                                        (busname,str(val.vhi),str(val.vlo),str(val.tfall),str(val.trise),str(1/val.rs),'0','bin',pattstr)
                     else:
                         self.print_log(type='F',msg='Input type \'%s\' undefined.' % val.iotype)
 
