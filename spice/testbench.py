@@ -423,6 +423,25 @@ class testbench(spice_module):
                                 except:
                                     pass
                                 self._inputsignals += 'vec_include "%s"\n' % val.file[i]
+                        elif self.parent.model == 'ngspice':
+                            for i in range(len(val.ionames)):
+                                pattstr = ''
+                                for d in val.Data[:,i]:
+                                    pattstr += '%s ' % str(d)
+                                try:
+                                    if float(self._trantime) < len(val.Data)/val.rs:
+                                        self._trantime = len(val.Data)/val.rs
+                                except:
+                                    pass
+                                # Checking if the given bus is actually a 1-bit signal
+                                if ('<' not in val.ionames[i]) and ('>' not in val.ionames[i]) and len(str(val.Data[0,i])) == 1:
+                                    busname = '%s_BUS' % val.ionames[i]
+                                    self._inputsignals += '.setbus %s %s\n' % (busname,val.ionames[i])
+                                else:
+                                    busname = val.ionames[i]
+                                # Adding the source
+                                self._inputsignals += ".sigbus %s vhi=%s vlo=%s tfall=%s trise=%s thold=%s tdelay=%s base=%s PATTERN %s\n" % \
+                                        (busname,str(val.vhi),str(val.vlo),str(val.tfall),str(val.trise),str(1/val.rs),'0','bin',pattstr)
                     else:
                         self.print_log(type='F',msg='Input type \'%s\' undefined.' % val.iotype)
 
