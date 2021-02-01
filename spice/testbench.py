@@ -447,6 +447,7 @@ class testbench(spice_module):
                                         self._trantime = len(val.Data)/val.rs
                                 except:
                                     pass
+
                                 # Checking if the given bus is actually a 1-bit signal
                                 if (('<' not in val.ionames[i]) 
                                         and ('>' not in val.ionames[i]) 
@@ -464,6 +465,53 @@ class testbench(spice_module):
                                     self._inputsignals += (
                                         '.model dac_%s dac_bridge(out_low = %s out_high = %s out_undef = %s input_load = 5.0e-16 t_rise = %s t_fall = %s' %
                                         (val.ionames[i], val.vlo, val.vhi, (val.vhi+val.vlo)/2,
+                                            val.trise, val.tfall )
+                                        )
+                                elif (('<' in val.ionames[i]) 
+                                        and ('>' in val.ionames[i])):
+                                    signame = val.ionames[i]
+                                    signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
+                                    busstart = int(signame[1])
+                                    busstop = int(signame[2])
+                                    loopstart=np.amin([busstart,busstop])
+                                    loopstop=np.amax([busstart,busstop])
+                                    self._inputsignals += ( 'a%s [ '
+                                            % ( signame[0])
+                                            )
+
+                                    for index in range(loopstart,loopstop+1):
+                                        self._inputsignals += ( '%s_%s_d '
+                                            % ( signame[0], index)
+                                            )
+
+                                    self._inputsignals += ( '] input_vector_%s\n'
+                                            % ( signame[0])
+                                            )
+
+                                    # Ngsim assumes lowercase filenames
+                                    self._inputsignals += (
+                                            '.model input_vector_%s d_source(input_file = %s)\n'
+                                            % ( signame[0], os.path.basename(val.file[i]).lower() )
+                                            ) 
+
+                                    # DAC
+                                    self._inputsignals += ( 'adac_%s [ ' % ( signame[0]) )
+
+                                    for index in range(loopstart,loopstop+1):
+                                        self._inputsignals += ( '%s_%s_d '
+                                                % ( signame[0], index))
+                                    self._inputsignals += ( '] [ ' )
+
+                                    for index in range(loopstart,loopstop+1):
+                                        self._inputsignals += (
+                                                    '%s_%s_ ' % ( signame[0], index)
+                                                )
+                                    self._inputsignals += (
+                                                '] dac_%s\n' % ( signame[0])
+                                            )
+                                    self._inputsignals += (
+                                        '.model dac_%s dac_bridge(out_low = %s out_high = %s out_undef = %s input_load = 5.0e-16 t_rise = %s t_fall = %s' %
+                                        (signame[0], val.vlo, val.vhi, (val.vhi+val.vlo)/2,
                                             val.trise, val.tfall )
                                         )
                                 else:
