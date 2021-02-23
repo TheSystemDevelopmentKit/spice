@@ -10,9 +10,9 @@ automatically generate testbenches for the most common simulation cases.
 
 Initially written by Okko Järvinen, 2019
 
-Last modification by Okko Järvinen, 12.01.2021 09:43
+Last modification by Okko Järvinen, 18.02.2021 15:39
 
-Release 1.4 , Jun 2020 supports Eldo and Spectre
+Release 1.6, Jun 2020 supports Eldo and Spectre
 """
 import os
 import sys
@@ -283,9 +283,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @spiceparameters.setter
     def spiceparameters(self,value): 
             self._spiceparameters = value
-    @spiceparameters.deleter
-    def spiceparameters(self): 
-            self._spiceparameters = None
 
     @property
     def runname(self):
@@ -378,9 +375,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @dspf.setter
     def dspf(self,value):
         self._dspf=value
-    @dspf.deleter
-    def dspf(self,value):
-        self._dspf=None
 
     @property
     def iofile_bundle(self):
@@ -412,7 +406,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 self.print_log(type='I',msg='Removing %s.' % simpathname)
             except:
                 self.print_log(type='W',msg='Could not remove %s.' % simpathname)
-        #self._iofile_bundle=None
 
     @property
     def dcsource_bundle(self):
@@ -480,10 +473,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @spice_submission.setter
     def spice_submission(self,value):
         self._spice_submission=value
-    @spice_submission.deleter
-    def spice_submission(self):
-        for name, val in self.spice_submission.Members.items():
-            val.remove()
 
     @property
     def plotlist(self): 
@@ -498,9 +487,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def plotlist(self,value): 
         self.print_log(type='W', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
         self._plotlist=value
-    @plotlist.deleter
-    def plotlist(self): 
-        self.print_log(type='W', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
 
     @property
     def spicemisc(self): 
@@ -522,9 +508,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @spicemisc.setter
     def spicemisc(self,value): 
             self._spicemisc = value
-    @spicemisc.deleter
-    def spicemisc(self): 
-            self._spicemisc = None
 
     @property
     def ahdlpath(self): 
@@ -539,9 +522,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @ahdlpath.setter
     def ahdlpath(self,value): 
             self._ahdlpath = value
-    @ahdlpath.deleter
-    def ahdlpath(self): 
-            self._ahdlpath = None
 
     @property
     def name(self):
@@ -577,7 +557,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         except:
             self.print_log(type='E',msg='Failed to create %s.' % self._spicesrcpath)
         return self._spicesrcpath
-    #No setter, no deleter.
 
     @property
     def spicesrc(self):
@@ -768,9 +747,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @spicecmd.setter
     def spicecmd(self,value):
         self._spicecmd=value
-    @spicecmd.deleter
-    def spicecmd(self):
-        self._spicecmd=None
 
     @property
     def plotprogcmd(self):
@@ -781,14 +757,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             path=self.spicesrcpath + '/tb_' + self.name + self.syntaxdict["resultfile_ext"]
             self._plotprogcmd='%s -datadir %s &' % (self.syntaxdict['plotprog'], path)
         return self._plotprogcmd
-
     @plotprogcmd.setter
     def plotprogcmd(self, value):
         self._plotprogcmd=value
-
-    @plotprogcmd.deleter
-    def plotprogcmd(self):
-        self._plotprogcmd=None
 
     def connect_inputs(self):
         """Automatically called function to connect iofiles (inputs) to top
@@ -825,7 +796,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     
     def execute_spice_sim(self):
         """Automatically called function to execute spice simulation."""
-        self.print_log(type='I', msg="Running external command %s\n" %(self.spicecmd) )
+        self.print_log(type='I', msg="Running external command %s" %(self.spicecmd) )
         if self.model == 'eldo':
             # This is some experimental stuff
             count = 0
@@ -861,23 +832,19 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def extract_powers(self):
         """
         Automatically called function to extract transient power and current
-        consumptions.
-        
-        Stores the results in two dictionaries, which are appended to self.IOS
-        and prints the results to the log also.
-        The consumptions are extracted for spice_dcsource objects
+        consumptions. The consumptions are extracted for spice_dcsource objects
         with the attribute extract=True.
         
         The extracted consumptions are accessible on the top-level after simulation as::
             
-            self.IOS.Members['powers'] # Dictionary with averaged power consumptions of each supply + total
-            self.IOS.Members['currents'] # Dictionary with averaged current consumptions of each supply + total
-            self.IOS.Members['curr_tran'] # Dictionary with transient current consumptions of each supply
+            self.extracts.Members['powers'] # Dictionary with averaged power consumptions of each supply + total
+            self.extracts.Members['currents'] # Dictionary with averaged current consumptions of each supply + total
+            self.extracts.Members['curr_tran'] # Dictionary with transient current consumptions of each supply
 
         """
-        self.IOS.Members['powers'] = {}
-        self.IOS.Members['currents'] = {}
-        self.IOS.Members['curr_tran'] = {}
+        self.extracts.Members['powers'] = {}
+        self.extracts.Members['currents'] = {}
+        self.extracts.Members['curr_tran'] = {}
         try:
             if self.model == 'eldo':
                 currentmatch = re.compile(r"\* CURRENT_")
@@ -889,12 +856,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                             words = line.split()
                             sourcename = words[1].replace('CURRENT_','')
                             extval = float(words[3])
-                            self.IOS.Members['currents'][sourcename] = extval
+                            self.extracts.Members['currents'][sourcename] = extval
                         elif powermatch.search(line):
                             words = line.split()
                             sourcename = words[1].replace('POWER_','')
                             extval = float(words[3])
-                            self.IOS.Members['powers'][sourcename] = extval
+                            self.extracts.Members['powers'][sourcename] = extval
             elif self.model == 'spectre':
                 for name, val in self.tb.dcsources.Members.items():
                     # Read transient power consumption of the extracted source
@@ -910,20 +877,20 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                         meancurr = np.sum(np.abs(arr[1:,1])*dt)/totaltime
                         meanpwr = meancurr*val.value
                         sourcename = '%s%s' % (val.sourcetype.upper(),val.name.upper())
-                        self.IOS.Members['currents'][sourcename] = meancurr
-                        self.IOS.Members['powers'][sourcename] = meanpwr
-                        self.IOS.Members['curr_tran'][sourcename] = arr
+                        self.extracts.Members['currents'][sourcename] = meancurr
+                        self.extracts.Members['powers'][sourcename] = meanpwr
+                        self.extracts.Members['curr_tran'][sourcename] = arr
             self.print_log(type='I',msg='Extracted power consumption from transient:')
             # This is newer Python syntax
-            maxlen = len(max([*self.IOS.Members['powers'],'total'],key=len))
-            for name,val in self.IOS.Members['currents'].items():
+            maxlen = len(max([*self.extracts.Members['powers'],'total'],key=len))
+            for name,val in self.extracts.Members['currents'].items():
                 self.print_log(type='I',msg='%s%s current = %.06f mA'%(name,' '*(maxlen-len(name)),1e3*val))
-            if len(self.IOS.Members['currents'].items()) > 0:
-                self.print_log(type='I',msg='Total%s current = %.06f mA'%(' '*(maxlen-5),1e3*sum(self.IOS.Members['currents'].values())))
-            for name,val in self.IOS.Members['powers'].items():
+            if len(self.extracts.Members['currents'].items()) > 0:
+                self.print_log(type='I',msg='Total%s current = %.06f mA'%(' '*(maxlen-5),1e3*sum(self.extracts.Members['currents'].values())))
+            for name,val in self.extracts.Members['powers'].items():
                 self.print_log(type='I',msg='%s%s power   = %.06f mW'%(name,' '*(maxlen-len(name)),1e3*val))
-            if len(self.IOS.Members['powers'].items()) > 0:
-                self.print_log(type='I',msg='Total%s power   = %.06f mW'%(' '*(maxlen-5),1e3*sum(self.IOS.Members['powers'].values())))
+            if len(self.extracts.Members['powers'].items()) > 0:
+                self.print_log(type='I',msg='Total%s power   = %.06f mW'%(' '*(maxlen-5),1e3*sum(self.extracts.Members['powers'].values())))
         except:
             self.print_log(type='W',msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting power consumptions.')
@@ -954,7 +921,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """
         try:
             if self.model=='spectre' and 'dc' in self.simcmd_bundle.Members.keys():
-                self.IOS.Members.update({'oppts' : {}})
+                self.extracts.Members.update({'oppts' : {}})
                 # Get dc simulation file name
                 for name, val in self.simcmd_bundle.Members.items():
                     if name == 'dc':
@@ -997,12 +964,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                                         dev = parts[0]
                                         param = parts[1]
                                     val = float(parts[2])
-                                    if dev not in self.IOS.Members['oppts']: # Found new device
-                                        self.IOS.Members['oppts'].update({dev : {}}) 
-                                    if param not in self.IOS.Members['oppts'][dev]: # Found new parameter for device
-                                        self.IOS.Members['oppts'][dev].update({param : [val]})
+                                    if dev not in self.extracts.Members['oppts']: # Found new device
+                                        self.extracts.Members['oppts'].update({dev : {}}) 
+                                    if param not in self.extracts.Members['oppts'][dev]: # Found new parameter for device
+                                        self.extracts.Members['oppts'][dev].update({param : [val]})
                                     else: # Parameter already existed, just append value. This can occur in e.g. sweeps
-                                        self.IOS.Members['oppts'][dev][param].append(val)
+                                        self.extracts.Members['oppts'][dev][param].append(val)
                             elif line == eof:
                                 parsevals = False
             elif self.model == 'eldo' and 'dc' in self.simcmd_bundle.Members.keys():
@@ -1010,7 +977,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             elif 'dc' in self.simcmd_bundle.Members.keys(): # Unsupported model
                 raise Exception('Unrecognized model %s.' % self.model)
             else: # DC analysis not in simcmds, oppts is empty
-                self.IOS.Members.update({'oppts' : {}})
+                self.extracts.Members.update({'oppts' : {}})
         except:
             self.print_log(type='W', msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting DC operating points.')
