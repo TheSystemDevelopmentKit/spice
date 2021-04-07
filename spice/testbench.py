@@ -6,7 +6,7 @@ Spice Testbench
 Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
-Last modification by Okko Järvinen, 15.01.2021 09:58
+Last modification by Kalle Spoof, kalle.spoof@aalto.fi, 07.04.2021 13:48
 
 """
 import os
@@ -406,6 +406,13 @@ class testbench(spice_module):
                                 self._inputsignals += "%s%s %s 0 %ssource type=pwl file=\"%s\"\n" % \
                                         (val.sourcetype.upper(),self.esc_bus(val.ionames[i].lower()),
                                         self.esc_bus(val.ionames[i].upper()),val.sourcetype.lower(),val.file[i])
+                            elif self.parent.model=='ngspice':
+                                self._inputsignals += "a%s %%vd[%s 0] filesrc%s\n" % \
+                                        (self.esc_bus(val.ionames[i].lower()),
+                                        self.esc_bus(val.ionames[i].upper()),self.esc_bus(val.ionames[i].lower()))
+                                self._inputsignals += ".model filesrc%s filesource (file=\"%s\"\n" % \
+                                        (self.esc_bus(val.ionames[i].lower()),os.path.basename(val.file[i]).lower())
+                                self._inputsignals += "+ amploffset=[0 0] amplscale=[1 1] timeoffset=0 timescale=1 timerelative=false amplstep=false)\n"
                     # Sample signals are digital
                     # Presumably these are already converted to bitstrings
                     elif val.iotype.lower()=='sample':
@@ -674,6 +681,8 @@ class testbench(spice_module):
                                 self._plotcmd += "eventout_%s (%s) veriloga_csv_write_allpoints filename=\"%s\"\n" % \
                                         (val.ionames[i].upper().replace('.','_').replace('<','').replace('>',''),signame,val.file[i])
                             elif self.parent.model=='ngspice':
+                                self._plotcmd += "plot %s(%s)\n" % \
+                                        (val.sourcetype,val.ionames[i].upper())
                                 self._plotcmd += "wrdata %s %s(%s)\n" % \
                                         (val.file[i], val.sourcetype,val.ionames[i].upper())
                     elif val.iotype=='sample':
