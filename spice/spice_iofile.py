@@ -8,7 +8,7 @@ for TheSDK spice.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 07.10.2020 14:40
+Last modification by Kalle Spoof, kalle.spoof@aalto.fi, 07.04.2021 14:52
 
 """
 import os
@@ -427,8 +427,13 @@ class spice_iofile(iofile):
         for i in range(len(self.file)):
             try:
                 if self.iotype=='event' or self.iotype=='vsample':
-                    arr = genfromtxt(self.file[i],delimiter=self.parent.syntaxdict['eventoutdelim'], \
-                            skip_header=self.parent.syntaxdict['csvskip'])
+                    if self.parent.model=='ngspice':
+                        #ngspice delimiter is two whitespaces for positive data and one whitespace for negative.
+                        arr = genfromtxt(self.file[i], \
+                                skip_header=self.parent.syntaxdict['csvskip'])
+                    else:
+                        arr = genfromtxt(self.file[i],delimiter=self.parent.syntaxdict['eventoutdelim'], \
+                                skip_header=self.parent.syntaxdict['csvskip'])
                     if self.Data is None: 
                         self.Data = np.array(arr)
                     else:

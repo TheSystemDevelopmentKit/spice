@@ -127,7 +127,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     "subckt" : '.subckt',
                     "lastline" : '.end',
                     "eventoutdelim" : '  ', # Two spaces
-                    "csvskip" : 2
+                    "csvskip" : 1
                     }
         return self._syntaxdict
     @syntaxdict.setter
