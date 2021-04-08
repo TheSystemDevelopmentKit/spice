@@ -7,7 +7,7 @@ Class for spice simulation commands.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 03.12.2020 19:10
+Last modification by Okko Järvinen, 18.03.2021 15:37
 
 """
 
@@ -167,6 +167,8 @@ class spice_simcmd(thesdk):
             self._seed=kwargs.get('seed',None)
             self._method=kwargs.get('method',None)
             self._cmin=kwargs.get('cmin',None)
+            self._mc=kwargs.get('mc',False)
+            self._mc_seed=kwargs.get('mc_seed',None)
         except:
             self.print_log(type='F', msg="Simulation command definition failed.")
         if hasattr(self.parent,'simcmd_bundle'):
@@ -390,3 +392,27 @@ class spice_simcmd(thesdk):
     @cmin.setter
     def cmin(self,value):
         self._cmin=value
+
+    @property
+    def mc(self):
+        """Set by argument 'mc'."""
+        if hasattr(self,'_mc'):
+            return self._mc
+        else:
+            self._mc=False
+        return self._mc
+    @mc.setter
+    def mc(self,value):
+        self._mc=value
+
+    @property
+    def mc_seed(self):
+        """Set by argument 'mc_seed'."""
+        if hasattr(self,'_mc_seed'):
+            return self._mc_seed
+        else:
+            self._mc_seed=None
+        return self._mc_seed
+    @mc_seed.setter
+    def mc_seed(self,value):
+        self._mc_seed=value

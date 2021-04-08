@@ -1,7 +1,7 @@
 // Verilog-A module to write all voltage values 
 // to csv-file.
 //
-// Last modification by Okko Järvinen, 08.06.2020 10:41
+// Last modification by Okko Järvinen, 16.03.2021 19:27
 
 `include "constants.vams"
 `include "disciplines.vams"
@@ -21,7 +21,7 @@ module veriloga_csv_write_allpoints(data);
 		end
 	
 		tran_time = $abstime;
-		$fwrite(file, "%g, ", tran_time);
+		$fwrite(file, "%.10g, ", tran_time);
         $fwrite(file, "%g\n", V(data));
 
 		@ (final_step) begin
