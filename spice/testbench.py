@@ -6,7 +6,7 @@ Spice Testbench
 Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
-Last modification by Okko Järvinen, 18.03.2021 16:14
+Last modification by Okko Järvinen, 08.04.2021 20:02
 
 """
 import os
@@ -391,6 +391,7 @@ class testbench(spice_module):
                                 try:
                                     if float(self._trantime) < len(val.Data)/val.rs:
                                         self._trantime = len(val.Data)/val.rs
+                                        self._trantime_name = name
                                 except:
                                     pass
                                 # Checking if the given bus is actually a 1-bit signal
@@ -408,6 +409,7 @@ class testbench(spice_module):
                                 try:
                                     if float(self._trantime) < len(val.Data)/val.rs:
                                         self._trantime = len(val.Data)/val.rs
+                                        self._trantime_name = name
                                 except:
                                     pass
                                 self._inputsignals += 'vec_include "%s"\n' % val.file[i]
