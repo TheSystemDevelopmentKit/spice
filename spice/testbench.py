@@ -484,6 +484,9 @@ class testbench(spice_module):
 
                     else:
                         self.print_log(type='E',msg='Unsupported model %s.' % self.parent.model)
+                elif str(sim).lower() == 'ac':
+                    print('AC simulation will be implemented here')
+
                 else:
                     self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
         return self._simcmdstr
