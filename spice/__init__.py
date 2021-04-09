@@ -10,7 +10,7 @@ automatically generate testbenches for the most common simulation cases.
 
 Initially written by Okko Järvinen, 2019
 
-Last modification by Okko Järvinen, 18.02.2021 15:39
+Last modification by Okko Järvinen, 08.04.2021 19:55
 
 Release 1.6, Jun 2020 supports Eldo and Spectre
 """
@@ -446,6 +446,18 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def simcmd_bundle(self):
         for name, val in self.simcmd_bundle.Members.items():
             val.remove()
+
+    @property
+    def extracts(self):
+        """ 
+        A thesdk.Bundle containing extracted quantities.
+        """
+        if not hasattr(self,'_extracts'):
+            self._extracts=Bundle()
+        return self._extracts
+    @extracts.setter
+    def extracts(self,value):
+        self._extracts=value
 
     @property 
     def spice_submission(self):

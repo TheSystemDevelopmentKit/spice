@@ -1,7 +1,7 @@
 // Verilog-A module to write all voltage values 
 // to csv-file.
 //
-// Last modification by Kalle Spoof, kalle.spoof@aalto.fi, 02.03.2021 08:26
+// Last modification by Kalle Spoof, kalle.spoof@aalto.fi, 09.04.2021 13:50
 
 `include "constants.vams"
 `include "disciplines.vams"
