@@ -6,7 +6,7 @@ Spice Testbench
 Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
-Last modification by Okko Järvinen, 15.01.2021 09:58
+Last modification by Okko Järvinen, 08.04.2021 20:02
 
 """
 import os
@@ -373,6 +373,7 @@ class testbench(spice_module):
                             maxtime = val.Data[-1,0]
                             if float(self._trantime) < float(maxtime):
                                 self._trantime = maxtime
+                                self._trantime_name = name
                             # Adding the source
                             if self.parent.model=='eldo':
                                 self._inputsignals += "%s%s %s 0 pwl(file=\"%s\")\n" % \
@@ -390,6 +391,7 @@ class testbench(spice_module):
                                 try:
                                     if float(self._trantime) < len(val.Data)/val.rs:
                                         self._trantime = len(val.Data)/val.rs
+                                        self._trantime_name = name
                                 except:
                                     pass
                                 # Checking if the given bus is actually a 1-bit signal
@@ -407,6 +409,7 @@ class testbench(spice_module):
                                 try:
                                     if float(self._trantime) < len(val.Data)/val.rs:
                                         self._trantime = len(val.Data)/val.rs
+                                        self._trantime_name = name
                                 except:
                                     pass
                                 self._inputsignals += 'vec_include "%s"\n' % val.file[i]
@@ -435,10 +438,13 @@ class testbench(spice_module):
         if not hasattr(self,'_simcmdstr'):
             self._simcmdstr = "%s Simulation commands\n" % self.parent.syntaxdict["commentchar"]
             for sim, val in self.simcmds.Members.items():
+                if val.mc and self.parent.model=='spectre':
+                    self._simcmdstr += 'mc montecarlo donominal=no variations=all %snumruns=1 {\n' \
+                            % ('' if val.mc_seed is None else 'seed=%d '%val.mc_seed)
                 if str(sim).lower() == 'tran':
                     simtime = val.tstop if val.tstop is not None else self._trantime
                     if val.tstop is None:
-                        self.print_log(type='I',msg='Inferred transient duration is %g s.' % simtime)
+                        self.print_log(type='I',msg='Inferred transient duration is %g s from \'%s\'.' % (simtime,self._trantime_name))
                     #TODO could this if-else be avoided?
                     if self.parent.model=='eldo':
                         self._simcmdstr += '.%s %s %s %s\n' % \
@@ -495,6 +501,8 @@ class testbench(spice_module):
 
                 else:
                     self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
+                if val.mc and self.parent.model=='spectre':
+                    self._simcmdstr += '}\n\n'
         return self._simcmdstr
     @simcmdstr.setter
     def simcmdstr(self,value):
