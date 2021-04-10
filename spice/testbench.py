@@ -381,7 +381,7 @@ class testbench(spice_module):
                             elif self.parent.model=='spectre':
                                 self._inputsignals += "%s%s %s 0 %ssource type=pwl file=\"%s\"\n" % \
                                         (val.sourcetype.upper(),self.esc_bus(val.ionames[i].lower()),
-                                        self.esc_bus(val.ionames[i].upper()),val.sourcetype.lower(),val.file[i])
+                                        self.esc_bus(val.ionames[i]),val.sourcetype.lower(),val.file[i])
                     elif val.iotype.lower()=='sample':
                         if self.parent.model == 'eldo':
                             for i in range(len(val.ionames)):
@@ -542,13 +542,22 @@ class testbench(spice_module):
             for name, val in self.simcmds.Members.items():
                 if len(val.plotlist) > 0 and name.lower() != 'dc':
                     self._plotcmd = "%s Manually probed signals\n" % self.parent.syntaxdict["commentchar"]
-                    self._plotcmd += '.plot ' if self.parent.model == 'eldo' else 'save '
+                    if self.parent.model == 'eldo': 
+                        self._plotcmd += '.plot ' 
+                    else:
+                        self._plotcmd += 'save ' 
+
                     for i in val.plotlist:
                         self._plotcmd += self.esc_bus(i) + " "
                     self._plotcmd += "\n\n"
+                
                 if len(val.plotlist) > 0 and name.lower() == 'dc':
                     self._plotcmd = "%s DC operating points to be captured:\n" % self.parent.syntaxdict["commentchar"]
-                    self._plotcmd += '.plot ' if self.parent.model == 'eldo' else 'save '
+                    if self.parent.model == 'eldo': 
+                        self._plotcmd += '.plot ' 
+                    else:
+                        self._plotcmd += 'save ' 
+
                     for i in val.plotlist:
                         self._plotcmd += self.esc_bus(i, esc_colon=False) + " "
                     if val.excludelist != []:
@@ -557,6 +566,7 @@ class testbench(spice_module):
                             self._plotcmd += i + ' '
                         self._plotcmd += ']'
                     self._plotcmd += "\n\n"
+
             self._plotcmd += "%s Output signals\n" % self.parent.syntaxdict["commentchar"]
             for name, val in self.iofiles.Members.items():
                 # Output iofile becomes an extract command
@@ -565,12 +575,12 @@ class testbench(spice_module):
                         for i in range(len(val.ionames)):
                             if self.parent.model=='eldo':
                                 self._plotcmd += ".printfile %s(%s) file=\"%s\"\n" % \
-                                        (val.sourcetype,val.ionames[i].upper(),val.file[i])
+                                        (val.sourcetype,val.ionames[i],val.file[i])
                             elif self.parent.model=='spectre':
-                                signame = self.esc_bus(val.ionames[i].upper())
+                                signame = self.esc_bus(val.ionames[i])
                                 self._plotcmd += 'save %s\n' % signame
                                 self._plotcmd += "eventout_%s (%s) veriloga_csv_write_allpoints filename=\"%s\"\n" % \
-                                        (val.ionames[i].upper().replace('.','_').replace('<','').replace('>',''),signame,val.file[i])
+                                        (val.ionames[i].replace('.','_').replace('<','').replace('>',''),signame,val.file[i])
                     elif val.iotype=='sample':
                         for i in range(len(val.ionames)):
                             # Checking the given trigger(s)
