@@ -1019,7 +1019,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             del self.dcsource_bundle
             del self.iofile_bundle
             # And eldo files (tb, subcircuit, wdb)
-            del self.spicesimpath
+            #del self.spicesimpath
         else:
             #Loading previous simulation results and not simulating again
             try:

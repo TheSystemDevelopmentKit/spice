@@ -586,9 +586,21 @@ class testbench(spice_module):
                                         self._plotcmd += 'simulator lang=spice\n'
                                         self._plotcmd += '.option ingold 2\n'
                                         #self._plotcmd += ".print %s %s(%s) file=\"%s\"\n" % \
-                                        self._plotcmd += ".print %s %s(%s)\n" % \
+                                        #(name.lower(),val.sourcetype,val.ionames[i],val.file[i])
+                                        # Implement complex value probing
+                                        print(val.sourcetype)
+                                        print(val.ionames)
+                                        print(name)
+
+                                        if val.sourcetype.lower() == 'vcomplex':
+                                            self._plotcmd += ".print %s vr(%s) vi(%s) \n" % \
+                                                    (name.lower(),val.ionames[i],val.ionames[i])
+                                        elif val.sourcetype.lower() == 'icomplex':
+                                            self._plotcmd += ".print %s ir(%s) ii(%s) \n" % \
+                                                    (name.lower(),val.ionames[i],val.ionames[i])
+                                        else:
+                                            self._plotcmd += ".print %s %s(%s)\n" % \
                                                 (name.lower(),val.sourcetype,val.ionames[i])
-                                                #(name.lower(),val.sourcetype,val.ionames[i],val.file[i])
                                         self._plotcmd += 'simulator lang=spectre\n'
 
 
