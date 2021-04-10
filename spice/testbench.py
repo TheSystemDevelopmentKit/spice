@@ -486,6 +486,12 @@ class testbench(spice_module):
                         self.print_log(type='E',msg='Unsupported model %s.' % self.parent.model)
                 elif str(sim).lower() == 'ac':
                     print('AC simulation will be implemented here')
+                    if self.parent.model=='eldo':
+                        print_log(type='F', msg='AC simulation for eldo not yet implemented')
+                    elif self.parent.model=='spectre':
+                        #[TODO] figure mechanism to define log/lin axes
+                        self._simcmdstr += 'AC_analysis %s start=%s stop=%s log=10' % \
+                                (sim,str(val.fmin),str(val.fmax))
 
                 else:
                     self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
