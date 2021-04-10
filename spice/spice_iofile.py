@@ -80,7 +80,9 @@ class spice_iofile(iofile):
                 Time type signals return a vector of timestamps corresponding
                 to threshold crossings.
             datatype (str)
-                Datatype, not yet implemented.
+                Inherited from the parent.
+                If complex, the ioname is handled as a complex signal.
+                Currently implemented only for writing the ouputs in testbenched and reading them in. 
             trigger (str or list<str>)
                 Name of the clock signal node in the Spice netlist.
                 If a single string is given, the same clock signal is used for all bits/buses.
@@ -120,9 +122,8 @@ class spice_iofile(iofile):
                 Default 5e-12.
             sourcetype (str)
                 Type of the source associated to a file.
-                v | i | vcomplex | icomplex
-                Vcomplex and Icomplex cause imaginary and rela part to be written to the output file
-                Default 'v'
+                V | I
+                Default 'V'
     """
     def __init__(self,parent=None,**kwargs):
         if parent==None:
@@ -431,7 +432,73 @@ class spice_iofile(iofile):
         for i in range(len(self.file)):
             if os.path.isfile(self.file[i]):
                 try:
-                    if self.iotype=='event' or self.iotype=='vsample':
+                    if self.iotype=='event':
+                        if self.parent.model=='spectre':
+                            with open(self.file[i]) as infile:
+                                wholefile=infile.readlines()
+                                found = False
+                                inited = False
+                                append = False
+                                predata = []
+                                for line in wholefile:
+                                    if not found:
+                                        for i in range(len(self.ionames)):
+                                            startmatch=re.compile(r".+?(%s).*?" %(self.ionames[i]) ,re.IGNORECASE)
+                                            if startmatch.search(line) != None:
+                                                found = True
+                                                if i==0:
+                                                    first = True
+                                                else:
+                                                    first = False
+                                    elif found and first:
+                                        stopmatch=re.compile(r".*?y.*?",re.IGNORECASE)
+                                        if stopmatch.search(line) == None:
+                                                data=np.array(line.split()).astype('double')
+                                                if self.datatype == 'complex':
+                                                    if not inited:
+                                                        self.Data=np.array([data[0], data[1]+1j*data[2]]).reshape(1,2)
+                                                        inited = True
+                                                    else:
+                                                        self.Data=np.r_['0', self.Data, np.array([data[0], data[1]+1j*data[2]]).reshape(1,2)]
+                                                else:
+                                                    if not inited:
+                                                        self.Data=np.array([data[0], data[1]]).reshape(1,2)
+                                                        inited = True
+                                                    else:
+                                                        self.Data=np.r_['0', self.Data, np.array([data[0], data[1]]).reshape(1,2)]
+                                        else:
+                                            found = False
+                                    elif found:
+                                        stopmatch=re.compile(r".*?y.*?",re.IGNORECASE)
+                                        if stopmatch.search(line) == None:
+                                                data=np.array(line.split()).astype('double')
+                                                if self.datatype == 'complex':
+                                                    if predata == []:
+                                                        predata=np.array([data[1]+1j*data[2]]).reshape(1,1)
+                                                    else:
+                                                        predata=np.r_['0', predata, np.array([data[1]+1j*data[2]]).reshape(1,1)]
+                                                else:
+                                                    if predata == []:
+                                                        predata=np.array([data[1]]).reshape(1,1)
+                                                    else:
+                                                        predata=np.r_['0', predata, np.array([data[1]])]
+                                        else:
+                                            found = False
+                                            append = True
+                                    if append:
+                                        self.Data=np.r_['1', self.Data, predata]
+                                        predata = []
+                                        append = False
+
+                        else:
+                            arr = genfromtxt(self.file[i],delimiter=self.parent.syntaxdict['eventoutdelim'], \
+                                    skip_header=self.parent.syntaxdict['csvskip'])
+                            if self.Data is None: 
+                                self.Data = np.array(arr)
+                            else:
+                                self.Data = np.hstack((self.Data,np.array(arr)))
+                        # TODO: verify csvskip
+                    elif self.iotype=='vsample':
                         arr = genfromtxt(self.file[i],delimiter=self.parent.syntaxdict['eventoutdelim'], \
                                 skip_header=self.parent.syntaxdict['csvskip'])
                         if self.Data is None: 

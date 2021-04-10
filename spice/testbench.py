@@ -588,12 +588,10 @@ class testbench(spice_module):
                                         #self._plotcmd += ".print %s %s(%s) file=\"%s\"\n" % \
                                         #(name.lower(),val.sourcetype,val.ionames[i],val.file[i])
                                         # Implement complex value probing
-                                        if val.sourcetype.lower() == 'vcomplex':
-                                            self._plotcmd += ".print %s vr(%s) vi(%s) \n" % \
-                                                    (name.lower(),val.ionames[i],val.ionames[i])
-                                        elif val.sourcetype.lower() == 'icomplex':
-                                            self._plotcmd += ".print %s ir(%s) ii(%s) \n" % \
-                                                    (name.lower(),val.ionames[i],val.ionames[i])
+                                        if val.datatype.lower() == 'complex':
+                                            self._plotcmd += ".print %s %sr(%s) %si(%s) \n" % \
+                                                    (name.lower(),val.sourcetype,val.ionames[i],
+                                                            val.sourcetype,val.ionames[i])
                                         else:
                                             self._plotcmd += ".print %s %s(%s)\n" % \
                                                 (name.lower(),val.sourcetype,val.ionames[i])
