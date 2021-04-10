@@ -491,7 +491,6 @@ class testbench(spice_module):
                     else:
                         self.print_log(type='E',msg='Unsupported model %s.' % self.parent.model)
                 elif str(sim).lower() == 'ac':
-                    print('AC simulation will be implemented here')
                     if self.parent.model=='eldo':
                         print_log(type='F', msg='AC simulation for eldo not yet implemented')
                     elif self.parent.model=='spectre':
@@ -540,6 +539,7 @@ class testbench(spice_module):
         if not hasattr(self,'_plotcmd'):
             self._plotcmd = "" 
             for name, val in self.simcmds.Members.items():
+                # Manual probes
                 if len(val.plotlist) > 0 and name.lower() != 'dc':
                     self._plotcmd = "%s Manually probed signals\n" % self.parent.syntaxdict["commentchar"]
                     if self.parent.model == 'eldo': 
@@ -550,7 +550,7 @@ class testbench(spice_module):
                     for i in val.plotlist:
                         self._plotcmd += self.esc_bus(i) + " "
                     self._plotcmd += "\n\n"
-                
+                #DC probes
                 if len(val.plotlist) > 0 and name.lower() == 'dc':
                     self._plotcmd = "%s DC operating points to be captured:\n" % self.parent.syntaxdict["commentchar"]
                     if self.parent.model == 'eldo': 
@@ -567,113 +567,128 @@ class testbench(spice_module):
                         self._plotcmd += ']'
                     self._plotcmd += "\n\n"
 
-            self._plotcmd += "%s Output signals\n" % self.parent.syntaxdict["commentchar"]
-            for name, val in self.iofiles.Members.items():
-                # Output iofile becomes an extract command
-                if val.dir.lower()=='out' or val.dir.lower()=='output':
-                    if val.iotype=='event':
-                        for i in range(len(val.ionames)):
-                            if self.parent.model=='eldo':
-                                self._plotcmd += ".printfile %s(%s) file=\"%s\"\n" % \
-                                        (val.sourcetype,val.ionames[i],val.file[i])
-                            elif self.parent.model=='spectre':
-                                signame = self.esc_bus(val.ionames[i])
-                                self._plotcmd += 'save %s\n' % signame
-                                self._plotcmd += "eventout_%s (%s) veriloga_csv_write_allpoints filename=\"%s\"\n" % \
-                                        (val.ionames[i].replace('.','_').replace('<','').replace('>',''),signame,val.file[i])
-                    elif val.iotype=='sample':
-                        for i in range(len(val.ionames)):
-                            # Checking the given trigger(s)
-                            if isinstance(val.trigger,list):
-                                if len(val.trigger) == len(val.ionames):
-                                    trig = val.trigger[i]
-                                else:
-                                    trig = val.trigger[0]
-                                    self.print_log(type='W',msg='%d triggers given for %d ionames. Using the first trigger for all ionames.' % (len(val.trigger),len(val.ionames)))
-                            else:
-                                trig = val.trigger
-                            # Checking the polarity of the triggers (for now every trigger has to have same polarity)
-                            vthstr = ',%s' % str(val.vth)
-                            afterstr = ',%g' % float(val.after)
-                            beforestr = ',end'
-                            if val.edgetype.lower()=='falling':
-                                polarity = 'xdown'
-                            elif val.edgetype.lower()=='both':
-                                # Syntax for tcross is a bit different
-                                polarity = 'tcross'
-                                vthstr = ',vth=%s' % str(val.vth)
-                                afterstr = ',after=%g' % float(val.after)
-                                beforestr = ',before=end'
-                            else:
-                                polarity = 'xup'
-                            if self.parent.model=='eldo':
-                                self._plotcmd += ".extract file=\"%s\" vect label=%s yval(v(%s<*>),%s(v(%s)%s%s%s))\n" % (val.file[i],val.ionames[i],val.ionames[i].upper(),polarity,trig,vthstr,afterstr,beforestr)
-                            elif self.parent.model=='spectre':
-                                # Extracting the bus width from the ioname
-                                signame = val.ionames[i].upper()
-                                signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
-                                if len(signame) == 1:
-                                    busstart = 0
-                                    busstop = 0
-                                else:
-                                    busstart = int(signame[1])
-                                    busstop = int(signame[2])
-                                if busstart > busstop:
-                                    buswidth = busstart-busstop+1
-                                else:
-                                    buswidth = busstop-busstart+1
-                                # Writing every individual bit of a bus to its own file (TODO: maybe to one file?)
-                                for j in range(buswidth):
-                                    bitname = self.esc_bus('%s<%d>' % (signame[0],j))
-                                    #self._plotcmd += 'save %s\n' % bitname
-                                    self._plotcmd += "sampleout_%s_%d (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
-                                            (signame[0],j,self.esc_bus(trig),bitname,val.file[i].replace('.txt','_%d.txt'%j),val.vth,-1 if val.edgetype.lower() is 'falling' else 1)
+                # Lets probe IO's only for transients.
+                if name.lower() == 'tran' or name.lower() == 'ac' :
+                    self._plotcmd += "%s Output signals\n" % self.parent.syntaxdict["commentchar"]
+                    for name, val in self.iofiles.Members.items():
+                        # Output iofile becomes an extract command
+                        if val.dir.lower()=='out' or val.dir.lower()=='output':
+                            if val.iotype=='event':
+                                for i in range(len(val.ionames)):
+                                    if self.parent.model=='eldo':
+                                        self._plotcmd += ".printfile %s(%s) file=\"%s\"\n" % \
+                                                (val.sourcetype,val.ionames[i],val.file[i])
+                                    elif self.parent.model=='spectre':
+                                        signame = self.esc_bus(val.ionames[i])
+                                        self._plotcmd += 'save %s\n' % signame
+                                        #self._plotcmd += "eventout_%s (%s) veriloga_csv_write_allpoints filename=\"%s\"\n" % \
+                                        #        (val.ionames[i].replace('.','_').replace('<','').replace('>',''),signame,val.file[i])
+                                        self._plotcmd += 'simulator lang=spice\n'
+                                        self._plotcmd += '.option ingold 2\n'
+                                        #self._plotcmd += ".print %s %s(%s) file=\"%s\"\n" % \
+                                        self._plotcmd += ".print %s %s(%s)\n" % \
+                                                (name.lower(),val.sourcetype,val.ionames[i])
+                                                #(name.lower(),val.sourcetype,val.ionames[i],val.file[i])
+                                        self._plotcmd += 'simulator lang=spectre\n'
 
-                    elif val.iotype=='time':
-                        for i in range(len(val.ionames)):
-                            if self.parent.model == 'eldo':
-                                self._plotcmd += ".printfile %s(%s) file=\"%s\"\n" % \
-                                        (val.sourcetype,val.ionames[i].upper(),val.file[i])
-                                #for i in range(len(val.ionames)):
-                                #    vthstr = ',%s' % str(val.vth)
-                                #    if val.edgetype.lower()=='falling':
-                                #        edge = 'xdown'
-                                #    elif val.edgetype.lower()=='both':
-                                #        edge = 'tcross'
-                                #        vthstr = ',vth=%s' % str(val.vth)
-                                #    elif val.edgetype.lower()=='risetime':
-                                #        edge = 'trise'
-                                #        vthstr = ''
-                                #    elif val.edgetype.lower()=='falltime':
-                                #        edge = 'tfall'
-                                #        vthstr = ''
-                                #    else:
-                                #        edge = 'xup'
-                                #    self._plotcmd += ".extract file=\"%s\" vect label=%s %s(v(%s)%s)\n" % (val.file[i],val.ionames[i],edge,val.ionames[i].upper(),vthstr)
-                            elif self.parent.model == 'spectre':
-                                signame = self.esc_bus(val.ionames[i].upper())
-                                #self._plotcmd += 'save %s\n' % signame
-                                self._plotcmd += "timeout_%s_%s (%s) veriloga_csv_write_allpoints filename=\"%s\"\n" % \
-                                        (val.edgetype.lower(),val.ionames[i].upper().replace('.','_').replace('<','').replace('>',''),signame,val.file[i])
-                    elif val.iotype=='vsample':
-                        for i in range(len(val.ionames)):
-                            # Checking the given trigger(s)
-                            if isinstance(val.trigger,list):
-                                if len(val.trigger) == len(val.ionames):
-                                    trig = val.trigger[i]
-                                else:
-                                    trig = val.trigger[0]
-                                    self.print_log(type='W',msg='%d triggers given for %d ionames. Using the first trigger for all ionames.' % (len(val.trigger),len(val.ionames)))
+
+
+
+                            elif val.iotype=='sample':
+                                for i in range(len(val.ionames)):
+                                    # Checking the given trigger(s)
+                                    if isinstance(val.trigger,list):
+                                        if len(val.trigger) == len(val.ionames):
+                                            trig = val.trigger[i]
+                                        else:
+                                            trig = val.trigger[0]
+                                            self.print_log(type='W',
+                                                    msg='%d triggers given for %d ionames. Using the first trigger for all ionames.' 
+                                                    % (len(val.trigger),len(val.ionames)))
+                                    else:
+                                        trig = val.trigger
+                                    # Checking the polarity of the triggers (for now every trigger has to have same polarity)
+                                    vthstr = ',%s' % str(val.vth)
+                                    afterstr = ',%g' % float(val.after)
+                                    beforestr = ',end'
+                                    if val.edgetype.lower()=='falling':
+                                        polarity = 'xdown'
+                                    elif val.edgetype.lower()=='both':
+                                        # Syntax for tcross is a bit different
+                                        polarity = 'tcross'
+                                        vthstr = ',vth=%s' % str(val.vth)
+                                        afterstr = ',after=%g' % float(val.after)
+                                        beforestr = ',before=end'
+                                    else:
+                                        polarity = 'xup'
+                                    if self.parent.model=='eldo':
+                                        self._plotcmd += ".extract file=\"%s\" vect label=%s yval(v(%s<*>),%s(v(%s)%s%s%s))\n" % (val.file[i],val.ionames[i],val.ionames[i].upper(),polarity,trig,vthstr,afterstr,beforestr)
+                                    elif self.parent.model=='spectre':
+                                        # Extracting the bus width from the ioname
+                                        signame = val.ionames[i].upper()
+                                        signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
+                                        if len(signame) == 1:
+                                            busstart = 0
+                                            busstop = 0
+                                        else:
+                                            busstart = int(signame[1])
+                                            busstop = int(signame[2])
+                                        if busstart > busstop:
+                                            buswidth = busstart-busstop+1
+                                        else:
+                                            buswidth = busstop-busstart+1
+                                        # Writing every individual bit of a bus to its own file (TODO: maybe to one file?)
+                                        for j in range(buswidth):
+                                            bitname = self.esc_bus('%s<%d>' % (signame[0],j))
+                                            #self._plotcmd += 'save %s\n' % bitname
+                                            self._plotcmd += "sampleout_%s_%d (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
+                                                    (signame[0],j,self.esc_bus(trig),bitname,val.file[i].replace('.txt','_%d.txt'%j),val.vth,-1 if val.edgetype.lower() is 'falling' else 1)
+
+                            elif val.iotype=='time':
+                                for i in range(len(val.ionames)):
+                                    if self.parent.model == 'eldo':
+                                        self._plotcmd += ".printfile %s(%s) file=\"%s\"\n" % \
+                                                (val.sourcetype,val.ionames[i].upper(),val.file[i])
+                                        #for i in range(len(val.ionames)):
+                                        #    vthstr = ',%s' % str(val.vth)
+                                        #    if val.edgetype.lower()=='falling':
+                                        #        edge = 'xdown'
+                                        #    elif val.edgetype.lower()=='both':
+                                        #        edge = 'tcross'
+                                        #        vthstr = ',vth=%s' % str(val.vth)
+                                        #    elif val.edgetype.lower()=='risetime':
+                                        #        edge = 'trise'
+                                        #        vthstr = ''
+                                        #    elif val.edgetype.lower()=='falltime':
+                                        #        edge = 'tfall'
+                                        #        vthstr = ''
+                                        #    else:
+                                        #        edge = 'xup'
+                                        #    self._plotcmd += ".extract file=\"%s\" vect label=%s %s(v(%s)%s)\n" % (val.file[i],val.ionames[i],edge,val.ionames[i].upper(),vthstr)
+                                    elif self.parent.model == 'spectre':
+                                        signame = self.esc_bus(val.ionames[i].upper())
+                                        #self._plotcmd += 'save %s\n' % signame
+                                        self._plotcmd += "timeout_%s_%s (%s) veriloga_csv_write_allpoints filename=\"%s\"\n" % \
+                                                (val.edgetype.lower(),val.ionames[i].upper().replace('.','_').replace('<','').replace('>',''),signame,val.file[i])
+                            elif val.iotype=='vsample':
+                                for i in range(len(val.ionames)):
+                                    # Checking the given trigger(s)
+                                    if isinstance(val.trigger,list):
+                                        if len(val.trigger) == len(val.ionames):
+                                            trig = val.trigger[i]
+                                        else:
+                                            trig = val.trigger[0]
+                                            self.print_log(type='W',msg='%d triggers given for %d ionames. Using the first trigger for all ionames.' % (len(val.trigger),len(val.ionames)))
+                                    else:
+                                        trig = val.trigger
+                                    if self.parent.model=='eldo':
+                                        self.print_log(type='F',msg='not yet done') #TODO
+                                    elif self.parent.model=='spectre':
+                                        #self._plotcmd += 'save %s\n' % val.ionames[i].upper()
+                                        self._plotcmd += "vsampleout_%s (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
+                                                (val.ionames[i].upper().replace('.','_'),trig,val.ionames[i].upper(),val.file[i],val.vth,-1 if val.edgetype.lower() is 'falling' else 1)
                             else:
-                                trig = val.trigger
-                            if self.parent.model=='eldo':
-                                self.print_log(type='F',msg='not yet done') #TODO
-                            elif self.parent.model=='spectre':
-                                #self._plotcmd += 'save %s\n' % val.ionames[i].upper()
-                                self._plotcmd += "vsampleout_%s (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
-                                        (val.ionames[i].upper().replace('.','_'),trig,val.ionames[i].upper(),val.file[i],val.vth,-1 if val.edgetype.lower() is 'falling' else 1)
-                    else:
-                        self.print_log(type='W',msg='Output filetype incorrectly defined.')
+                                self.print_log(type='W',msg='Output filetype incorrectly defined.')
         return self._plotcmd
     @plotcmd.setter
     def plotcmd(self,value):
