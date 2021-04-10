@@ -118,6 +118,11 @@ class spice_iofile(iofile):
             trise (float)
                 Risetime of sample type input.
                 Default 5e-12.
+            sourcetype (str)
+                Type of the source associated to a file.
+                v | i | vcomplex | icomplex
+                Vcomplex and Icomplex cause imaginary and rela part to be written to the output file
+                Default 'v'
     """
     def __init__(self,parent=None,**kwargs):
         if parent==None:
@@ -299,8 +304,22 @@ class spice_iofile(iofile):
         """
         self._file = []
         for ioname in self.ionames:
-            filename = '%s/%s_%s_%s%s.txt' % (self.parent.spicesimpath,self.parent.runname,ioname.replace('<','').replace('>','').replace('.','_'),self.iotype,('_%s' % self.edgetype if self.iotype is not 'event' else ''))
-            self._file.append(filename)
+            if self.iotype is not 'event': 
+                filename = ( '%s/%s_%s_%s_%s.txt' 
+                        % (self.parent.spicesimpath,
+                            self.parent.runname,ioname.replace('<','').replace('>','').replace('.','_'),
+                            self.iotype,self.edgetype))
+            else:
+                # We cant control the filename. Location is defined with -odir option
+                if self.parent.model == 'spectre':
+                    filename = '%s/tb_%s.print' % (self.parent.spicesimpath,self.parent.name)
+                else:
+                    filename = ( '%s/%s_%s_%s.txt' 
+                        % (self.parent.spicesimpath,
+                            self.parent.runname,ioname.replace('<','').replace('>','').replace('.','_'),
+                            self.iotype))
+
+        self._file.append(filename)
         return self._file
     @file.setter
     def file(self,val):
