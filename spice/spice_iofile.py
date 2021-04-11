@@ -434,16 +434,23 @@ class spice_iofile(iofile):
                 try:
                     if self.iotype=='event':
                         if self.parent.model=='spectre':
+                            ''' Logic of parsing:
+                                Parse throught the file, match to (<ionam>), if found,
+                                start storing the values to self.Data. self.Data is initialized 
+                                with the first matching <ioname>. The following <ionames> are appended as columns.
+                            '''
                             with open(self.file[i]) as infile:
                                 wholefile=infile.readlines()
                                 found = False
                                 inited = False
                                 append = False
                                 predata = []
+                                # The 'y' marks the end of segment  
+                                stopmatch=re.compile(r".*?y.*?")
                                 for line in wholefile:
                                     if not found:
                                         for i in range(len(self.ionames)):
-                                            startmatch=re.compile(r".+?(%s).*?" %(self.ionames[i]) ,re.IGNORECASE)
+                                            startmatch=re.compile(r".+?\(%s\).*?" %(self.ionames[i]))
                                             if startmatch.search(line) != None:
                                                 found = True
                                                 if i==0:
@@ -451,7 +458,6 @@ class spice_iofile(iofile):
                                                 else:
                                                     first = False
                                     elif found and first:
-                                        stopmatch=re.compile(r".*?y.*?",re.IGNORECASE)
                                         if stopmatch.search(line) == None:
                                                 data=np.array(line.split()).astype('double')
                                                 if self.datatype == 'complex':
@@ -469,7 +475,6 @@ class spice_iofile(iofile):
                                         else:
                                             found = False
                                     elif found:
-                                        stopmatch=re.compile(r".*?y.*?",re.IGNORECASE)
                                         if stopmatch.search(line) == None:
                                                 data=np.array(line.split()).astype('double')
                                                 if self.datatype == 'complex':
@@ -489,7 +494,6 @@ class spice_iofile(iofile):
                                         self.Data=np.r_['1', self.Data, predata]
                                         predata = []
                                         append = False
-
                         else:
                             arr = genfromtxt(self.file[i],delimiter=self.parent.syntaxdict['eventoutdelim'], \
                                     skip_header=self.parent.syntaxdict['csvskip'])
