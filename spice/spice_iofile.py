@@ -312,7 +312,7 @@ class spice_iofile(iofile):
                             self.iotype,self.edgetype))
             else:
                 # We cant control the filename. Location is defined with -odir option
-                if self.parent.model == 'spectre':
+                if self.parent.model == 'spectre' and self.dir == 'out':
                     filename = '%s/tb_%s.print' % (self.parent.spicesimpath,self.parent.name)
                 else:
                     filename = ( '%s/%s_%s_%s.txt' 
