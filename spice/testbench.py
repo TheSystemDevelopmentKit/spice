@@ -495,8 +495,8 @@ class testbench(spice_module):
                         print_log(type='F', msg='AC simulation for eldo not yet implemented')
                     elif self.parent.model=='spectre':
                         #[TODO] figure mechanism to define log/lin axes
-                        self._simcmdstr += 'AC_analysis %s start=%s stop=%s log=10' % \
-                                (sim,str(val.fmin),str(val.fmax))
+                        self._simcmdstr += 'AC_analysis %s start=%s stop=%s %s=%s' % \
+                                (sim,str(val.fmin),str(val.fmax),str(val.fscale),str(val.fpoints))
 
                 else:
                     self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
