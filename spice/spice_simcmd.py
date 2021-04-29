@@ -131,6 +131,10 @@ class spice_simcmd(thesdk):
                 Minimum noise frequency. Default 1 (Hz).
             fmax: float/str
                 Maximum noise frequency. Default 5e9.
+            fscale: str
+                log | lin . Logarithmic or linear scale for frequency. Default log
+            fpoints: str
+                number of points for frequency analysis. Default 1000.
             seed: int
                 Random generator seed for noise transient. Default None (random).
             method: str
@@ -164,6 +168,8 @@ class spice_simcmd(thesdk):
             self._noise=kwargs.get('noise',False)
             self._fmin=kwargs.get('fmin',1)
             self._fmax=kwargs.get('fmax',5e9)
+            self._fscale=kwargs.get('fscale','log')
+            self._fpoints=kwargs.get('fpoints',1000)
             self._seed=kwargs.get('seed',None)
             self._method=kwargs.get('method',None)
             self._cmin=kwargs.get('cmin',None)
@@ -356,6 +362,29 @@ class spice_simcmd(thesdk):
     @fmax.setter
     def fmax(self,value):
         self._fmax=value
+
+    @property
+    def fscale(self):
+        """Set by argument 'fscale'."""
+        if hasattr(self,'_fscale'):
+            return self._fscale
+        else:
+            self._fcsale='log'
+        return self._scale
+    @fscale.setter
+    def fscale(self,value):
+        self._scale=value
+    @property
+    def fpoints(self):
+        """Set by argument 'fpoints'."""
+        if hasattr(self,'_fpoints'):
+            return self._fpoints
+        else:
+            self._fpoints=1000
+        return self._points
+    @fpoints.setter
+    def fpoints(self,value):
+        self._fpoints=value
 
     @property
     def seed(self):
