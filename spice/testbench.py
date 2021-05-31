@@ -494,10 +494,24 @@ class testbench(spice_module):
                     if self.parent.model=='eldo':
                         print_log(type='F', msg='AC simulation for eldo not yet implemented')
                     elif self.parent.model=='spectre':
-                        #[TODO] figure mechanism to define log/lin axes
-                        self._simcmdstr += 'AC_analysis %s start=%s stop=%s %s=%s' % \
-                                (sim,str(val.fmin),str(val.fmax),str(val.fscale),str(val.fpoints))
-
+                        if val.fscale.lower()=='log':
+                            if val.fpoints != 0:
+                                pts_str='log=%d' % val.fpoints
+                            elif val.fstepsize != 0:
+                                pts_str='dec=%d' % val.fstepsize
+                            else:
+                                self.print_log(type='F', msg='Set either fpoints or fstepsize for AC simulation!')
+                        elif val.fscale.lower()=='lin':
+                            if val.fpoints != 0:
+                                pts_str='lin=%d' % val.fpoints
+                            elif val.fstepsize != 0:
+                                pts_str='step=%d' % val.fstepsize
+                            else:
+                                self.print_log(type='F', msg='Set either fpoints or fstepsize for AC simulation!')
+                        else:
+                            self.print_log(type='F', msg='Unsupported frequency scale %s for AC simulation!' % val.fscale)
+                        self._simcmdstr += 'AC_analysis %s start=%s stop=%s %s' % \
+                                (sim,str(val.fmin),str(val.fmax),pts_str)
                 else:
                     self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
                 if val.mc and self.parent.model=='spectre':

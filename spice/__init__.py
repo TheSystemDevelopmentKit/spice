@@ -805,7 +805,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         iofile with direction 'output'."""
         for name, val in self.iofile_bundle.Members.items():
             if val.dir.lower()=='out' or val.dir.lower()=='output':
-                 self.iofile_bundle.Members[name].read()
+                self.iofile_bundle.Members[name].read()
     
     def execute_spice_sim(self):
         """Automatically called function to execute spice simulation."""
