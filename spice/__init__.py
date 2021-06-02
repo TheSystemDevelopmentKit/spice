@@ -75,7 +75,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @property
     def syntaxdict(self):
         """Internally used dictionary for common syntax conversions between
-        Spectre and Eldo."""
+        Spectre, Eldo, and Ngspice."""
         if self.model=='eldo':
             self._syntaxdict = {
                     "cmdfile_ext" : '.cir',
@@ -113,6 +113,25 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     "lastline" : '///', #needed?
                     "eventoutdelim" : ',',
                     "csvskip" : 0
+                    }
+        if self.model=='ngspice':
+            self._syntaxdict = {
+                    "cmdfile_ext" : '.ngcir',
+                    "resultfile_ext" : '',
+                    'plotprog' : '',
+                    "commentchar" : '*',
+                    "commentline" : '***********************\n',
+                    "nprocflag" : 'set num_threads=', #Goes to .control section
+                    "simulatorcmd" : 'ngspice -b', 
+                    #"dcsource_declaration" : '',
+                    "parameter" : '.param ',
+                    "option" : '.option ',
+                    "include" : '.include',
+                    "dspfinclude" : '.include',
+                    "subckt" : '.subckt',
+                    "lastline" : '.end',
+                    "eventoutdelim" : '  ', # Two spaces
+                    "csvskip" : 1
                     }
         return self._syntaxdict
     @syntaxdict.setter
@@ -210,7 +229,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
         Feature for specifying the 'section' of the model library file and
         simulation temperature. The path to model libraries should be set in
-        TheSDK.config as either ELDOLIBFILE or SPECTRELIBFILE variables.
+        TheSDK.config as either ELDOLIBFILE, SPECTRELIBFILE or NGSPICELIBFILE variable.
 
         Example::
 
@@ -239,7 +258,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         Feature for specifying options for spice simulation. The key is the
         name of the option (as in simulator manual specifies), and the value is
         the value given to said option. Valid key-value pairs can be found from
-        the manual of the simulator (Eldo or Spectre).
+        the manual of the simulator (Eldo, Spectre or Ngspice).
 
         Example::
 
@@ -460,6 +479,17 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         self._extracts=value
 
     @property 
+    def has_lsf(self):
+        """
+        Returs True if LSF submissions are properly defined. Default False
+        """
+        if ( not thesdk.GLOBALS['LSFINTERACTIVE'] == '' ) and (not thesdk.GLOBALS['LSFINTERACTIVE'] == ''):
+            self._has_lsf = True
+        else:
+            self._has_lsf = False
+        return self._has_lsf
+
+    @property 
     def spice_submission(self):
         """
         Defines spice submission prefix from thesdk.GLOBALS['LSFSUBMISSION']
@@ -469,14 +499,16 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """
         if not hasattr(self, '_spice_submission'):
             try:
-                if self.interactive_spice:
-                    if not self.distributed_run:
-                        self._spice_submission = thesdk.GLOBALS['LSFINTERACTIVE'] + ' '
-                    else: # Spectre LSF doesn't support interactive queues
-                        self.print_log(type='W', msg='Cannot run in interactive mode if distributed mode is on!')
-                        self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
+                if not self.has_lsf:
+                    self.print_log(type='I', msg='LSF not configured. Running locally')
+                    self._spice_submission=''
                 else:
-                    self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
+                    if self.interactive_spice:
+                        if not self.distributed_run:
+                            self._spice_submission = thesdk.GLOBALS['LSFINTERACTIVE'] + ' '
+                        else: # Spectre LSF doesn't support interactive queues
+                            self.print_log(type='W', msg='Cannot run in interactive mode if distributed mode is on!')
+                            self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
             except:
                 self.print_log(type='W',msg='Error while defining spice submission command. Running locally.')
                 self._spice_submission=''
@@ -491,13 +523,13 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """
             OBSOLETE! RE-LOCATED TO SPICE_SIMCMD.PY
         """
-        self.print_log(type='W', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
+        self.print_log(type='O', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
         if not hasattr(self,'_plotlist'):
             self._plotlist=[]
         return self._plotlist 
     @plotlist.setter
     def plotlist(self,value): 
-        self.print_log(type='W', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
+        self.print_log(type='O', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
         self._plotlist=value
 
     @property
@@ -596,7 +628,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def spicetbsrc(self):
         """String
 
-        Path to the spice testbench ('./spice/tb_entityname.scs').
+        Path to the spice testbench ('./spice/tb_entityname.<suffix>').
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicetbsrc'):
@@ -641,7 +673,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def spicesubcktsrc(self):
         """String
 
-        Path to the parsed subcircuit file. ('./spice/subckt_entityname.scs').
+        Path to the parsed subcircuit file. ('./spice/subckt_entityname.<suffix>').
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicesubcktsrc'):
@@ -672,8 +704,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         if not self.interactive_spice and not self.preserve_spicefiles:
             # Removing generated files
             filelist = [
-                #self.eldochisrc,
-                #self.eldowdbsrc,
                 self.spicetbsrc,
                 self.spicesubcktsrc
                 ]
@@ -743,12 +773,15 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 plflag = ''
 
             if self.model=='eldo':
+                # Shouldn't this use self.syntaxdict["simulatorcmd"] ?
                 spicesimcmd = "eldo -64b %s %s " % (plottingprogram,nprocflag)
             elif self.model=='spectre':
                 #spicesimcmd = "\"sleep 10; spectre %s %s \"" % (plottingprogram,nprocflag)
                 #spicesimcmd = "spectre %s %s " % (plottingprogram,nprocflag)
                 spicesimcmd = ("spectre -64 +lqtimeout=0 ++aps=%s %s %s %s -outdir %s " 
                         % (self.errpreset, plflag,plottingprogram,nprocflag,self.spicesimpath))
+            elif self.model=='ngspice':
+                spicesimcmd = self.syntaxdict["simulatorcmd"] + ' '
 
             #spicesimcmd = "%s %s %s " % (self.syntaxdict["simulatorcmd"],plottingprogram,nprocflag)
             spicetbfile = self.spicetbsrc

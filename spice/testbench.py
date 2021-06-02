@@ -6,7 +6,6 @@ Spice Testbench
 Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
-Last modification by Okko Järvinen, 08.04.2021 20:02
 
 """
 import os
@@ -172,6 +171,19 @@ class testbench(spice_module):
                     self._libcmd = "// Spectre device models (undefined)\n"
                     self._libcmd += "//include " + libfile + " " + corner + "\n"
                 self._libcmd += 'tempOption options temp=%s\n' % str(temp)
+            if self.parent.model == 'ngspice':
+                try:
+                    libfile = thesdk.GLOBALS['NGSPICELIBFILE']
+                    if libfile == '':
+                        raise ValueError
+                    else:
+                        self._libcmd = "*** Ngspice device models\n"
+                        self._libcmd += ".lib " + libfile + " " + corner + "\n"
+                except:
+                    self.print_log(type='W',msg='Global TheSDK variable ELDOLIBPATH not set.')
+                    self._libcmd = "*** Eldo device models (undefined)\n"
+                    self._libcmd += "*.lib " + libfile + " " + corner + "\n"
+                self._libcmd += ".temp " + str(temp) + "\n"
         return self._libcmd
     @libcmd.setter
     def libcmd(self,value):
@@ -346,6 +358,17 @@ class testbench(spice_module):
                         # Writing source current consumption to a file
                         self._dcsourcestr += "pwrout_%s%s (%s_p %s) veriloga_csv_write_allpoints_current filename=\"%s\"\n" % \
                             (val.sourcetype.lower(),val.name.lower().replace('.','_'),self.esc_bus(val.pos),self.esc_bus(val.pos),val._extfile)
+                elif self.parent.model == 'ngspice':
+                    if val.ramp == 0:
+                        self._dcsourcestr += "%s%s %s %s %g %s\n" % \
+                                (val.sourcetype.upper(),val.name.lower(),val.pos,val.neg,val.value, \
+                                'NONOISE' if not val.noise else '')
+                    else:
+                        self._dcsourcestr += "%s%s %s %s %s %s\n" % \
+                                (val.sourcetype.upper(),val.name.lower(),val.pos,val.neg, \
+                                'pulse(0 %g 0 %g)' % (val.value,abs(val.ramp)), \
+                                'NONOISE' if not val.noise else '')
+                    # If the DC source is a supply, the power consumption is extracted for it automatically
         return self._dcsourcestr
     @dcsourcestr.setter
     def dcsourcestr(self,value):
@@ -367,6 +390,7 @@ class testbench(spice_module):
             for name, val in self.iofiles.Members.items():
                 # Input file becomes a source
                 if val.dir.lower()=='in' or val.dir.lower()=='input':
+                    # Event signals are analog
                     if val.iotype.lower()=='event':
                         for i in range(len(val.ionames)):
                             # Finding the max time instant
@@ -382,6 +406,15 @@ class testbench(spice_module):
                                 self._inputsignals += "%s%s %s 0 %ssource type=pwl file=\"%s\"\n" % \
                                         (val.sourcetype.upper(),self.esc_bus(val.ionames[i].lower()),
                                         self.esc_bus(val.ionames[i]),val.sourcetype.lower(),val.file[i])
+                            elif self.parent.model=='ngspice':
+                                self._inputsignals += "a%s %%vd[%s 0] filesrc%s\n" % \
+                                        (self.esc_bus(val.ionames[i].lower()),
+                                        self.esc_bus(val.ionames[i].upper()),self.esc_bus(val.ionames[i].lower()))
+                                self._inputsignals += ".model filesrc%s filesource (file=\"%s\"\n" % \
+                                        (self.esc_bus(val.ionames[i].lower()),os.path.basename(val.file[i]).lower())
+                                self._inputsignals += "+ amploffset=[0 0] amplscale=[1 1] timeoffset=0 timescale=1 timerelative=false amplstep=false)\n"
+                    # Sample signals are digital
+                    # Presumably these are already converted to bitstrings
                     elif val.iotype.lower()=='sample':
                         if self.parent.model == 'eldo':
                             for i in range(len(val.ionames)):
@@ -413,6 +446,85 @@ class testbench(spice_module):
                                 except:
                                     pass
                                 self._inputsignals += 'vec_include "%s"\n' % val.file[i]
+                        elif self.parent.model == 'ngspice':
+                            for i in range(len(val.ionames)):
+                                pattstr = ''
+                                for d in val.Data[:,i]:
+                                    pattstr += '%s ' % str(d)
+                                try:
+                                    if float(self._trantime) < len(val.Data)/val.rs:
+                                        self._trantime = len(val.Data)/val.rs
+                                except:
+                                    pass
+
+                                # Checking if the given bus is actually a 1-bit signal
+                                if (('<' not in val.ionames[i]) 
+                                        and ('>' not in val.ionames[i]) 
+                                        and len(str(val.Data[0,i])) == 1):
+                                    self._inputsignals += ( 'a%s [ %s_d ] input_vector_%s\n'
+                                            % ( val.ionames[i], val.ionames[i], val.ionames[i]) )
+                                    # Ngsim assumes lowercase filenames
+                                    self._inputsignals += (
+                                            '.model input_vector_%s d_source(input_file = %s)\n'
+                                            % ( val.ionames[i], os.path.basename(val.file[i]).lower() )) 
+                                    self._inputsignals += (
+                                            'adac_%s [ %s_d ] [ %s ] dac_%s\n' % ( val.ionames[i],
+                                                val.ionames[i], val.ionames[i], val.ionames[i])
+                                                )
+                                    self._inputsignals += (
+                                        '.model dac_%s dac_bridge(out_low = %s out_high = %s out_undef = %s input_load = 5.0e-16 t_rise = %s t_fall = %s' %
+                                        (val.ionames[i], val.vlo, val.vhi, (val.vhi+val.vlo)/2,
+                                            val.trise, val.tfall )
+                                        )
+                                elif (('<' in val.ionames[i]) 
+                                        and ('>' in val.ionames[i])):
+                                    signame = val.ionames[i]
+                                    signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
+                                    busstart = int(signame[1])
+                                    busstop = int(signame[2])
+                                    loopstart=np.amin([busstart,busstop])
+                                    loopstop=np.amax([busstart,busstop])
+                                    self._inputsignals += ( 'a%s [ '
+                                            % ( signame[0])
+                                            )
+
+                                    for index in range(loopstart,loopstop+1):
+                                        self._inputsignals += ( '%s_%s_d '
+                                            % ( signame[0], index)
+                                            )
+
+                                    self._inputsignals += ( '] input_vector_%s\n'
+                                            % ( signame[0])
+                                            )
+
+                                    # Ngsim assumes lowercase filenames
+                                    self._inputsignals += (
+                                            '.model input_vector_%s d_source(input_file = %s)\n'
+                                            % ( signame[0], os.path.basename(val.file[i]).lower() )
+                                            ) 
+
+                                    # DAC
+                                    self._inputsignals += ( 'adac_%s [ ' % ( signame[0]) )
+
+                                    for index in range(loopstart,loopstop+1):
+                                        self._inputsignals += ( '%s_%s_d '
+                                                % ( signame[0], index))
+                                    self._inputsignals += ( '] [ ' )
+
+                                    for index in range(loopstart,loopstop+1):
+                                        self._inputsignals += (
+                                                    '%s_%s_ ' % ( signame[0], index)
+                                                )
+                                    self._inputsignals += (
+                                                '] dac_%s\n' % ( signame[0])
+                                            )
+                                    self._inputsignals += (
+                                        '.model dac_%s dac_bridge(out_low = %s out_high = %s out_undef = %s input_load = 5.0e-16 t_rise = %s t_fall = %s' %
+                                        (signame[0], val.vlo, val.vhi, (val.vhi+val.vlo)/2,
+                                            val.trise, val.tfall )
+                                        )
+                                else:
+                                    busname = val.ionames[i]
                     else:
                         self.print_log(type='F',msg='Input type \'%s\' undefined.' % val.iotype)
 
@@ -466,6 +578,13 @@ class testbench(spice_module):
                         if val.cmin is not None:
                             self._simcmdstr += 'cmin=%s ' %  (str(val.cmin))
                         self._simcmdstr += '\n\n' 
+                    elif self.parent.model=='ngspice':
+                        self._simcmdstr += '.%s %s %s %s\n' % \
+                                (sim,str(val.tprint),str(simtime),'uic' if val.uic else '')
+                        if val.noise:
+                            self.print_log(type='E', 
+                                    msg= ( 'Noise transient not available for Ngsim. Running regular transient.'))
+
                 elif str(sim).lower() == 'dc':
                     if self.parent.model=='eldo':
                         self._simcmdstr='.op'
@@ -581,9 +700,14 @@ class testbench(spice_module):
                         self._plotcmd += ']'
                     self._plotcmd += "\n\n"
 
-                # Lets probe IO's only for transients.
                 if name.lower() == 'tran' or name.lower() == 'ac' :
                     self._plotcmd += "%s Output signals\n" % self.parent.syntaxdict["commentchar"]
+                    if self.parent.model=='ngspice':
+                        self._plotcmd += ".control\nset wr_singlescale\nset wr_vecnames\n"
+                        if self.parent.nproc: 
+                            self._plotcmd +="%s%d\n" % (self.parent.syntaxdict["nprocflag"],self.parent.nproc)
+                        self._plotcmd += "run\n"
+
                     for name, val in self.iofiles.Members.items():
                         # Output iofile becomes an extract command
                         if val.dir.lower()=='out' or val.dir.lower()=='output':
@@ -610,6 +734,11 @@ class testbench(spice_module):
                                             self._plotcmd += ".print %s %s(%s)\n" % \
                                                 (name.lower(),val.sourcetype,val.ionames[i])
                                         self._plotcmd += 'simulator lang=spectre\n'
+                                elif self.parent.model=='ngspice':
+                                    self._plotcmd += "plot %s(%s)\n" % \
+                                            (val.sourcetype,val.ionames[i].upper())
+                                    self._plotcmd += "wrdata %s %s(%s)\n" % \
+                                            (val.file[i], val.sourcetype,val.ionames[i].upper())
 
 
                             elif val.iotype=='sample':
@@ -705,8 +834,23 @@ class testbench(spice_module):
                                         #self._plotcmd += 'save %s\n' % val.ionames[i].upper()
                                         self._plotcmd += "vsampleout_%s (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
                                                 (val.ionames[i].upper().replace('.','_'),trig,val.ionames[i].upper(),val.file[i],val.vth,-1 if val.edgetype.lower() is 'falling' else 1)
+           
                             else:
-                                self.print_log(type='W',msg='Output filetype incorrectly defined.')
+                                trig = val.trigger
+                            if self.parent.model=='eldo':
+                                self.print_log(type='F',msg='not yet done') #TODO
+                            elif self.parent.model=='spectre':
+                                #self._plotcmd += 'save %s\n' % val.ionames[i].upper()
+                                self._plotcmd += "vsampleout_%s (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
+                                        (val.ionames[i].upper().replace('.','_'),trig,val.ionames[i].upper(),val.file[i],val.vth,-1 if val.edgetype.lower() is 'falling' else 1)
+                            elif self.parent.model=='ngspice':
+                                self.print_log(type='F',msg='Iotype vsample not implemented for Ngspice') #TODO
+                    # Close the control sectin for Ngspice
+
+                    else:
+                        self.print_log(type='W',msg='Output filetype incorrectly defined.')
+            if self.parent.model=='ngspice':
+                    self._plotcmd += ".endc\n"
         return self._plotcmd
     @plotcmd.setter
     def plotcmd(self,value):

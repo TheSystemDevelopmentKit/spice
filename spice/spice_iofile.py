@@ -8,7 +8,7 @@ for TheSDK spice.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 07.10.2020 14:40
+Last modification by Kalle Spoof, kalle.spoof@aalto.fi, 07.04.2021 14:52
 
 """
 import os
@@ -305,22 +305,25 @@ class spice_iofile(iofile):
         """
         self._file = []
         for ioname in self.ionames:
+            filepath = self.parent.spicesimpath+'/'
             if self.iotype is not 'event': 
-                filename = ( '%s/%s_%s_%s_%s.txt' 
-                        % (self.parent.spicesimpath,
-                            self.parent.runname,ioname.replace('<','').replace('>','').replace('.','_'),
+                filename = ( '%s_%s_%s_%s.txt' 
+                        % ( self.parent.runname,ioname.replace('<','').replace('>','').replace('.','_'),
                             self.iotype,self.edgetype))
             else:
                 # We cant control the filename. Location is defined with -odir option
                 if self.parent.model == 'spectre' and self.dir == 'out':
-                    filename = '%s/tb_%s.print' % (self.parent.spicesimpath,self.parent.name)
+                    filename = 'tb_%s.print' % (self.parent.name)
                 else:
-                    filename = ( '%s/%s_%s_%s.txt' 
-                        % (self.parent.spicesimpath,
-                            self.parent.runname,ioname.replace('<','').replace('>','').replace('.','_'),
+                    filename = ( '%s_%s_%s.txt' 
+                        % ( self.parent.runname,ioname.replace('<','').replace('>','').replace('.','_'),
                             self.iotype))
 
-        self._file.append(filename)
+            if self.parent.model == 'ngspice' and self.dir == 'in':
+                # For some reason Ngspice requires lowercase names
+                filename = filename.lower()
+            filename = filepath + filename    
+            self._file.append(filename)
         return self._file
     @file.setter
     def file(self,val):
@@ -374,8 +377,7 @@ class spice_iofile(iofile):
             except:
                     self.print_log(type='E',msg=traceback.format_exc())
                     self.print_log(type='E',msg='Failed while writing files for %s.' % self.file[i])
-        elif self.iotype == 'sample' and self.parent.model == 'spectre':
-            # Spectre digital input vector file is written here
+        elif self.iotype == 'sample':
             try:
                 for i in range(len(self.file)):
                     self.print_log(type='I',msg='Writing digital input file: %s.' % self.file[i])
@@ -398,7 +400,8 @@ class spice_iofile(iofile):
                         buswidth = busstart-busstop+1
                     else:
                         buswidth = busstop-busstart+1
-                    with open(self.file[i],'w') as outfile:
+                with open(self.file[i],'w') as outfile:
+                    if self.parent.model == 'spectre':
                         # This is Spectre vector file syntax
                         outfile.write('radix %s\n' % ('1 '*buswidth))
                         outfile.write('io i\n')
@@ -418,6 +421,17 @@ class spice_iofile(iofile):
                                 # Input values  are bits (strings of '1' and '0')
                                 binary = vec[j]
                             outfile.write('%s\n' % binary)
+                    if self.parent.model == 'ngspice':
+                        # This is Ngsim vector file syntax
+                        for j in range(len(vec)):
+                            if self.ioformat == 'dec':
+                                # Input values are integer numbers (TODO: check if its unsigned)
+                                binary = format(vec[j],'0%db' % buswidth)
+                            else:
+                                # Input values  are bits (strings of '1' and '0')
+                                binary = vec[j]
+                            line = str(j/self.rs)+' '+'s '.join(binary)+'s'
+                            outfile.write('%s\n' % line)
             except:
                 self.print_log(type='E',msg=traceback.format_exc())
                 self.print_log(type='E',msg='Failed while writing files for %s.' % self.file[i])
