@@ -734,11 +734,11 @@ class testbench(spice_module):
                                             self._plotcmd += ".print %s %s(%s)\n" % \
                                                 (name.lower(),val.sourcetype,val.ionames[i])
                                         self._plotcmd += 'simulator lang=spectre\n'
-                                elif self.parent.model=='ngspice':
-                                    self._plotcmd += "plot %s(%s)\n" % \
-                                            (val.sourcetype,val.ionames[i].upper())
-                                    self._plotcmd += "wrdata %s %s(%s)\n" % \
-                                            (val.file[i], val.sourcetype,val.ionames[i].upper())
+                                    elif self.parent.model=='ngspice':
+                                        self._plotcmd += "plot %s(%s)\n" % \
+                                                (val.sourcetype,val.ionames[i].upper())
+                                        self._plotcmd += "wrdata %s %s(%s)\n" % \
+                                                (val.file[i], val.sourcetype,val.ionames[i].upper())
 
 
                             elif val.iotype=='sample':
@@ -789,7 +789,7 @@ class testbench(spice_module):
                                             bitname = self.esc_bus('%s<%d>' % (signame[0],j))
                                             #self._plotcmd += 'save %s\n' % bitname
                                             self._plotcmd += "sampleout_%s_%d (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
-                                                    (signame[0],j,self.esc_bus(trig),bitname,val.file[i].replace('.txt','_%d.txt'%j),val.vth,-1 if val.edgetype.lower() is 'falling' else 1)
+                                                    (signame[0],j,self.esc_bus(trig),bitname,val.file[i].replace('.txt','_%d.txt'%j),val.vth,-1 if val.edgetype.lower() == 'falling' else 1)
 
                             elif val.iotype=='time':
                                 for i in range(len(val.ionames)):
@@ -833,7 +833,7 @@ class testbench(spice_module):
                                     elif self.parent.model=='spectre':
                                         #self._plotcmd += 'save %s\n' % val.ionames[i].upper()
                                         self._plotcmd += "vsampleout_%s (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
-                                                (val.ionames[i].upper().replace('.','_'),trig,val.ionames[i].upper(),val.file[i],val.vth,-1 if val.edgetype.lower() is 'falling' else 1)
+                                                (val.ionames[i].upper().replace('.','_'),trig,val.ionames[i].upper(),val.file[i],val.vth,-1 if val.edgetype.lower() == 'falling' else 1)
            
                             else:
                                 trig = val.trigger
@@ -842,7 +842,7 @@ class testbench(spice_module):
                             elif self.parent.model=='spectre':
                                 #self._plotcmd += 'save %s\n' % val.ionames[i].upper()
                                 self._plotcmd += "vsampleout_%s (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
-                                        (val.ionames[i].upper().replace('.','_'),trig,val.ionames[i].upper(),val.file[i],val.vth,-1 if val.edgetype.lower() is 'falling' else 1)
+                                        (val.ionames[i].upper().replace('.','_'),trig,val.ionames[i].upper(),val.file[i],val.vth,-1 if val.edgetype.lower() == 'falling' else 1)
                             elif self.parent.model=='ngspice':
                                 self.print_log(type='F',msg='Iotype vsample not implemented for Ngspice') #TODO
                     # Close the control sectin for Ngspice

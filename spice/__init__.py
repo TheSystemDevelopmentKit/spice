@@ -815,7 +815,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 val=self.iofile_bundle.Members[ioname]
                 # File type inputs are driven by the file.Data, not the input field
                 if not isinstance(self.IOS.Members[val.name].Data,spice_iofile) \
-                        and val.dir is 'in':
+                        and val.dir == 'in':
                     # Data must be properly shaped
                     self.iofile_bundle.Members[ioname].Data=self.IOS.Members[ioname].Data
 
@@ -823,7 +823,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """Automatically called function to connect iofiles (outputs) to top
         entity IOS Bundle items."""
         for name,val in self.iofile_bundle.Members.items():
-            if val.dir is 'out':
+            if val.dir == 'out':
                 self.IOS.Members[name].Data=self.iofile_bundle.Members[name].Data
 
     def write_infile(self):
