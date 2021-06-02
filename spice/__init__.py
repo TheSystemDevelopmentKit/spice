@@ -508,11 +508,14 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                             self._spice_submission = thesdk.GLOBALS['LSFINTERACTIVE'] + ' '
                         else: # Spectre LSF doesn't support interactive queues
                             self.print_log(type='W', msg='Cannot run in interactive mode if distributed mode is on!')
-                            self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
+                        self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
+                    else:
+                        self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
+
             except:
                 self.print_log(type='W',msg='Error while defining spice submission command. Running locally.')
                 self._spice_submission=''
-
+        print(self.has_lsf)
         return self._spice_submission
     @spice_submission.setter
     def spice_submission(self,value):
