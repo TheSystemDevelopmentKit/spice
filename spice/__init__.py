@@ -515,7 +515,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             except:
                 self.print_log(type='W',msg='Error while defining spice submission command. Running locally.')
                 self._spice_submission=''
-        print(self.has_lsf)
         return self._spice_submission
     @spice_submission.setter
     def spice_submission(self,value):

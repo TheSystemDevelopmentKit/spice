@@ -832,12 +832,13 @@ class testbench(spice_module):
                                         self.print_log(type='F',msg='not yet done') #TODO
                                     elif self.parent.model=='spectre':
                                         #self._plotcmd += 'save %s\n' % val.ionames[i].upper()
-                                        self._plotcmd += "vsampleout_%s (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
-                                                (val.ionames[i].upper().replace('.','_'),trig,val.ionames[i].upper(),val.file[i],val.vth,-1 if val.edgetype.lower() == 'falling' else 1)
+                                        self._plotcmd += ("vsampleout_%s (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" 
+                                                %(val.ionames[i].upper().replace('.','_'),trig,val.ionames[i].upper(),
+                                                    val.file[i],val.vth,-1 if val.edgetype.lower() == 'falling' else 1))
                                     elif self.parent.model=='ngspice':
                                         self.print_log(type='F',msg='Iotype vsample not implemented for Ngspice') #TODO
-                    else:
-                        self.print_log(type='W',msg='Output filetype incorrectly defined.')
+                            else:
+                                self.print_log(type='W',msg='Output filetype incorrectly defined.')
             if self.parent.model=='ngspice':
                     self._plotcmd += ".endc\n"
         return self._plotcmd
