@@ -631,6 +631,22 @@ class testbench(spice_module):
                             self.print_log(type='F', msg='Unsupported frequency scale %s for AC simulation!' % val.fscale)
                         self._simcmdstr += 'AC_analysis %s start=%s stop=%s %s' % \
                                 (sim,str(val.fmin),str(val.fmax),pts_str)
+                    elif self.parent.model=='ngspice':
+                        if val.fscale.lower()=='dec':
+                            if val.fpoints != 0:
+                                pts_str='dec %d' % val.fpoints
+                            else:
+                                self.print_log(type='F', msg='Set fpoints for ngspice AC simulation!')
+                        elif val.fscale.lower()=='lin':
+                            if val.fpoints != 0:
+                                pts_str='lin=%d' % val.fpoints
+                            else:
+                                self.print_log(type='F', msg='Set fpoints for ngspice AC simulation!')
+                        else:
+                            self.print_log(type='F', msg='Unsupported frequency scale %s for AC simulation!' % val.fscale)
+                        self._simcmdstr += '.ac %s %s %s' % \
+                                (pts_str,val.fmin,val.fmax)
+
                 else:
                     self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
                 if val.mc and self.parent.model=='spectre':
