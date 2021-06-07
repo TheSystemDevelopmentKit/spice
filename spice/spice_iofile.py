@@ -8,7 +8,7 @@ for TheSDK spice.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Kalle Spoof, kalle.spoof@aalto.fi, 07.06.2021 10:50
+Last modification by Kalle Spoof, kalle.spoof@aalto.fi, 07.06.2021 11:37
 
 """
 import os
@@ -513,7 +513,6 @@ class spice_iofile(iofile):
                                 #ngspice delimiter is two whitespaces for positive data and one whitespace for negative.
                                 tmparr = genfromtxt(self.file[i], \
                                         skip_header=self.parent.syntaxdict['csvskip'])
-                                pdb.set_trace()
                                 if self.datatype == 'complex':
                                     arr = np.column_stack((tmparr[:,0], tmparr[:,1] + 1j*tmparr[:,2]))
                                 else:
