@@ -134,10 +134,10 @@ class spice_simcmd(thesdk):
             fscale: str
                 log | lin . Logarithmic or linear scale for frequency. Default log
             fpoints: int
-                number of points for frequency analysis. Default 1000.
+                number of points for frequency analysis. Default 0.
             fstepsize: int 
                 step size for AC analysis, if scale if lin. If fscale is log,
-                this parameter gives number of points per decade. Default 100.
+                this parameter gives number of points per decade. Default 0.
             seed: int
                 Random generator seed for noise transient. Default None (random).
             method: str
@@ -172,8 +172,8 @@ class spice_simcmd(thesdk):
             self._fmin=kwargs.get('fmin',1)
             self._fmax=kwargs.get('fmax',5e9)
             self._fscale=kwargs.get('fscale','log')
-            self._fpoints=kwargs.get('fpoints',1000)
-            self._fstepsize=kwargs.get('fstepsize',100)
+            self._fpoints=kwargs.get('fpoints',0)
+            self._fstepsize=kwargs.get('fstepsize',0)
             self._seed=kwargs.get('seed',None)
             self._method=kwargs.get('method',None)
             self._cmin=kwargs.get('cmin',None)
