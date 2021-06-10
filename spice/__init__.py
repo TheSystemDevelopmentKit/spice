@@ -979,24 +979,16 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                         else:
                             fname = 'oppoint*.dc'
                             break
-                # Move to spicesim
+                # For distributed runs
                 if self.distributed_run:
-                    ## NOTA BENE: The pattern [0-9]* matches any path with the first character
-                    # being integer in range 0-9 and any number of trailing characters. Glob doesn't
-                    # support exactly matching ANY number of digits and there shouldn't be any files
-                    # in the simulation result directory mathing this pattern so this is probably good enough.
-                    fpath = os.path.join(self.entitypath, 'spice/tb_%s.raw' % self.name,
-                            '[0-9]*', fname)
+                    path=os.path.join(self.spicesimpath,'tb_%s.raw' % self.name, '[0-9]*', fname)
+                    files = sorted(glob.glob(path))
                 else:
-                    fpath = os.path.join(self.entitypath, 'spice/tb_%s.raw' % self.name, fname)
-                destpath = os.path.join(self.entitypath, 'Simulations/spicesim', self.runname)
-                files = glob.glob(fpath)
-                for file in files:
-                    os.rename(file, os.path.join(destpath, file.split('/')[-1]))
+                    path=os.path.join(self.spicesimpath,'tb_%s.raw' % self.name, fname)
+                    files = sorted(glob.glob(path))
                 valbegin = 'VALUE\n'
                 eof = 'END\n'
                 parsevals = False
-                files = sorted(glob.glob(os.path.join(destpath, fname)))
                 for file in files:
                     with open(file, 'r') as f:
                         for line in f:
