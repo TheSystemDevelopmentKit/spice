@@ -251,7 +251,6 @@ class spice_module(thesdk):
             if self.parent.model == 'eldo':
                 self._subinst += ('+')  + self.parent.name.upper()
             elif self.parent.model == 'spectre':
-                print("Saatana")
                 self._subinst += (') ' )  + self.parent.name.upper()
             elif self.parent.model == 'ngspice':
                 self._subinst += ('+')  + self.parent.name.upper()
