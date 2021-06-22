@@ -122,7 +122,7 @@ class spice_iofile(iofile):
                 Default 5e-12.
             sourcetype (str)
                 Type of the source associated to a file.
-                V | I
+                V | I | ISUB (for spectre, event type)
                 Default 'V'
     """
     def __init__(self,parent=None,**kwargs):

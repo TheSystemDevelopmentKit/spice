@@ -735,20 +735,16 @@ class testbench(spice_module):
                                     elif self.parent.model=='spectre':
                                         signame = self.esc_bus(val.ionames[i])
                                         self._plotcmd += 'save %s\n' % signame
-                                        #self._plotcmd += "eventout_%s (%s) veriloga_csv_write_allpoints filename=\"%s\"\n" % \
-                                        #        (val.ionames[i].replace('.','_').replace('<','').replace('>',''),signame,val.file[i])
                                         self._plotcmd += 'simulator lang=spice\n'
                                         self._plotcmd += '.option ingold 2\n'
-                                        #self._plotcmd += ".print %s %s(%s) file=\"%s\"\n" % \
-                                        #(name.lower(),val.sourcetype,val.ionames[i],val.file[i])
                                         # Implement complex value probing
                                         if val.datatype.lower() == 'complex':
-                                            self._plotcmd += ".print %s %sr(%s) %si(%s) \n" % \
-                                                    (name.lower(),val.sourcetype,val.ionames[i],
+                                            self._plotcmd += ".print %sr(%s) %si(%s) \n" % \
+                                                    (val.sourcetype,val.ionames[i],
                                                             val.sourcetype,val.ionames[i])
                                         else:
-                                            self._plotcmd += ".print %s %s(%s)\n" % \
-                                                (name.lower(),val.sourcetype,val.ionames[i])
+                                            self._plotcmd += ".print %s(%s)\n" % \
+                                                (val.sourcetype,val.ionames[i])
                                         self._plotcmd += 'simulator lang=spectre\n'
                                     elif self.parent.model=='ngspice':
                                         self._plotcmd += "plot %s(%s)\n" % \
