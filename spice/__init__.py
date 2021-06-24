@@ -967,6 +967,19 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """ Internally called function to read the DC operating points of the circuit
             TODO: Implement for Eldo as well.
         """
+        def sorter(val):
+            '''
+            Function for sorting the files in correct order
+            Files that are output from simulation are of form
+
+            dcSweep-<integer>_oppoint.dc
+
+            Strategy: extract integer from filename and sort based on the integer.
+
+            '''
+            key=val.split('-')[1].split('_')[0]
+            return int(key)
+
         try:
             if self.model=='spectre' and 'dc' in self.simcmd_bundle.Members.keys():
                 self.extracts.Members.update({'oppts' : {}})
@@ -982,10 +995,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 # For distributed runs
                 if self.distributed_run:
                     path=os.path.join(self.spicesimpath,'tb_%s.raw' % self.name, '[0-9]*', fname)
-                    files = sorted(glob.glob(path))
+                    files = sorted(glob.glob(path),key=sorter)
                 else:
                     path=os.path.join(self.spicesimpath,'tb_%s.raw' % self.name, fname)
-                    files = sorted(glob.glob(path))
+                    files = sorted(glob.glob(path),key=sorter)
                 valbegin = 'VALUE\n'
                 eof = 'END\n'
                 parsevals = False
