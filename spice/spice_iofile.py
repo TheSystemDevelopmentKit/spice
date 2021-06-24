@@ -456,58 +456,41 @@ class spice_iofile(iofile):
                             with open(self.file[i]) as infile:
                                 wholefile=infile.readlines()
                                 found = False
-                                inited = False
-                                append = False
-                                predata = []
+                                inited=False
+                                data = []
                                 # The 'y' marks the end of segment  
                                 stopmatch=re.compile(r".*?y.*?")
                                 for line in wholefile:
                                     if not found:
-                                        for i in range(len(self.ionames)):
-                                            startmatch=re.compile(r".+?\(%s\).*?" %(self.ionames[i]))
+                                        for key in self.parent.iofile_eventdict.keys():
+                                            startmatch=re.compile(r".+?\(%s\).*?" %(key))
                                             if startmatch.search(line) != None:
-                                                found = True
-                                                if i==0:
-                                                    first = True
-                                                else:
-                                                    first = False
-                                    elif found and first:
-                                        if stopmatch.search(line) == None:
-                                                data=np.array(line.split()).astype('double')
-                                                if self.datatype == 'complex':
-                                                    if not inited:
-                                                        self.Data=np.array([data[0], data[1]+1j*data[2]]).reshape(1,2)
-                                                        inited = True
-                                                    else:
-                                                        self.Data=np.r_['0', self.Data, np.array([data[0], data[1]+1j*data[2]]).reshape(1,2)]
-                                                else:
-                                                    if not inited:
-                                                        self.Data=np.array([data[0], data[1]]).reshape(1,2)
-                                                        inited = True
-                                                    else:
-                                                        self.Data=np.r_['0', self.Data, np.array([data[0], data[1]]).reshape(1,2)]
-                                        else:
-                                            found = False
+                                                found=True
+                                                break
                                     elif found:
                                         if stopmatch.search(line) == None:
-                                                data=np.array(line.split()).astype('double')
+                                                linedata=np.array(line.split()).astype('double')
                                                 if self.datatype == 'complex':
-                                                    if predata == []:
-                                                        predata=np.array([data[1]+1j*data[2]]).reshape(1,1)
+                                                    if not inited:
+                                                        data=np.array([linedata[0], linedata[1]+1j*linedata[2]]).reshape(1,2)
+                                                        inited = True
                                                     else:
-                                                        predata=np.r_['0', predata, np.array([data[1]+1j*data[2]]).reshape(1,1)]
+                                                        data=np.r_['0', data, np.array([linedata[0], linedata[1]+1j*linedata[2]]).reshape(1,2)]
                                                 else:
-                                                    if predata == []:
-                                                        predata=np.array([data[1]]).reshape(1,1)
+                                                    if not inited:
+                                                        data=np.array([linedata[0], linedata[1]]).reshape(1,2)
+                                                        inited = True
                                                     else:
-                                                        predata=np.r_['0', predata, np.array([data[1]])]
-                                        else:
+                                                        data=np.r_['0', data, np.array([linedata[0], linedata[1]]).reshape(1,2)]
+                                        else: # Stopmatch -> new IO begins after a couple of lines
+                                            if not self.parent.iofile_eventdict[key]:
+                                                self.parent.iofile_eventdict[key]=data
+                                            else:
+                                                self.print_log(type='W', msg='Key %s already has data associated with it. Appending!')
+                                                self.parent.iofile_eventdict[key]=np.r_['1', self.iofile_eventdict[key], data]
                                             found = False
-                                            append = True
-                                    if append:
-                                        self.Data=np.r_['1', self.Data, predata]
-                                        predata = []
-                                        append = False
+                                            inited=False
+                                            data=[]
                         else:
                             if self.parent.model=='ngspice':
                                 #ngspice delimiter is two whitespaces for positive data and one whitespace for negative.
