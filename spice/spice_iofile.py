@@ -471,6 +471,7 @@ class spice_iofile(iofile):
                                                     first = True
                                                 else:
                                                     first = False
+                                                break
                                     elif found and first:
                                         if stopmatch.search(line) == None:
                                                 data=np.array(line.split()).astype('double')
@@ -500,7 +501,7 @@ class spice_iofile(iofile):
                                                     if predata == []:
                                                         predata=np.array([data[1]]).reshape(1,1)
                                                     else:
-                                                        predata=np.r_['0', predata, np.array([data[1]])]
+                                                        predata=np.r_['0', predata, np.array([data[1]]).reshape(1,1)]
                                         else:
                                             found = False
                                             append = True
