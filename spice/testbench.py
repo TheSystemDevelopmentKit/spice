@@ -828,7 +828,7 @@ class testbench(spice_module):
                                         signame = self.esc_bus(val.ionames[i].upper())
                                         #self._plotcmd += 'save %s\n' % signame
                                         self._plotcmd += "timeout_%s_%s (%s) veriloga_csv_write_allpoints filename=\"%s\"\n" % \
-                                                (val.edgetype.lower(),val.ionames[i].upper().replace('.','_').replace('<','').replace('>',''),signame,val.file[i])
+                                                (val.edgetype.lower(),val.name.upper().replace('.','_').replace('<','').replace('>',''),signame,val.file[i])
                             elif val.iotype=='vsample':
                                 for i in range(len(val.ionames)):
                                     # Checking the given trigger(s)
