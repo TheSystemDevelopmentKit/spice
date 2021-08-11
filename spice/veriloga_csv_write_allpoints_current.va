@@ -1,7 +1,7 @@
 // Verilog-A module to write all voltage values 
 // to csv-file.
 //
-// Last modification by Okko Järvinen, 08.06.2020 10:41
+// Last modification by Okko Järvinen, 16.03.2021 19:28
 
 `include "constants.vams"
 `include "disciplines.vams"
@@ -19,11 +19,11 @@ module veriloga_csv_write_allpoints_current(pos,neg);
 
 	analog begin
 		@ (initial_step) begin
-			file = $fopen(filename, "a");
+			file = $fopen(filename, "w");
 		end
 	
 		tran_time = $abstime;
-		$fwrite(file, "%g, ", tran_time);
+		$fwrite(file, "%.10g, ", tran_time);
         $fwrite(file, "%g\n", I(pos,neg));
 
 		@ (final_step) begin

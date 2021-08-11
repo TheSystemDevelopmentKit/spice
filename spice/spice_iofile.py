@@ -8,7 +8,7 @@ for TheSDK spice.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 07.10.2020 14:40
+Last modification by Kalle Spoof, kalle.spoof@aalto.fi, 07.06.2021 11:37
 
 """
 import os
@@ -80,7 +80,9 @@ class spice_iofile(iofile):
                 Time type signals return a vector of timestamps corresponding
                 to threshold crossings.
             datatype (str)
-                Datatype, not yet implemented.
+                Inherited from the parent.
+                If complex, the ioname is handled as a complex signal.
+                Currently implemented only for writing the ouputs in testbenched and reading them in. 
             trigger (str or list<str>)
                 Name of the clock signal node in the Spice netlist.
                 If a single string is given, the same clock signal is used for all bits/buses.
@@ -118,6 +120,10 @@ class spice_iofile(iofile):
             trise (float)
                 Risetime of sample type input.
                 Default 5e-12.
+            sourcetype (str)
+                Type of the source associated to a file.
+                V | I | ISUB (for spectre, event type)
+                Default 'V'
     """
     def __init__(self,parent=None,**kwargs):
         if parent==None:
@@ -136,6 +142,7 @@ class spice_iofile(iofile):
             self._vlo=kwargs.get('vlo',0)
             self._tfall=kwargs.get('tfall',5e-12)
             self._trise=kwargs.get('trise',5e-12)
+            self._sourcetype=kwargs.get('sourcetype','V')
         except:
             self.print_log(type='F', msg="spice IO file definition failed.")
 
@@ -296,7 +303,24 @@ class spice_iofile(iofile):
         """
         self._file = []
         for ioname in self.ionames:
-            filename = '%s/%s_%s_%s%s.txt' % (self.parent.spicesimpath,self.parent.runname,ioname.replace('<','').replace('>','').replace('.','_'),self.iotype,('_%s' % self.edgetype if self.iotype is not 'event' else ''))
+            filepath = self.parent.spicesimpath+'/'
+            if self.iotype is not 'event': 
+                filename = ( '%s_ioname_%s_bundlename_%s_%s_%s.txt' 
+                        % ( self.parent.runname,ioname.replace('<','').replace('>','').replace('.','_'),
+                            self.name.replace('<','').replace('>','').replace('.','_'),self.iotype,self.edgetype))
+            else:
+                # We cant control the filename. Location is defined with -odir option
+                if self.parent.model == 'spectre' and self.dir == 'out':
+                    filename = 'tb_%s.print' % (self.parent.name)
+                else:
+                    filename = ( '%s_%s_%s.txt' 
+                        % ( self.parent.runname,ioname.replace('<','').replace('>','').replace('.','_'),
+                            self.iotype))
+
+            if self.parent.model == 'ngspice' and self.dir == 'in':
+                # For some reason Ngspice requires lowercase names
+                filename = filename.lower()
+            filename = filepath + filename    
             self._file.append(filename)
         return self._file
     @file.setter
@@ -351,8 +375,7 @@ class spice_iofile(iofile):
             except:
                     self.print_log(type='E',msg=traceback.format_exc())
                     self.print_log(type='E',msg='Failed while writing files for %s.' % self.file[i])
-        elif self.iotype == 'sample' and self.parent.model == 'spectre':
-            # Spectre digital input vector file is written here
+        elif self.iotype == 'sample':
             try:
                 for i in range(len(self.file)):
                     self.print_log(type='I',msg='Writing digital input file: %s.' % self.file[i])
@@ -375,7 +398,8 @@ class spice_iofile(iofile):
                         buswidth = busstart-busstop+1
                     else:
                         buswidth = busstop-busstart+1
-                    with open(self.file[i],'w') as outfile:
+                with open(self.file[i],'w') as outfile:
+                    if self.parent.model == 'spectre':
                         # This is Spectre vector file syntax
                         outfile.write('radix %s\n' % ('1 '*buswidth))
                         outfile.write('io i\n')
@@ -395,6 +419,17 @@ class spice_iofile(iofile):
                                 # Input values  are bits (strings of '1' and '0')
                                 binary = vec[j]
                             outfile.write('%s\n' % binary)
+                    if self.parent.model == 'ngspice':
+                        # This is Ngsim vector file syntax
+                        for j in range(len(vec)):
+                            if self.ioformat == 'dec':
+                                # Input values are integer numbers (TODO: check if its unsigned)
+                                binary = format(vec[j],'0%db' % buswidth)
+                            else:
+                                # Input values  are bits (strings of '1' and '0')
+                                binary = vec[j]
+                            line = str(j/self.rs)+' '+'s '.join(binary)+'s'
+                            outfile.write('%s\n' % line)
             except:
                 self.print_log(type='E',msg=traceback.format_exc())
                 self.print_log(type='E',msg='Failed while writing files for %s.' % self.file[i])
@@ -407,187 +442,275 @@ class spice_iofile(iofile):
         Function to read files associated with this spice_iofile.
         """
         for i in range(len(self.file)):
-            try:
-                if self.iotype=='event' or self.iotype=='vsample':
-                    arr = genfromtxt(self.file[i],delimiter=self.parent.syntaxdict['eventoutdelim'], \
-                            skip_header=self.parent.syntaxdict['csvskip'])
-                    if self.Data is None: 
-                        self.Data = np.array(arr)
-                    else:
-                        self.Data = np.hstack((self.Data,np.array(arr)))
-                    # TODO: verify csvskip
-                elif self.iotype=='time':
-                    #if self.parent.model == 'eldo':
-                    #    nodematch=re.compile(r"%s" % self.ionames[i].upper())
-                    #    with open(self.file[i]) as infile:
-                    #        wholefile=infile.readlines()
-                    #        arr = []
-                    #        for line in wholefile:
-                    #            if nodematch.search(line) != None:
-                    #                arr.append(float(line.split()[-1]))
-                    #        nparr = np.array(arr).reshape(-1,1)
-                    #        if self.Data is None: 
-                    #            self.Data = nparr
-                    #        else:
-                    #            if len(self.Data[:,-1]) > len(nparr):
-                    #                # Old max length is bigger -> padding new array
-                    #                nans = np.empty(self.Data[:,-1].shape).reshape(-1,1)
-                    #                nans.fill(np.nan)
-                    #                nans[:nparr.shape[0],:nparr.shape[1]] = nparr
-                    #                nparr = nans
-                    #            elif len(self.Data[:,-1]) < len(nparr):
-                    #                # Old max length is smaller -> padding old array
-                    #                nans = np.empty((nparr.shape[0],self.Data.shape[1]))
-                    #                nans.fill(np.nan)
-                    #                nans[:self.Data.shape[0],:self.Data.shape[1]] = self.Data
-                    #                self.Data = nans
-                    #            self.Data = np.hstack((self.Data,nparr))
-                    #    infile.close()
-                    #elif self.parent.model == 'spectre':
-
-                    # This should work for both spectre and eldo now
-                    arr = genfromtxt(self.file[i],delimiter=', ',skip_header=self.parent.syntaxdict["csvskip"])
-                    if self.edgetype.lower() == 'both':
-                        trise = self.interp_crossings(arr,self.vth,256,'rising')
-                        tfall = self.interp_crossings(arr,self.vth,256,'falling')
-                        tcross = np.sort(np.vstack((trise.reshape(-1,1),tfall.reshape(-1,1))),0)
-                    else:
-                        tcross = self.interp_crossings(arr,self.vth,256,self.edgetype)
-                    nparr = np.array(tcross).reshape(-1,1)
-                    if self.Data is None: 
-                        self.Data = nparr
-                    else:
-                        if len(self.Data[:,-1]) > len(nparr):
-                            # Old max length is bigger -> padding new array
-                            nans = np.empty(self.Data[:,-1].shape).reshape(-1,1)
-                            nans.fill(np.nan)
-                            nans[:nparr.shape[0],:nparr.shape[1]] = nparr
-                            nparr = nans
-                        elif len(self.Data[:,-1]) < len(nparr):
-                            # Old max length is smaller -> padding old array
-                            nans = np.empty((nparr.shape[0],self.Data.shape[1]))
-                            nans.fill(np.nan)
-                            nans[:self.Data.shape[0],:self.Data.shape[1]] = self.Data
-                            self.Data = nans
-                        self.Data = np.hstack((self.Data,nparr))
-                elif self.iotype=='sample':
-                    if self.parent.model == 'eldo':
-                        nodematch=re.compile(r"%s" % self.ionames[i].upper())
-                        with open(self.file[i]) as infile:
-                            wholefile=infile.readlines()
-                            maxsamp = -1
-                            outbus = {}
-                            for line in wholefile:
-                                if nodematch.search(line) != None:
-                                    tokens = re.findall(r"[\w']+",line)
-                                    bitidx = tokens[2]
-                                    sampidx = tokens[3]
-                                    if int(sampidx) > maxsamp:
-                                        maxsamp = int(sampidx)
-                                    bitval = line.split()[-1]
-                                    # TODO: Rounding to bits is done here (might need to go elsewhere)
-                                    # Also, not all sampled signals need to be output as bits necessarily
-                                    if float(bitval) >= self.vth:
-                                        bitval = '1'
-                                    else:
-                                        bitval = '0'
-                                    if bitidx in outbus.keys():
-                                        outbus[bitidx].append(bitval)
-                                    else:
-                                        outbus.update({bitidx:[bitval]})
-                            maxbit = max(map(int,outbus.keys()))
-                            minbit = min(map(int,outbus.keys()))
-                            # TODO: REALLY check the endianness of these (together with RTL)
-                            if not self.big_endian:
-                                bitrange = range(maxbit,minbit-1,-1)
-                                self.print_log(type='I',msg='Reading %s<%d:%d> from file to %s.'%(self.ionames[i].upper(),maxbit,minbit,self.name))
-                            else:
-                                bitrange = range(minbit,maxbit+1,1)
-                                self.print_log(type='I',msg='Reading %s<%d:%d> from file to %s.'%(self.ionames[i].upper(),minbit,maxbit,self.name))
-                            arr = []
-                            for idx in range(maxsamp):
-                                word = ''
-                                for key in bitrange:
-                                    word += outbus[str(key)][idx]
-                                arr.append(word)
-                            if self.Data is None: 
-                                self.Data = np.array(arr).reshape(-1,1)
-                            else:
-                                self.Data = np.hstack((self.Data,np.array(arr).reshape(-1,1)))
-                        infile.close()
-                    elif self.parent.model == 'spectre':
-                        # Extracting the bus width (TODO: this is copy-pasted a lot -> make into a function)
-                        signame = self.ionames[i]
-                        signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
-                        if len(signame) == 1:
-                            busstart = 0
-                            busstop = 0
+            if os.path.isfile(self.file[i]):
+                try:
+                    if self.iotype=='event':
+                        if self.parent.model=='spectre':
+                            ''' Logic of parsing:
+                                Parse throught the file, match to (<ionam>), if found,
+                                start storing the values to self.Data. self.Data is initialized 
+                                with the first matching <ioname>. The following <ionames> are appended as columns.
+                            '''
+                            with open(self.file[i]) as infile:
+                                wholefile=infile.readlines()
+                                found = False
+                                inited = False
+                                append = False
+                                predata = []
+                                # The 'y' marks the end of segment  
+                                stopmatch=re.compile(r".*?y.*?")
+                                for line in wholefile:
+                                    if not found:
+                                        for i in range(len(self.ionames)):
+                                            startmatch=re.compile(r".+?\(%s\).*?" %(self.ionames[i]))
+                                            if startmatch.search(line) != None:
+                                                found = True
+                                                if i==0:
+                                                    first = True
+                                                else:
+                                                    first = False
+                                                break
+                                    elif found and first:
+                                        if stopmatch.search(line) == None:
+                                                data=np.array(line.split()).astype('double')
+                                                if self.datatype == 'complex':
+                                                    if not inited:
+                                                        self.Data=np.array([data[0], data[1]+1j*data[2]]).reshape(1,2)
+                                                        inited = True
+                                                    else:
+                                                        self.Data=np.r_['0', self.Data, np.array([data[0], data[1]+1j*data[2]]).reshape(1,2)]
+                                                else:
+                                                    if not inited:
+                                                        self.Data=np.array([data[0], data[1]]).reshape(1,2)
+                                                        inited = True
+                                                    else:
+                                                        self.Data=np.r_['0', self.Data, np.array([data[0], data[1]]).reshape(1,2)]
+                                        else:
+                                            found = False
+                                    elif found:
+                                        if stopmatch.search(line) == None:
+                                                data=np.array(line.split()).astype('double')
+                                                if self.datatype == 'complex':
+                                                    if predata == []:
+                                                        predata=np.array([data[1]+1j*data[2]]).reshape(1,1)
+                                                    else:
+                                                        predata=np.r_['0', predata, np.array([data[1]+1j*data[2]]).reshape(1,1)]
+                                                else:
+                                                    if predata == []:
+                                                        predata=np.array([data[1]]).reshape(1,1)
+                                                    else:
+                                                        predata=np.r_['0', predata, np.array([data[1]]).reshape(1,1)]
+                                        else:
+                                            found = False
+                                            append = True
+                                    if append:
+                                        self.Data=np.r_['1', self.Data, predata]
+                                        predata = []
+                                        append = False
                         else:
-                            busstart = int(signame[1])
-                            busstop = int(signame[2])
-                        if busstart > busstop:
-                            buswidth = busstart-busstop+1
-                        else:
-                            buswidth = busstop-busstart+1
-                        if self.big_endian:
-                            bitrange = range(buswidth)
-                        else:
-                            bitrange = range(buswidth-1,-1,-1)
-                        self.print_log(type='I',msg='Reading bus %s from file to %s.'%(self.ionames[i].upper(),self.name))
-                        # Reading each bit of the bus from a file
-                        failed = False
-                        bitmat = None
-                        for j in bitrange:
-                            fname = self.file[i].replace('.txt','_%d.txt' % j)
-                            # Check if file is empty
-                            if os.stat(fname).st_size > 1:
-                                arr = genfromtxt(fname,delimiter=', ',skip_header=self.parent.syntaxdict["csvskip"])
-                                if len(arr.shape) > 1:
-                                    arr = (arr[:,1]>=self.vth).reshape(-1,1).astype(int).astype(str)
+                            if self.parent.model=='ngspice':
+                                #ngspice delimiter is two whitespaces for positive data and one whitespace for negative.
+                                tmparr = genfromtxt(self.file[i], \
+                                        skip_header=self.parent.syntaxdict['csvskip'])
+                                if self.datatype == 'complex':
+                                    arr = np.column_stack((tmparr[:,0], tmparr[:,1] + 1j*tmparr[:,2]))
                                 else:
-                                    arr = np.array(['0']).reshape(-1,1)
-                                    failed = True
+                                    arr=tmparr
                             else:
-                                arr = np.array(['0']).reshape(-1,1)
-                                failed = True
-                            if bitmat is None:
-                                # First bit is read, it becomes the first column of the bit matrix
-                                bitmat = arr
+                                arr = genfromtxt(self.file[i],delimiter=self.parent.syntaxdict['eventoutdelim'], \
+                                        skip_header=self.parent.syntaxdict['csvskip'])
+                            if self.Data is None: 
+                                self.Data = np.array(arr)
                             else:
-                                # Following bits get stacked as columns to the left of the previous one
-                                bitmat = np.hstack((bitmat,arr))
-                        if failed:
-                            self.print_log(type='W',msg='Failed reading sample type output vector.')
-                        # Bits collected, mashing the rows into binary strings
-                        # There's probably a one-liner to do this, I'm lazy
-                        arr = []
-                        for j in range(len(bitmat[:,0])):
-                            arr.append(''.join(bitmat[j,:]))
-                        nparr = np.array(arr).reshape(-1,1)
-                        # TODO: also this should be a function
+                                self.Data = np.hstack((self.Data,np.array(arr)))
+                        # TODO: verify csvskip
+                    elif self.iotype=='vsample':
+                        if self.parent.model=='ngspice':
+                            #ngspice delimiter is two whitespaces for positive data and one whitespace for negative.
+                            arr = genfromtxt(self.file[i], \
+                                    skip_header=self.parent.syntaxdict['csvskip'])
+                        else:
+                            arr = genfromtxt(self.file[i],delimiter=self.parent.syntaxdict['eventoutdelim'], \
+                                    skip_header=self.parent.syntaxdict['csvskip'])
+                        if self.Data is None: 
+                            self.Data = np.array(arr)
+                        else:
+                            self.Data = np.hstack((self.Data,np.array(arr)))
+                        # TODO: verify csvskip
+                    elif self.iotype=='time':
+                        #if self.parent.model == 'eldo':
+                        #    nodematch=re.compile(r"%s" % self.ionames[i].upper())
+                        #    with open(self.file[i]) as infile:
+                        #        wholefile=infile.readlines()
+                        #        arr = []
+                        #        for line in wholefile:
+                        #            if nodematch.search(line) != None:
+                        #                arr.append(float(line.split()[-1]))
+                        #        nparr = np.array(arr).reshape(-1,1)
+                        #        if self.Data is None: 
+                        #            self.Data = nparr
+                        #        else:
+                        #            if len(self.Data[:,-1]) > len(nparr):
+                        #                # Old max length is bigger -> padding new array
+                        #                nans = np.empty(self.Data[:,-1].shape).reshape(-1,1)
+                        #                nans.fill(np.nan)
+                        #                nans[:nparr.shape[0],:nparr.shape[1]] = nparr
+                        #                nparr = nans
+                        #            elif len(self.Data[:,-1]) < len(nparr):
+                        #                # Old max length is smaller -> padding old array
+                        #                nans = np.empty((nparr.shape[0],self.Data.shape[1]))
+                        #                nans.fill(np.nan)
+                        #                nans[:self.Data.shape[0],:self.Data.shape[1]] = self.Data
+                        #                self.Data = nans
+                        #            self.Data = np.hstack((self.Data,nparr))
+                        #    infile.close()
+                        #elif self.parent.model == 'spectre':
+
+                        # This should work for both spectre and eldo now
+                        arr = genfromtxt(self.file[i],delimiter=', ',skip_header=self.parent.syntaxdict["csvskip"])
+                        if self.edgetype.lower() == 'both':
+                            trise = self.interp_crossings(arr,self.vth,256,'rising')
+                            tfall = self.interp_crossings(arr,self.vth,256,'falling')
+                            tcross = np.sort(np.vstack((trise.reshape(-1,1),tfall.reshape(-1,1))),0)
+                        else:
+                            tcross = self.interp_crossings(arr,self.vth,256,self.edgetype)
+                        nparr = np.array(tcross).reshape(-1,1)
                         if self.Data is None: 
                             self.Data = nparr
                         else:
                             if len(self.Data[:,-1]) > len(nparr):
                                 # Old max length is bigger -> padding new array
-                                nans = np.empty(self.Data[:,-1].shape,dtype='S%s' % buswidth).reshape(-1,1)
-                                nans.fill('U' * buswidth)
-                                nans = nans.astype(str)
+                                nans = np.empty(self.Data[:,-1].shape).reshape(-1,1)
+                                nans.fill(np.nan)
                                 nans[:nparr.shape[0],:nparr.shape[1]] = nparr
                                 nparr = nans
                             elif len(self.Data[:,-1]) < len(nparr):
                                 # Old max length is smaller -> padding old array
-                                nans = np.empty(self.Data[:,-1].shape,dtype='S%s' % buswidth).reshape(-1,1)
-                                nans.fill('U' * buswidth)
-                                nans = nans.astype(str)
+                                nans = np.empty((nparr.shape[0],self.Data.shape[1]))
+                                nans.fill(np.nan)
                                 nans[:self.Data.shape[0],:self.Data.shape[1]] = self.Data
                                 self.Data = nans
                             self.Data = np.hstack((self.Data,nparr))
-                else:
-                    self.print_log(type='F',msg='Couldn\'t read file for input type \'%s\'.'%self.iotype)
-            except:
-                self.print_log(type='E',msg=traceback.format_exc())
-                self.print_log(type='F',msg='Failed while reading files for %s.' % self.name)
+                    elif self.iotype=='sample':
+                        if self.parent.model == 'eldo':
+                            nodematch=re.compile(r"%s" % self.ionames[i].upper())
+                            with open(self.file[i]) as infile:
+                                wholefile=infile.readlines()
+                                maxsamp = -1
+                                outbus = {}
+                                for line in wholefile:
+                                    if nodematch.search(line) != None:
+                                        tokens = re.findall(r"[\w']+",line)
+                                        bitidx = tokens[2]
+                                        sampidx = tokens[3]
+                                        if int(sampidx) > maxsamp:
+                                            maxsamp = int(sampidx)
+                                        bitval = line.split()[-1]
+                                        # TODO: Rounding to bits is done here (might need to go elsewhere)
+                                        # Also, not all sampled signals need to be output as bits necessarily
+                                        if float(bitval) >= self.vth:
+                                            bitval = '1'
+                                        else:
+                                            bitval = '0'
+                                        if bitidx in outbus.keys():
+                                            outbus[bitidx].append(bitval)
+                                        else:
+                                            outbus.update({bitidx:[bitval]})
+                                maxbit = max(map(int,outbus.keys()))
+                                minbit = min(map(int,outbus.keys()))
+                                # TODO: REALLY check the endianness of these (together with RTL)
+                                if not self.big_endian:
+                                    bitrange = range(maxbit,minbit-1,-1)
+                                    self.print_log(type='I',msg='Reading %s<%d:%d> from file to %s.'%(self.ionames[i].upper(),maxbit,minbit,self.name))
+                                else:
+                                    bitrange = range(minbit,maxbit+1,1)
+                                    self.print_log(type='I',msg='Reading %s<%d:%d> from file to %s.'%(self.ionames[i].upper(),minbit,maxbit,self.name))
+                                arr = []
+                                for idx in range(maxsamp):
+                                    word = ''
+                                    for key in bitrange:
+                                        word += outbus[str(key)][idx]
+                                    arr.append(word)
+                                if self.Data is None: 
+                                    self.Data = np.array(arr).reshape(-1,1)
+                                else:
+                                    self.Data = np.hstack((self.Data,np.array(arr).reshape(-1,1)))
+                            infile.close()
+                        elif self.parent.model == 'spectre':
+                            # Extracting the bus width (TODO: this is copy-pasted a lot -> make into a function)
+                            signame = self.ionames[i]
+                            signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
+                            if len(signame) == 1:
+                                busstart = 0
+                                busstop = 0
+                            else:
+                                busstart = int(signame[1])
+                                busstop = int(signame[2])
+                            if busstart > busstop:
+                                buswidth = busstart-busstop+1
+                            else:
+                                buswidth = busstop-busstart+1
+                            if self.big_endian:
+                                bitrange = range(buswidth)
+                            else:
+                                bitrange = range(buswidth-1,-1,-1)
+                            self.print_log(type='I',msg='Reading bus %s from file to %s.'%(self.ionames[i].upper(),self.name))
+                            # Reading each bit of the bus from a file
+                            failed = False
+                            bitmat = None
+                            for j in bitrange:
+                                fname = self.file[i].replace('.txt','_%d.txt' % j)
+                                # Check if file is empty
+                                if os.stat(fname).st_size > 1:
+                                    arr = genfromtxt(fname,delimiter=', ',skip_header=self.parent.syntaxdict["csvskip"])
+                                    if len(arr.shape) > 1:
+                                        arr = (arr[:,1]>=self.vth).reshape(-1,1).astype(int).astype(str)
+                                    else:
+                                        arr = np.array(['0']).reshape(-1,1)
+                                        failed = True
+                                else:
+                                    arr = np.array(['0']).reshape(-1,1)
+                                    failed = True
+                                if bitmat is None:
+                                    # First bit is read, it becomes the first column of the bit matrix
+                                    bitmat = arr
+                                else:
+                                    # Following bits get stacked as columns to the left of the previous one
+                                    bitmat = np.hstack((bitmat,arr))
+                            if failed:
+                                self.print_log(type='W',msg='Failed reading sample type output vector.')
+                            # Bits collected, mashing the rows into binary strings
+                            # There's probably a one-liner to do this, I'm lazy
+                            arr = []
+                            for j in range(len(bitmat[:,0])):
+                                arr.append(''.join(bitmat[j,:]))
+                            nparr = np.array(arr).reshape(-1,1)
+                            # TODO: also this should be a function
+                            if self.Data is None: 
+                                self.Data = nparr
+                            else:
+                                if len(self.Data[:,-1]) > len(nparr):
+                                    # Old max length is bigger -> padding new array
+                                    nans = np.empty(self.Data[:,-1].shape,dtype='S%s' % buswidth).reshape(-1,1)
+                                    nans.fill('U' * buswidth)
+                                    nans = nans.astype(str)
+                                    nans[:nparr.shape[0],:nparr.shape[1]] = nparr
+                                    nparr = nans
+                                elif len(self.Data[:,-1]) < len(nparr):
+                                    # Old max length is smaller -> padding old array
+                                    nans = np.empty(self.Data[:,-1].shape,dtype='S%s' % buswidth).reshape(-1,1)
+                                    nans.fill('U' * buswidth)
+                                    nans = nans.astype(str)
+                                    nans[:self.Data.shape[0],:self.Data.shape[1]] = self.Data
+                                    self.Data = nans
+                                self.Data = np.hstack((self.Data,nparr))
+                    else:
+                        self.print_log(type='F',msg='Couldn\'t read file for input type \'%s\'.'%self.iotype)
+                except:
+                    self.print_log(type='E',msg=traceback.format_exc())
+                    self.print_log(type='F',msg='Failed while reading files for %s.' % self.name)
+            else:
+                        self.print_log(type='I',msg='File \'%s\' does not exist.' % self.file[i])
 
     def interp_crossings(self,data,vth,nint,edgetype):
         """ 

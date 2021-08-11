@@ -6,7 +6,6 @@ Spice Testbench
 Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
-Last modification by Okko Järvinen, 15.01.2021 09:58
 
 """
 import os
@@ -172,6 +171,19 @@ class testbench(spice_module):
                     self._libcmd = "// Spectre device models (undefined)\n"
                     self._libcmd += "//include " + libfile + " " + corner + "\n"
                 self._libcmd += 'tempOption options temp=%s\n' % str(temp)
+            if self.parent.model == 'ngspice':
+                try:
+                    libfile = thesdk.GLOBALS['NGSPICELIBFILE']
+                    if libfile == '':
+                        raise ValueError
+                    else:
+                        self._libcmd = "*** Ngspice device models\n"
+                        self._libcmd += ".lib " + libfile + " " + corner + "\n"
+                except:
+                    self.print_log(type='W',msg='Global TheSDK variable ELDOLIBPATH not set.')
+                    self._libcmd = "*** Eldo device models (undefined)\n"
+                    self._libcmd += "*.lib " + libfile + " " + corner + "\n"
+                self._libcmd += ".temp " + str(temp) + "\n"
         return self._libcmd
     @libcmd.setter
     def libcmd(self,value):
@@ -346,6 +358,17 @@ class testbench(spice_module):
                         # Writing source current consumption to a file
                         self._dcsourcestr += "pwrout_%s%s (%s_p %s) veriloga_csv_write_allpoints_current filename=\"%s\"\n" % \
                             (val.sourcetype.lower(),val.name.lower().replace('.','_'),self.esc_bus(val.pos),self.esc_bus(val.pos),val._extfile)
+                elif self.parent.model == 'ngspice':
+                    if val.ramp == 0:
+                        self._dcsourcestr += "%s%s %s %s %g %s\n" % \
+                                (val.sourcetype.upper(),val.name.lower(),val.pos,val.neg,val.value, \
+                                'NONOISE' if not val.noise else '')
+                    else:
+                        self._dcsourcestr += "%s%s %s %s %s %s\n" % \
+                                (val.sourcetype.upper(),val.name.lower(),val.pos,val.neg, \
+                                'pulse(0 %g 0 %g)' % (val.value,abs(val.ramp)), \
+                                'NONOISE' if not val.noise else '')
+                    # If the DC source is a supply, the power consumption is extracted for it automatically
         return self._dcsourcestr
     @dcsourcestr.setter
     def dcsourcestr(self,value):
@@ -365,8 +388,10 @@ class testbench(spice_module):
         if not hasattr(self,'_inputsignals'):
             self._inputsignals = "%s Input signals\n" % self.parent.syntaxdict["commentchar"]
             for name, val in self.iofiles.Members.items():
+                self._trantime_name = name
                 # Input file becomes a source
                 if val.dir.lower()=='in' or val.dir.lower()=='input':
+                    # Event signals are analog
                     if val.iotype.lower()=='event':
                         for i in range(len(val.ionames)):
                             # Finding the max time instant
@@ -380,7 +405,16 @@ class testbench(spice_module):
                             elif self.parent.model=='spectre':
                                 self._inputsignals += "%s%s %s 0 %ssource type=pwl file=\"%s\"\n" % \
                                         (val.sourcetype.upper(),self.esc_bus(val.ionames[i].lower()),
-                                        self.esc_bus(val.ionames[i].upper()),val.sourcetype.lower(),val.file[i])
+                                        self.esc_bus(val.ionames[i]),val.sourcetype.lower(),val.file[i])
+                            elif self.parent.model=='ngspice':
+                                self._inputsignals += "a%s %%vd[%s 0] filesrc%s\n" % \
+                                        (self.esc_bus(val.ionames[i].lower()),
+                                        self.esc_bus(val.ionames[i].upper()),self.esc_bus(val.ionames[i].lower()))
+                                self._inputsignals += ".model filesrc%s filesource (file=\"%s\"\n" % \
+                                        (self.esc_bus(val.ionames[i].lower()),os.path.basename(val.file[i]).lower())
+                                self._inputsignals += "+ amploffset=[0 0] amplscale=[1 1] timeoffset=0 timescale=1 timerelative=false amplstep=false)\n"
+                    # Sample signals are digital
+                    # Presumably these are already converted to bitstrings
                     elif val.iotype.lower()=='sample':
                         if self.parent.model == 'eldo':
                             for i in range(len(val.ionames)):
@@ -390,6 +424,7 @@ class testbench(spice_module):
                                 try:
                                     if float(self._trantime) < len(val.Data)/val.rs:
                                         self._trantime = len(val.Data)/val.rs
+                                        self._trantime_name = name
                                 except:
                                     pass
                                 # Checking if the given bus is actually a 1-bit signal
@@ -407,9 +442,89 @@ class testbench(spice_module):
                                 try:
                                     if float(self._trantime) < len(val.Data)/val.rs:
                                         self._trantime = len(val.Data)/val.rs
+                                        self._trantime_name = name
                                 except:
                                     pass
                                 self._inputsignals += 'vec_include "%s"\n' % val.file[i]
+                        elif self.parent.model == 'ngspice':
+                            for i in range(len(val.ionames)):
+                                pattstr = ''
+                                for d in val.Data[:,i]:
+                                    pattstr += '%s ' % str(d)
+                                try:
+                                    if float(self._trantime) < len(val.Data)/val.rs:
+                                        self._trantime = len(val.Data)/val.rs
+                                except:
+                                    pass
+
+                                # Checking if the given bus is actually a 1-bit signal
+                                if (('<' not in val.ionames[i]) 
+                                        and ('>' not in val.ionames[i]) 
+                                        and len(str(val.Data[0,i])) == 1):
+                                    self._inputsignals += ( 'a%s [ %s_d ] input_vector_%s\n'
+                                            % ( val.ionames[i], val.ionames[i], val.ionames[i]) )
+                                    # Ngsim assumes lowercase filenames
+                                    self._inputsignals += (
+                                            '.model input_vector_%s d_source(input_file = %s)\n'
+                                            % ( val.ionames[i], os.path.basename(val.file[i]).lower() )) 
+                                    self._inputsignals += (
+                                            'adac_%s [ %s_d ] [ %s ] dac_%s\n' % ( val.ionames[i],
+                                                val.ionames[i], val.ionames[i], val.ionames[i])
+                                                )
+                                    self._inputsignals += (
+                                        '.model dac_%s dac_bridge(out_low = %s out_high = %s out_undef = %s input_load = 5.0e-16 t_rise = %s t_fall = %s' %
+                                        (val.ionames[i], val.vlo, val.vhi, (val.vhi+val.vlo)/2,
+                                            val.trise, val.tfall )
+                                        )
+                                elif (('<' in val.ionames[i]) 
+                                        and ('>' in val.ionames[i])):
+                                    signame = val.ionames[i]
+                                    signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
+                                    busstart = int(signame[1])
+                                    busstop = int(signame[2])
+                                    loopstart=np.amin([busstart,busstop])
+                                    loopstop=np.amax([busstart,busstop])
+                                    self._inputsignals += ( 'a%s [ '
+                                            % ( signame[0])
+                                            )
+
+                                    for index in range(loopstart,loopstop+1):
+                                        self._inputsignals += ( '%s_%s_d '
+                                            % ( signame[0], index)
+                                            )
+
+                                    self._inputsignals += ( '] input_vector_%s\n'
+                                            % ( signame[0])
+                                            )
+
+                                    # Ngsim assumes lowercase filenames
+                                    self._inputsignals += (
+                                            '.model input_vector_%s d_source(input_file = %s)\n'
+                                            % ( signame[0], os.path.basename(val.file[i]).lower() )
+                                            ) 
+
+                                    # DAC
+                                    self._inputsignals += ( 'adac_%s [ ' % ( signame[0]) )
+
+                                    for index in range(loopstart,loopstop+1):
+                                        self._inputsignals += ( '%s_%s_d '
+                                                % ( signame[0], index))
+                                    self._inputsignals += ( '] [ ' )
+
+                                    for index in range(loopstart,loopstop+1):
+                                        self._inputsignals += (
+                                                    '%s_%s_ ' % ( signame[0], index)
+                                                )
+                                    self._inputsignals += (
+                                                '] dac_%s\n' % ( signame[0])
+                                            )
+                                    self._inputsignals += (
+                                        '.model dac_%s dac_bridge(out_low = %s out_high = %s out_undef = %s input_load = 5.0e-16 t_rise = %s t_fall = %s' %
+                                        (signame[0], val.vlo, val.vhi, (val.vhi+val.vlo)/2,
+                                            val.trise, val.tfall )
+                                        )
+                                else:
+                                    busname = val.ionames[i]
                     else:
                         self.print_log(type='F',msg='Input type \'%s\' undefined.' % val.iotype)
 
@@ -435,10 +550,13 @@ class testbench(spice_module):
         if not hasattr(self,'_simcmdstr'):
             self._simcmdstr = "%s Simulation commands\n" % self.parent.syntaxdict["commentchar"]
             for sim, val in self.simcmds.Members.items():
+                if val.mc and self.parent.model=='spectre':
+                    self._simcmdstr += 'mc montecarlo donominal=no variations=all %snumruns=1 {\n' \
+                            % ('' if val.mc_seed is None else 'seed=%d '%val.mc_seed)
                 if str(sim).lower() == 'tran':
                     simtime = val.tstop if val.tstop is not None else self._trantime
                     if val.tstop is None:
-                        self.print_log(type='I',msg='Inferred transient duration is %g s.' % simtime)
+                        self.print_log(type='I',msg='Inferred transient duration is %g s from \'%s\'.' % (simtime,self._trantime_name))
                     #TODO could this if-else be avoided?
                     if self.parent.model=='eldo':
                         self._simcmdstr += '.%s %s %s %s\n' % \
@@ -460,6 +578,13 @@ class testbench(spice_module):
                         if val.cmin is not None:
                             self._simcmdstr += 'cmin=%s ' %  (str(val.cmin))
                         self._simcmdstr += '\n\n' 
+                    elif self.parent.model=='ngspice':
+                        self._simcmdstr += '.%s %s %s %s\n' % \
+                                (sim,str(val.tprint),str(simtime),'uic' if val.uic else '')
+                        if val.noise:
+                            self.print_log(type='E', 
+                                    msg= ( 'Noise transient not available for Ngsim. Running regular transient.'))
+
                 elif str(sim).lower() == 'dc':
                     if self.parent.model=='eldo':
                         self._simcmdstr='.op'
@@ -484,8 +609,48 @@ class testbench(spice_module):
 
                     else:
                         self.print_log(type='E',msg='Unsupported model %s.' % self.parent.model)
+                elif str(sim).lower() == 'ac':
+                    if self.parent.model=='eldo':
+                        print_log(type='F', msg='AC simulation for eldo not yet implemented')
+                    elif self.parent.model=='spectre':
+                        if val.fscale.lower()=='log':
+                            if val.fpoints != 0:
+                                pts_str='log=%d' % val.fpoints
+                            elif val.fstepsize != 0:
+                                pts_str='dec=%d' % val.fstepsize
+                            else:
+                                self.print_log(type='F', msg='Set either fpoints or fstepsize for AC simulation!')
+                        elif val.fscale.lower()=='lin':
+                            if val.fpoints != 0:
+                                pts_str='lin=%d' % val.fpoints
+                            elif val.fstepsize != 0:
+                                pts_str='step=%d' % val.fstepsize
+                            else:
+                                self.print_log(type='F', msg='Set either fpoints or fstepsize for AC simulation!')
+                        else:
+                            self.print_log(type='F', msg='Unsupported frequency scale %s for AC simulation!' % val.fscale)
+                        self._simcmdstr += 'AC_analysis %s start=%s stop=%s %s' % \
+                                (sim,str(val.fmin),str(val.fmax),pts_str)
+                    elif self.parent.model=='ngspice':
+                        if val.fscale.lower()=='dec':
+                            if val.fpoints != 0:
+                                pts_str='dec %d' % val.fpoints
+                            else:
+                                self.print_log(type='F', msg='Set fpoints for ngspice AC simulation!')
+                        elif val.fscale.lower()=='lin':
+                            if val.fpoints != 0:
+                                pts_str='lin=%d' % val.fpoints
+                            else:
+                                self.print_log(type='F', msg='Set fpoints for ngspice AC simulation!')
+                        else:
+                            self.print_log(type='F', msg='Unsupported frequency scale %s for AC simulation!' % val.fscale)
+                        self._simcmdstr += '.ac %s %s %s' % \
+                                (pts_str,val.fmin,val.fmax)
+
                 else:
                     self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
+                if val.mc and self.parent.model=='spectre':
+                    self._simcmdstr += '}\n\n'
         return self._simcmdstr
     @simcmdstr.setter
     def simcmdstr(self,value):
@@ -523,15 +688,25 @@ class testbench(spice_module):
         if not hasattr(self,'_plotcmd'):
             self._plotcmd = "" 
             for name, val in self.simcmds.Members.items():
+                # Manual probes
                 if len(val.plotlist) > 0 and name.lower() != 'dc':
                     self._plotcmd = "%s Manually probed signals\n" % self.parent.syntaxdict["commentchar"]
-                    self._plotcmd += '.plot ' if self.parent.model == 'eldo' else 'save '
+                    if self.parent.model == 'eldo': 
+                        self._plotcmd += '.plot ' 
+                    else:
+                        self._plotcmd += 'save ' 
+
                     for i in val.plotlist:
                         self._plotcmd += self.esc_bus(i) + " "
                     self._plotcmd += "\n\n"
+                #DC probes
                 if len(val.plotlist) > 0 and name.lower() == 'dc':
                     self._plotcmd = "%s DC operating points to be captured:\n" % self.parent.syntaxdict["commentchar"]
-                    self._plotcmd += '.plot ' if self.parent.model == 'eldo' else 'save '
+                    if self.parent.model == 'eldo': 
+                        self._plotcmd += '.plot ' 
+                    else:
+                        self._plotcmd += 'save ' 
+
                     for i in val.plotlist:
                         self._plotcmd += self.esc_bus(i, esc_colon=False) + " "
                     if val.excludelist != []:
@@ -540,113 +715,144 @@ class testbench(spice_module):
                             self._plotcmd += i + ' '
                         self._plotcmd += ']'
                     self._plotcmd += "\n\n"
-            self._plotcmd += "%s Output signals\n" % self.parent.syntaxdict["commentchar"]
-            for name, val in self.iofiles.Members.items():
-                # Output iofile becomes an extract command
-                if val.dir.lower()=='out' or val.dir.lower()=='output':
-                    if val.iotype=='event':
-                        for i in range(len(val.ionames)):
-                            if self.parent.model=='eldo':
-                                self._plotcmd += ".printfile %s(%s) file=\"%s\"\n" % \
-                                        (val.sourcetype,val.ionames[i].upper(),val.file[i])
-                            elif self.parent.model=='spectre':
-                                signame = self.esc_bus(val.ionames[i].upper())
-                                self._plotcmd += 'save %s\n' % signame
-                                self._plotcmd += "eventout_%s (%s) veriloga_csv_write_allpoints filename=\"%s\"\n" % \
-                                        (val.ionames[i].upper().replace('.','_').replace('<','').replace('>',''),signame,val.file[i])
-                    elif val.iotype=='sample':
-                        for i in range(len(val.ionames)):
-                            # Checking the given trigger(s)
-                            if isinstance(val.trigger,list):
-                                if len(val.trigger) == len(val.ionames):
-                                    trig = val.trigger[i]
-                                else:
-                                    trig = val.trigger[0]
-                                    self.print_log(type='W',msg='%d triggers given for %d ionames. Using the first trigger for all ionames.' % (len(val.trigger),len(val.ionames)))
-                            else:
-                                trig = val.trigger
-                            # Checking the polarity of the triggers (for now every trigger has to have same polarity)
-                            vthstr = ',%s' % str(val.vth)
-                            afterstr = ',%g' % float(val.after)
-                            beforestr = ',end'
-                            if val.edgetype.lower()=='falling':
-                                polarity = 'xdown'
-                            elif val.edgetype.lower()=='both':
-                                # Syntax for tcross is a bit different
-                                polarity = 'tcross'
-                                vthstr = ',vth=%s' % str(val.vth)
-                                afterstr = ',after=%g' % float(val.after)
-                                beforestr = ',before=end'
-                            else:
-                                polarity = 'xup'
-                            if self.parent.model=='eldo':
-                                self._plotcmd += ".extract file=\"%s\" vect label=%s yval(v(%s<*>),%s(v(%s)%s%s%s))\n" % (val.file[i],val.ionames[i],val.ionames[i].upper(),polarity,trig,vthstr,afterstr,beforestr)
-                            elif self.parent.model=='spectre':
-                                # Extracting the bus width from the ioname
-                                signame = val.ionames[i].upper()
-                                signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
-                                if len(signame) == 1:
-                                    busstart = 0
-                                    busstop = 0
-                                else:
-                                    busstart = int(signame[1])
-                                    busstop = int(signame[2])
-                                if busstart > busstop:
-                                    buswidth = busstart-busstop+1
-                                else:
-                                    buswidth = busstop-busstart+1
-                                # Writing every individual bit of a bus to its own file (TODO: maybe to one file?)
-                                for j in range(buswidth):
-                                    bitname = self.esc_bus('%s<%d>' % (signame[0],j))
-                                    #self._plotcmd += 'save %s\n' % bitname
-                                    self._plotcmd += "sampleout_%s_%d (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
-                                            (signame[0],j,self.esc_bus(trig),bitname,val.file[i].replace('.txt','_%d.txt'%j),val.vth,-1 if val.edgetype.lower() is 'falling' else 1)
 
-                    elif val.iotype=='time':
-                        for i in range(len(val.ionames)):
-                            if self.parent.model == 'eldo':
-                                self._plotcmd += ".printfile %s(%s) file=\"%s\"\n" % \
-                                        (val.sourcetype,val.ionames[i].upper(),val.file[i])
-                                #for i in range(len(val.ionames)):
-                                #    vthstr = ',%s' % str(val.vth)
-                                #    if val.edgetype.lower()=='falling':
-                                #        edge = 'xdown'
-                                #    elif val.edgetype.lower()=='both':
-                                #        edge = 'tcross'
-                                #        vthstr = ',vth=%s' % str(val.vth)
-                                #    elif val.edgetype.lower()=='risetime':
-                                #        edge = 'trise'
-                                #        vthstr = ''
-                                #    elif val.edgetype.lower()=='falltime':
-                                #        edge = 'tfall'
-                                #        vthstr = ''
-                                #    else:
-                                #        edge = 'xup'
-                                #    self._plotcmd += ".extract file=\"%s\" vect label=%s %s(v(%s)%s)\n" % (val.file[i],val.ionames[i],edge,val.ionames[i].upper(),vthstr)
-                            elif self.parent.model == 'spectre':
-                                signame = self.esc_bus(val.ionames[i].upper())
-                                #self._plotcmd += 'save %s\n' % signame
-                                self._plotcmd += "timeout_%s_%s (%s) veriloga_csv_write_allpoints filename=\"%s\"\n" % \
-                                        (val.edgetype.lower(),val.ionames[i].upper().replace('.','_').replace('<','').replace('>',''),signame,val.file[i])
-                    elif val.iotype=='vsample':
-                        for i in range(len(val.ionames)):
-                            # Checking the given trigger(s)
-                            if isinstance(val.trigger,list):
-                                if len(val.trigger) == len(val.ionames):
-                                    trig = val.trigger[i]
-                                else:
-                                    trig = val.trigger[0]
-                                    self.print_log(type='W',msg='%d triggers given for %d ionames. Using the first trigger for all ionames.' % (len(val.trigger),len(val.ionames)))
+                if name.lower() == 'tran' or name.lower() == 'ac' :
+                    self._plotcmd += "%s Output signals\n" % self.parent.syntaxdict["commentchar"]
+                    if self.parent.model=='ngspice':
+                        self._plotcmd += ".control\nset wr_singlescale\nset wr_vecnames\n"
+                        if self.parent.nproc: 
+                            self._plotcmd +="%s%d\n" % (self.parent.syntaxdict["nprocflag"],self.parent.nproc)
+                        self._plotcmd += "run\n"
+
+                    for name, val in self.iofiles.Members.items():
+                        # Output iofile becomes an extract command
+                        if val.dir.lower()=='out' or val.dir.lower()=='output':
+                            if val.iotype=='event':
+                                for i in range(len(val.ionames)):
+                                    if self.parent.model=='eldo':
+                                        self._plotcmd += ".printfile %s(%s) file=\"%s\"\n" % \
+                                                (val.sourcetype,val.ionames[i],val.file[i])
+                                    elif self.parent.model=='spectre':
+                                        signame = self.esc_bus(val.ionames[i])
+                                        self._plotcmd += 'save %s\n' % signame
+                                        self._plotcmd += 'simulator lang=spice\n'
+                                        self._plotcmd += '.option ingold 2\n'
+                                        # Implement complex value probing
+                                        if val.datatype.lower() == 'complex':
+                                            self._plotcmd += ".print %sr(%s) %si(%s) \n" % \
+                                                    (val.sourcetype,val.ionames[i],
+                                                            val.sourcetype,val.ionames[i])
+                                        else:
+                                            self._plotcmd += ".print %s(%s)\n" % \
+                                                (val.sourcetype,val.ionames[i])
+                                        self._plotcmd += 'simulator lang=spectre\n'
+                                    elif self.parent.model=='ngspice':
+                                        self._plotcmd += "plot %s(%s)\n" % \
+                                                (val.sourcetype,val.ionames[i].upper())
+                                        self._plotcmd += "wrdata %s %s(%s)\n" % \
+                                                (val.file[i], val.sourcetype,val.ionames[i].upper())
+
+
+                            elif val.iotype=='sample':
+                                for i in range(len(val.ionames)):
+                                    # Checking the given trigger(s)
+                                    if isinstance(val.trigger,list):
+                                        if len(val.trigger) == len(val.ionames):
+                                            trig = val.trigger[i]
+                                        else:
+                                            trig = val.trigger[0]
+                                            self.print_log(type='W',
+                                                    msg='%d triggers given for %d ionames. Using the first trigger for all ionames.' 
+                                                    % (len(val.trigger),len(val.ionames)))
+                                    else:
+                                        trig = val.trigger
+                                    # Checking the polarity of the triggers (for now every trigger has to have same polarity)
+                                    vthstr = ',%s' % str(val.vth)
+                                    afterstr = ',%g' % float(val.after)
+                                    beforestr = ',end'
+                                    if val.edgetype.lower()=='falling':
+                                        polarity = 'xdown'
+                                    elif val.edgetype.lower()=='both':
+                                        # Syntax for tcross is a bit different
+                                        polarity = 'tcross'
+                                        vthstr = ',vth=%s' % str(val.vth)
+                                        afterstr = ',after=%g' % float(val.after)
+                                        beforestr = ',before=end'
+                                    else:
+                                        polarity = 'xup'
+                                    if self.parent.model=='eldo':
+                                        self._plotcmd += ".extract file=\"%s\" vect label=%s yval(v(%s<*>),%s(v(%s)%s%s%s))\n" % (val.file[i],val.ionames[i],val.ionames[i].upper(),polarity,trig,vthstr,afterstr,beforestr)
+                                    elif self.parent.model=='spectre':
+                                        # Extracting the bus width from the ioname
+                                        signame = val.ionames[i].upper()
+                                        signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
+                                        if len(signame) == 1:
+                                            busstart = 0
+                                            busstop = 0
+                                        else:
+                                            busstart = int(signame[1])
+                                            busstop = int(signame[2])
+                                        if busstart > busstop:
+                                            buswidth = busstart-busstop+1
+                                        else:
+                                            buswidth = busstop-busstart+1
+                                        # Writing every individual bit of a bus to its own file (TODO: maybe to one file?)
+                                        for j in range(buswidth):
+                                            bitname = self.esc_bus('%s<%d>' % (signame[0],j))
+                                            #self._plotcmd += 'save %s\n' % bitname
+                                            self._plotcmd += "sampleout_%s_%d (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
+                                                    (signame[0],j,self.esc_bus(trig),bitname,val.file[i].replace('.txt','_%d.txt'%j),val.vth,-1 if val.edgetype.lower() == 'falling' else 1)
+
+                            elif val.iotype=='time':
+                                for i in range(len(val.ionames)):
+                                    if self.parent.model == 'eldo':
+                                        self._plotcmd += ".printfile %s(%s) file=\"%s\"\n" % \
+                                                (val.sourcetype,val.ionames[i].upper(),val.file[i])
+                                        #for i in range(len(val.ionames)):
+                                        #    vthstr = ',%s' % str(val.vth)
+                                        #    if val.edgetype.lower()=='falling':
+                                        #        edge = 'xdown'
+                                        #    elif val.edgetype.lower()=='both':
+                                        #        edge = 'tcross'
+                                        #        vthstr = ',vth=%s' % str(val.vth)
+                                        #    elif val.edgetype.lower()=='risetime':
+                                        #        edge = 'trise'
+                                        #        vthstr = ''
+                                        #    elif val.edgetype.lower()=='falltime':
+                                        #        edge = 'tfall'
+                                        #        vthstr = ''
+                                        #    else:
+                                        #        edge = 'xup'
+                                        #    self._plotcmd += ".extract file=\"%s\" vect label=%s %s(v(%s)%s)\n" % (val.file[i],val.ionames[i],edge,val.ionames[i].upper(),vthstr)
+                                    elif self.parent.model == 'spectre':
+                                        signame = self.esc_bus(val.ionames[i].upper())
+                                        #self._plotcmd += 'save %s\n' % signame
+                                        self._plotcmd += "timeout_%s_%s (%s) veriloga_csv_write_allpoints filename=\"%s\"\n" % \
+                                                (val.edgetype.lower(),val.name.upper().replace('.','_').replace('<','').replace('>',''),signame,val.file[i])
+                            elif val.iotype=='vsample':
+                                for i in range(len(val.ionames)):
+                                    # Checking the given trigger(s)
+                                    if isinstance(val.trigger,list):
+                                        if len(val.trigger) == len(val.ionames):
+                                            trig = val.trigger[i]
+                                        else:
+                                            trig = val.trigger[0]
+                                            self.print_log(type='W',msg='%d triggers given for %d ionames. Using the first trigger for all ionames.' % (len(val.trigger),len(val.ionames)))
+                                    else:
+                                        trig = val.trigger
+                                    if self.parent.model=='eldo':
+                                        self.print_log(type='F',msg='not yet done') #TODO
+                                    elif self.parent.model=='spectre':
+                                        #self._plotcmd += 'save %s\n' % val.ionames[i].upper()
+                                        self._plotcmd += ("vsampleout_%s (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" 
+                                                %(val.ionames[i].upper().replace('.','_'),trig,val.ionames[i].upper(),
+                                                    val.file[i],val.vth,-1 if val.edgetype.lower() == 'falling' else 1))
+                                    elif self.parent.model=='ngspice':
+                                        self.print_log(type='F',msg='Iotype vsample not implemented for Ngspice') #TODO
                             else:
-                                trig = val.trigger
-                            if self.parent.model=='eldo':
-                                self.print_log(type='F',msg='not yet done') #TODO
-                            elif self.parent.model=='spectre':
-                                #self._plotcmd += 'save %s\n' % val.ionames[i].upper()
-                                self._plotcmd += "vsampleout_%s (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
-                                        (val.ionames[i].upper().replace('.','_'),trig,val.ionames[i].upper(),val.file[i],val.vth,-1 if val.edgetype.lower() is 'falling' else 1)
-                    else:
-                        self.print_log(type='W',msg='Output filetype incorrectly defined.')
+                                self.print_log(type='W',msg='Output filetype incorrectly defined.')
+            if self.parent.model=='ngspice':
+                    self._plotcmd += ".endc\n"
         return self._plotcmd
     @plotcmd.setter
     def plotcmd(self,value):

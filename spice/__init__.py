@@ -10,9 +10,9 @@ automatically generate testbenches for the most common simulation cases.
 
 Initially written by Okko Järvinen, 2019
 
-Last modification by Okko Järvinen, 12.01.2021 09:43
+Last modification by Okko Järvinen, 08.04.2021 19:55
 
-Release 1.4 , Jun 2020 supports Eldo and Spectre
+Release 1.6, Jun 2020 supports Eldo and Spectre
 """
 import os
 import sys
@@ -75,11 +75,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @property
     def syntaxdict(self):
         """Internally used dictionary for common syntax conversions between
-        Spectre and Eldo."""
+        Spectre, Eldo, and Ngspice."""
         if self.model=='eldo':
             self._syntaxdict = {
                     "cmdfile_ext" : '.cir',
                     "resultfile_ext" : '.wdb',
+                    'plotprog' : 'ezwave',
                     "commentchar" : '*',
                     "commentline" : '***********************\n',
                     "nprocflag" : '-use_proc ', #space required
@@ -97,6 +98,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         elif self.model=='spectre':
             self._syntaxdict = {
                     "cmdfile_ext" : '.scs',
+                    'plotprog' : 'viva',
                     "resultfile_ext" : '.raw',
                     "commentchar" : '//',
                     "commentline" : '///////////////////////\n',
@@ -111,6 +113,25 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     "lastline" : '///', #needed?
                     "eventoutdelim" : ',',
                     "csvskip" : 0
+                    }
+        if self.model=='ngspice':
+            self._syntaxdict = {
+                    "cmdfile_ext" : '.ngcir',
+                    "resultfile_ext" : '',
+                    'plotprog' : '',
+                    "commentchar" : '*',
+                    "commentline" : '***********************\n',
+                    "nprocflag" : 'set num_threads=', #Goes to .control section
+                    "simulatorcmd" : 'ngspice -b', 
+                    #"dcsource_declaration" : '',
+                    "parameter" : '.param ',
+                    "option" : '.option ',
+                    "include" : '.include',
+                    "dspfinclude" : '.include',
+                    "subckt" : '.subckt',
+                    "lastline" : '.end',
+                    "eventoutdelim" : '  ', # Two spaces
+                    "csvskip" : 1
                     }
         return self._syntaxdict
     @syntaxdict.setter
@@ -208,7 +229,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
         Feature for specifying the 'section' of the model library file and
         simulation temperature. The path to model libraries should be set in
-        TheSDK.config as either ELDOLIBFILE or SPECTRELIBFILE variables.
+        TheSDK.config as either ELDOLIBFILE, SPECTRELIBFILE or NGSPICELIBFILE variable.
 
         Example::
 
@@ -237,7 +258,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         Feature for specifying options for spice simulation. The key is the
         name of the option (as in simulator manual specifies), and the value is
         the value given to said option. Valid key-value pairs can be found from
-        the manual of the simulator (Eldo or Spectre).
+        the manual of the simulator (Eldo, Spectre or Ngspice).
 
         Example::
 
@@ -281,9 +302,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @spiceparameters.setter
     def spiceparameters(self,value): 
             self._spiceparameters = value
-    @spiceparameters.deleter
-    def spiceparameters(self): 
-            self._spiceparameters = None
 
     @property
     def runname(self):
@@ -376,9 +394,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @dspf.setter
     def dspf(self,value):
         self._dspf=value
-    @dspf.deleter
-    def dspf(self,value):
-        self._dspf=None
 
     @property
     def iofile_bundle(self):
@@ -410,7 +425,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 self.print_log(type='I',msg='Removing %s.' % simpathname)
             except:
                 self.print_log(type='W',msg='Could not remove %s.' % simpathname)
-        #self._iofile_bundle=None
 
     @property
     def dcsource_bundle(self):
@@ -452,6 +466,29 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         for name, val in self.simcmd_bundle.Members.items():
             val.remove()
 
+    @property
+    def extracts(self):
+        """ 
+        A thesdk.Bundle containing extracted quantities.
+        """
+        if not hasattr(self,'_extracts'):
+            self._extracts=Bundle()
+        return self._extracts
+    @extracts.setter
+    def extracts(self,value):
+        self._extracts=value
+
+    @property 
+    def has_lsf(self):
+        """
+        Returs True if LSF submissions are properly defined. Default False
+        """
+        if ( not thesdk.GLOBALS['LSFINTERACTIVE'] == '' ) and (not thesdk.GLOBALS['LSFINTERACTIVE'] == ''):
+            self._has_lsf = True
+        else:
+            self._has_lsf = False
+        return self._has_lsf
+
     @property 
     def spice_submission(self):
         """
@@ -462,43 +499,40 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """
         if not hasattr(self, '_spice_submission'):
             try:
-                if self.interactive_spice:
-                    if not self.distributed_run:
-                        self._spice_submission = thesdk.GLOBALS['LSFINTERACTIVE'] + ' '
-                    else: # Spectre LSF doesn't support interactive queues
-                        self.print_log(type='W', msg='Cannot run in interactive mode if distributed mode is on!')
-                        self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
+                if not self.has_lsf:
+                    self.print_log(type='I', msg='LSF not configured. Running locally')
+                    self._spice_submission=''
                 else:
-                    self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
+                    if self.interactive_spice:
+                        if not self.distributed_run:
+                            self._spice_submission = thesdk.GLOBALS['LSFINTERACTIVE'] + ' '
+                        else: # Spectre LSF doesn't support interactive queues
+                            self.print_log(type='W', msg='Cannot run in interactive mode if distributed mode is on!')
+                        self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
+                    else:
+                        self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
+
             except:
                 self.print_log(type='W',msg='Error while defining spice submission command. Running locally.')
                 self._spice_submission=''
-
         return self._spice_submission
     @spice_submission.setter
     def spice_submission(self,value):
         self._spice_submission=value
-    @spice_submission.deleter
-    def spice_submission(self):
-        for name, val in self.spice_submission.Members.items():
-            val.remove()
 
     @property
     def plotlist(self): 
         """
             OBSOLETE! RE-LOCATED TO SPICE_SIMCMD.PY
         """
-        self.print_log(type='W', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
+        self.print_log(type='O', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
         if not hasattr(self,'_plotlist'):
             self._plotlist=[]
         return self._plotlist 
     @plotlist.setter
     def plotlist(self,value): 
-        self.print_log(type='W', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
+        self.print_log(type='O', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
         self._plotlist=value
-    @plotlist.deleter
-    def plotlist(self): 
-        self.print_log(type='W', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
 
     @property
     def spicemisc(self): 
@@ -520,9 +554,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @spicemisc.setter
     def spicemisc(self,value): 
             self._spicemisc = value
-    @spicemisc.deleter
-    def spicemisc(self): 
-            self._spicemisc = None
 
     @property
     def ahdlpath(self): 
@@ -537,9 +568,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @ahdlpath.setter
     def ahdlpath(self,value): 
             self._ahdlpath = value
-    @ahdlpath.deleter
-    def ahdlpath(self): 
-            self._ahdlpath = None
 
     @property
     def name(self):
@@ -575,7 +603,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         except:
             self.print_log(type='E',msg='Failed to create %s.' % self._spicesrcpath)
         return self._spicesrcpath
-    #No setter, no deleter.
 
     @property
     def spicesrc(self):
@@ -603,7 +630,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def spicetbsrc(self):
         """String
 
-        Path to the spice testbench ('./spice/tb_entityname.scs').
+        Path to the spice testbench ('./spice/tb_entityname.<suffix>').
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicetbsrc'):
@@ -648,7 +675,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def spicesubcktsrc(self):
         """String
 
-        Path to the parsed subcircuit file. ('./spice/subckt_entityname.scs').
+        Path to the parsed subcircuit file. ('./spice/subckt_entityname.<suffix>').
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicesubcktsrc'):
@@ -679,8 +706,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         if not self.interactive_spice and not self.preserve_spicefiles:
             # Removing generated files
             filelist = [
-                #self.eldochisrc,
-                #self.eldowdbsrc,
                 self.spicetbsrc,
                 self.spicesubcktsrc
                 ]
@@ -728,10 +753,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         if not hasattr(self,'_spicecmd'):
             if self.interactive_spice:
                 if self.model=='eldo':
-                    plottingprogram = "-ezwave"
+                    plottingprogram=self.syntaxdict['plotprog'] 
                 elif self.model=='spectre':
-                    #plottingprogram = "-ezwave"
-                    plottingprogram = ''
+                    plottingprogram = '' # Plotting for spectre handled differently. See self.plotprogcmd
                 #submission=""
                 submission=self.spice_submission
             else:
@@ -751,11 +775,15 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 plflag = ''
 
             if self.model=='eldo':
+                # Shouldn't this use self.syntaxdict["simulatorcmd"] ?
                 spicesimcmd = "eldo -64b %s %s " % (plottingprogram,nprocflag)
             elif self.model=='spectre':
                 #spicesimcmd = "\"sleep 10; spectre %s %s \"" % (plottingprogram,nprocflag)
                 #spicesimcmd = "spectre %s %s " % (plottingprogram,nprocflag)
-                spicesimcmd = "spectre -64 +lqtimeout=0 ++aps=%s %s %s %s " % (self.errpreset,plflag,plottingprogram,nprocflag)
+                spicesimcmd = ("spectre -64 +lqtimeout=0 ++aps=%s %s %s %s -outdir %s " 
+                        % (self.errpreset, plflag,plottingprogram,nprocflag,self.spicesimpath))
+            elif self.model=='ngspice':
+                spicesimcmd = self.syntaxdict["simulatorcmd"] + ' '
 
             #spicesimcmd = "%s %s %s " % (self.syntaxdict["simulatorcmd"],plottingprogram,nprocflag)
             spicetbfile = self.spicetbsrc
@@ -767,9 +795,19 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @spicecmd.setter
     def spicecmd(self,value):
         self._spicecmd=value
-    @spicecmd.deleter
-    def spicecmd(self):
-        self._spicecmd=None
+
+    @property
+    def plotprogcmd(self):
+        """
+        Sets the command to be run for interactive Spectre simulations.
+        """
+        if not hasattr(self, '_plotprogcmd') and self.model=='spectre':
+            path=self.spicesrcpath + '/tb_' + self.name + self.syntaxdict["resultfile_ext"]
+            self._plotprogcmd='%s -datadir %s &' % (self.syntaxdict['plotprog'], path)
+        return self._plotprogcmd
+    @plotprogcmd.setter
+    def plotprogcmd(self, value):
+        self._plotprogcmd=value
 
     def connect_inputs(self):
         """Automatically called function to connect iofiles (inputs) to top
@@ -779,7 +817,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 val=self.iofile_bundle.Members[ioname]
                 # File type inputs are driven by the file.Data, not the input field
                 if not isinstance(self.IOS.Members[val.name].Data,spice_iofile) \
-                        and val.dir is 'in':
+                        and val.dir == 'in':
                     # Data must be properly shaped
                     self.iofile_bundle.Members[ioname].Data=self.IOS.Members[ioname].Data
 
@@ -787,7 +825,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """Automatically called function to connect iofiles (outputs) to top
         entity IOS Bundle items."""
         for name,val in self.iofile_bundle.Members.items():
-            if val.dir is 'out':
+            if val.dir == 'out':
                 self.IOS.Members[name].Data=self.iofile_bundle.Members[name].Data
 
     def write_infile(self):
@@ -802,11 +840,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         iofile with direction 'output'."""
         for name, val in self.iofile_bundle.Members.items():
             if val.dir.lower()=='out' or val.dir.lower()=='output':
-                 self.iofile_bundle.Members[name].read()
+                self.iofile_bundle.Members[name].read()
     
     def execute_spice_sim(self):
         """Automatically called function to execute spice simulation."""
-        self.print_log(type='I', msg="Running external command %s\n" %(self.spicecmd) )
+        self.print_log(type='I', msg="Running external command %s" %(self.spicecmd) )
         if self.model == 'eldo':
             # This is some experimental stuff
             count = 0
@@ -825,26 +863,36 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         else:
             os.system(self.spicecmd)
 
+    def run_viva(self):
+        """ Run plotting program for interactive Spectre simulations
+            NOTE: This feature is for Spectre simulations ONLY!
+        """
+        cmd=self.plotprogcmd
+        self.print_log(type='I', msg='Running external command: %s' % cmd)
+        try:
+            ret=os.system(cmd)
+            if ret != 0:
+                self.print_log(type='W', msg='%s returned with exit status %d!' % (self.syntaxdict['plotprog'], ret))
+        except: 
+            self.print_log(type='W',msg='Something went wrong while launcing %s.' % self.syntaxdict['plotprog'])
+            self.print_log(type='W',msg=traceback.format_exc())
+
     def extract_powers(self):
         """
         Automatically called function to extract transient power and current
-        consumptions.
-        
-        Stores the results in two dictionaries, which are appended to self.IOS
-        and prints the results to the log also.
-        The consumptions are extracted for spice_dcsource objects
+        consumptions. The consumptions are extracted for spice_dcsource objects
         with the attribute extract=True.
         
         The extracted consumptions are accessible on the top-level after simulation as::
             
-            self.IOS.Members['powers'] # Dictionary with averaged power consumptions of each supply + total
-            self.IOS.Members['currents'] # Dictionary with averaged current consumptions of each supply + total
-            self.IOS.Members['curr_tran'] # Dictionary with transient current consumptions of each supply
+            self.extracts.Members['powers'] # Dictionary with averaged power consumptions of each supply + total
+            self.extracts.Members['currents'] # Dictionary with averaged current consumptions of each supply + total
+            self.extracts.Members['curr_tran'] # Dictionary with transient current consumptions of each supply
 
         """
-        self.IOS.Members['powers'] = {}
-        self.IOS.Members['currents'] = {}
-        self.IOS.Members['curr_tran'] = {}
+        self.extracts.Members['powers'] = {}
+        self.extracts.Members['currents'] = {}
+        self.extracts.Members['curr_tran'] = {}
         try:
             if self.model == 'eldo':
                 currentmatch = re.compile(r"\* CURRENT_")
@@ -856,12 +904,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                             words = line.split()
                             sourcename = words[1].replace('CURRENT_','')
                             extval = float(words[3])
-                            self.IOS.Members['currents'][sourcename] = extval
+                            self.extracts.Members['currents'][sourcename] = extval
                         elif powermatch.search(line):
                             words = line.split()
                             sourcename = words[1].replace('POWER_','')
                             extval = float(words[3])
-                            self.IOS.Members['powers'][sourcename] = extval
+                            self.extracts.Members['powers'][sourcename] = extval
             elif self.model == 'spectre':
                 for name, val in self.tb.dcsources.Members.items():
                     # Read transient power consumption of the extracted source
@@ -877,20 +925,20 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                         meancurr = np.sum(np.abs(arr[1:,1])*dt)/totaltime
                         meanpwr = meancurr*val.value
                         sourcename = '%s%s' % (val.sourcetype.upper(),val.name.upper())
-                        self.IOS.Members['currents'][sourcename] = meancurr
-                        self.IOS.Members['powers'][sourcename] = meanpwr
-                        self.IOS.Members['curr_tran'][sourcename] = arr
+                        self.extracts.Members['currents'][sourcename] = meancurr
+                        self.extracts.Members['powers'][sourcename] = meanpwr
+                        self.extracts.Members['curr_tran'][sourcename] = arr
             self.print_log(type='I',msg='Extracted power consumption from transient:')
             # This is newer Python syntax
-            maxlen = len(max([*self.IOS.Members['powers'],'total'],key=len))
-            for name,val in self.IOS.Members['currents'].items():
+            maxlen = len(max([*self.extracts.Members['powers'],'total'],key=len))
+            for name,val in self.extracts.Members['currents'].items():
                 self.print_log(type='I',msg='%s%s current = %.06f mA'%(name,' '*(maxlen-len(name)),1e3*val))
-            if len(self.IOS.Members['currents'].items()) > 0:
-                self.print_log(type='I',msg='Total%s current = %.06f mA'%(' '*(maxlen-5),1e3*sum(self.IOS.Members['currents'].values())))
-            for name,val in self.IOS.Members['powers'].items():
+            if len(self.extracts.Members['currents'].items()) > 0:
+                self.print_log(type='I',msg='Total%s current = %.06f mA'%(' '*(maxlen-5),1e3*sum(self.extracts.Members['currents'].values())))
+            for name,val in self.extracts.Members['powers'].items():
                 self.print_log(type='I',msg='%s%s power   = %.06f mW'%(name,' '*(maxlen-len(name)),1e3*val))
-            if len(self.IOS.Members['powers'].items()) > 0:
-                self.print_log(type='I',msg='Total%s power   = %.06f mW'%(' '*(maxlen-5),1e3*sum(self.IOS.Members['powers'].values())))
+            if len(self.extracts.Members['powers'].items()) > 0:
+                self.print_log(type='I',msg='Total%s power   = %.06f mW'%(' '*(maxlen-5),1e3*sum(self.extracts.Members['powers'].values())))
         except:
             self.print_log(type='W',msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting power consumptions.')
@@ -919,9 +967,22 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """ Internally called function to read the DC operating points of the circuit
             TODO: Implement for Eldo as well.
         """
+        def sorter(val):
+            '''
+            Function for sorting the files in correct order
+            Files that are output from simulation are of form
+
+            dcSweep-<integer>_oppoint.dc
+
+            Strategy: extract integer from filename and sort based on the integer.
+
+            '''
+            key=val.split('-')[1].split('_')[0]
+            return int(key)
+
         try:
             if self.model=='spectre' and 'dc' in self.simcmd_bundle.Members.keys():
-                self.IOS.Members.update({'oppts' : {}})
+                self.extracts.Members.update({'oppts' : {}})
                 # Get dc simulation file name
                 for name, val in self.simcmd_bundle.Members.items():
                     if name == 'dc':
@@ -931,24 +992,16 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                         else:
                             fname = 'oppoint*.dc'
                             break
-                # Move to spicesim
+                # For distributed runs
                 if self.distributed_run:
-                    ## NOTA BENE: The pattern [0-9]* matches any path with the first character
-                    # being integer in range 0-9 and any number of trailing characters. Glob doesn't
-                    # support exactly matching ANY number of digits and there shouldn't be any files
-                    # in the simulation result directory mathing this pattern so this is probably good enough.
-                    fpath = os.path.join(self.entitypath, 'spice/tb_%s.raw' % self.name,
-                            '[0-9]*', fname)
+                    path=os.path.join(self.spicesimpath,'tb_%s.raw' % self.name, '[0-9]*', fname)
+                    files = sorted(glob.glob(path),key=sorter)
                 else:
-                    fpath = os.path.join(self.entitypath, 'spice/tb_%s.raw' % self.name, fname)
-                destpath = os.path.join(self.entitypath, 'Simulations/spicesim', self.runname)
-                files = glob.glob(fpath)
-                for file in files:
-                    os.rename(file, os.path.join(destpath, file.split('/')[-1]))
+                    path=os.path.join(self.spicesimpath,'tb_%s.raw' % self.name, fname)
+                    files = sorted(glob.glob(path),key=sorter)
                 valbegin = 'VALUE\n'
                 eof = 'END\n'
                 parsevals = False
-                files = sorted(glob.glob(os.path.join(destpath, fname)))
                 for file in files:
                     with open(file, 'r') as f:
                         for line in f:
@@ -964,12 +1017,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                                         dev = parts[0]
                                         param = parts[1]
                                     val = float(parts[2])
-                                    if dev not in self.IOS.Members['oppts']: # Found new device
-                                        self.IOS.Members['oppts'].update({dev : {}}) 
-                                    if param not in self.IOS.Members['oppts'][dev]: # Found new parameter for device
-                                        self.IOS.Members['oppts'][dev].update({param : [val]})
+                                    if dev not in self.extracts.Members['oppts']: # Found new device
+                                        self.extracts.Members['oppts'].update({dev : {}}) 
+                                    if param not in self.extracts.Members['oppts'][dev]: # Found new parameter for device
+                                        self.extracts.Members['oppts'][dev].update({param : [val]})
                                     else: # Parameter already existed, just append value. This can occur in e.g. sweeps
-                                        self.IOS.Members['oppts'][dev][param].append(val)
+                                        self.extracts.Members['oppts'][dev][param].append(val)
                             elif line == eof:
                                 parsevals = False
             elif self.model == 'eldo' and 'dc' in self.simcmd_bundle.Members.keys():
@@ -977,7 +1030,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             elif 'dc' in self.simcmd_bundle.Members.keys(): # Unsupported model
                 raise Exception('Unrecognized model %s.' % self.model)
             else: # DC analysis not in simcmds, oppts is empty
-                self.IOS.Members.update({'oppts' : {}})
+                self.extracts.Members.update({'oppts' : {}})
         except:
             self.print_log(type='W', msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting DC operating points.')
@@ -996,6 +1049,8 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self.tb.export(force=True)
             self.write_infile()
             self.execute_spice_sim()
+            if self.interactive_spice and self.model=='spectre':
+                self.run_viva()
             self.extract_powers()
             self.read_outfile()
             self.connect_outputs()

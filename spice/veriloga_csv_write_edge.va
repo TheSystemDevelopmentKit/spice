@@ -1,7 +1,7 @@
 // Verilog-A module to write voltage values at clock edges
 // to csv-file.
 //
-// Last modification by Okko Järvinen, 01.06.2020 11:04
+// Last modification by Okko Järvinen, 16.03.2021 19:29
 
 `include "constants.vams"
 `include "disciplines.vams"
@@ -23,12 +23,12 @@ module veriloga_csv_write_edge (clk, data);
 
 	analog begin
 		@ (initial_step) begin
-			file = $fopen(filename, "a");
+			file = $fopen(filename, "w");
 		end
 	
 		@ (cross(V(clk) - vth, edgetype)) begin
 			tran_time = $abstime;
-			$fwrite(file, "%g, ", tran_time);
+			$fwrite(file, "%.10g, ", tran_time);
             $fwrite(file, "%g\n", V(data));
 		end
 
