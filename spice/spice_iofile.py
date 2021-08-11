@@ -307,7 +307,7 @@ class spice_iofile(iofile):
         for ioname in self.ionames:
             filepath = self.parent.spicesimpath+'/'
             if self.iotype is not 'event': 
-                filename = ( '%s_ioname=%s_bundlename=%s_%s_%s.txt' 
+                filename = ( '%s_ioname_%s_bundlename_%s_%s_%s.txt' 
                         % ( self.parent.runname,ioname.replace('<','').replace('>','').replace('.','_'),
                             self.name.replace('<','').replace('>','').replace('.','_'),self.iotype,self.edgetype))
             else:

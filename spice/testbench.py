@@ -388,6 +388,7 @@ class testbench(spice_module):
         if not hasattr(self,'_inputsignals'):
             self._inputsignals = "%s Input signals\n" % self.parent.syntaxdict["commentchar"]
             for name, val in self.iofiles.Members.items():
+                self._trantime_name = name
                 # Input file becomes a source
                 if val.dir.lower()=='in' or val.dir.lower()=='input':
                     # Event signals are analog
@@ -397,7 +398,6 @@ class testbench(spice_module):
                             maxtime = val.Data[-1,0]
                             if float(self._trantime) < float(maxtime):
                                 self._trantime = maxtime
-                                self._trantime_name = name
                             # Adding the source
                             if self.parent.model=='eldo':
                                 self._inputsignals += "%s%s %s 0 pwl(file=\"%s\")\n" % \
