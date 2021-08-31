@@ -876,7 +876,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                                     if i == 0:
                                         data=self.iofile_eventdict[key]
                                     else:
-                                        data=np.r_['1', data, self.iofile_eventdict[key]]
+                                        try:
+                                            data=np.r_['1', data, self.iofile_eventdict[key]]
+                                        except ValueError:
+                                            self.print_log(type='W', msg='Invalid dimensions for concatinating arrays for IO %s!' % name)
                                 except KeyError:
                                     self.print_log(type='W', msg='Invalid ioname %s for iofile %s' % (key, name))
                             self.iofile_bundle.Members[name].Data=data

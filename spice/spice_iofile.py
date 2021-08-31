@@ -324,6 +324,9 @@ class spice_iofile(iofile):
                 filename = filename.lower()
             filename = filepath + filename    
             self._file.append(filename)
+        # Keep unique filenames only for event-type outputs to keep load times at minimum
+        if self.parent.model=='spectre' and self.iotype=='event' and self.dir=='out':
+            self._file=list(set(self._file))
         return self._file
     @file.setter
     def file(self,val):
