@@ -998,7 +998,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     files = sorted(glob.glob(path),key=sorter)
                 else:
                     path=os.path.join(self.spicesimpath,'tb_%s.raw' % self.name, fname)
-                    files = sorted(glob.glob(path),key=sorter)
+                    files = glob.glob(path)
                 valbegin = 'VALUE\n'
                 eof = 'END\n'
                 parsevals = False
