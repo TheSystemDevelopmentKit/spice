@@ -6,6 +6,8 @@ Spice Testbench
 Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
+=======
+Last modification by Okko Järvinen, 22.09.2021 16:51
 
 """
 import os
@@ -798,7 +800,10 @@ class testbench(spice_module):
                                             buswidth = busstop-busstart+1
                                         # Writing every individual bit of a bus to its own file (TODO: maybe to one file?)
                                         for j in range(buswidth):
-                                            bitname = self.esc_bus('%s<%d>' % (signame[0],j))
+                                            if buswidth == 1:
+                                                bitname = self.esc_bus('%s' % signame[0])
+                                            else:
+                                                bitname = self.esc_bus('%s<%d>' % (signame[0],j))
                                             #self._plotcmd += 'save %s\n' % bitname
                                             self._plotcmd += "sampleout_%s_%d (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
                                                     (signame[0],j,self.esc_bus(trig),bitname,val.file[i].replace('.txt','_%d.txt'%j),val.vth,-1 if val.edgetype.lower() == 'falling' else 1)
