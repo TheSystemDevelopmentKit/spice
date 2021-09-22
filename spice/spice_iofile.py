@@ -8,7 +8,7 @@ for TheSDK spice.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Kalle Spoof, kalle.spoof@aalto.fi, 07.06.2021 11:37
+Last modification by Okko Järvinen, 22.09.2021 21:22
 
 """
 import os
@@ -449,7 +449,7 @@ class spice_iofile(iofile):
         """
 
         if self.iotype=='event' and self.parent.model=='spectre':
-            label_match=re.compile(r'\(([A-Za-z0-9._]+)\)')
+            label_match=re.compile(r'\((.*)\)')
             file=self.file[0] # File is the same for all event type outputs
             lines=subprocess.check_output('grep -n \"time\|freq\" %s' % file, shell=True).decode('utf-8')
             lines=lines.split('\n') 
@@ -463,12 +463,12 @@ class spice_iofile(iofile):
                         line=int(parts[0])
                         linenumbers.append(line)
                     except ValueError:
-                        self.print_log(type='W', msg='Couldn\'t decode linenumber from file %s' %  self.file)
+                        self.print_log(type='W', msg='Couldn\'t decode linenumber from file %s' %  file)
                     label=label_match.search(parts[1])
                     if label:
                         labels.append(label.group(1)) # Capture inner group (== ioname)
                     else:
-                        self.print_log(type='W', msg='Couldn\'t fine IO on line %d from file %s' %  (line, self.file))
+                        self.print_log(type='W', msg='Couldn\'t find IO on line %d from file %s' %  (line, file))
             if len(labels) == len(linenumbers):
                 numlines=sum(1 for line in open(file, 'r'))
                 for k in range(len(linenumbers)-1):
@@ -478,8 +478,9 @@ class spice_iofile(iofile):
                     arr=np.genfromtxt(file, dtype=dtype,skip_header=start, skip_footer=stop,encoding='utf-8')
                     try:
                         self.parent.iofile_eventdict[labels[k]]=arr
+                        self.print_log(msg='Read signal %s' % labels[k])
                     except KeyError:
-                        self.print_log(type='W', msg='No such ioname %s in file %s' % (label, file))
+                        self.print_log(type='W', msg='No such ioname %s in file %s' % (labels[k], file))
             else:
                 self.print_log(type='W', msg='Couldn\'t read IOs from file %s. Missing ioname?' % file)
         else:
