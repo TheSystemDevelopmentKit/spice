@@ -7,7 +7,7 @@ Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
 =======
-Last modification by Okko Järvinen, 22.09.2021 16:51
+Last modification by Okko Järvinen, 22.09.2021 18:36
 
 """
 import os
@@ -832,8 +832,8 @@ class testbench(spice_module):
                                     elif self.parent.model == 'spectre':
                                         signame = self.esc_bus(val.ionames[i].upper())
                                         #self._plotcmd += 'save %s\n' % signame
-                                        self._plotcmd += "timeout_%s_%s (%s) veriloga_csv_write_allpoints filename=\"%s\"\n" % \
-                                                (val.edgetype.lower(),val.name.upper().replace('.','_').replace('<','').replace('>',''),signame,val.file[i])
+                                        self._plotcmd += "timeout_%s_%s_%d (%s) veriloga_csv_write_allpoints filename=\"%s\"\n" % \
+                                                (val.edgetype.lower(),val.name.upper().replace('.','_').replace('<','').replace('>',''),i,signame,val.file[i])
                             elif val.iotype=='vsample':
                                 for i in range(len(val.ionames)):
                                     # Checking the given trigger(s)
