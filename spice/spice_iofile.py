@@ -448,61 +448,60 @@ class spice_iofile(iofile):
         Function to read files associated with this spice_iofile.
         """
 
-        if self.iotype=='event':
-            if self.parent.model=='spectre':
-                label_match=re.compile(r'\(([A-Za-z0-9._]+)\)')
-                file=self.file[0] # File is the same for all event type outputs
-                lines=subprocess.check_output('grep -n \"time\|freq\" %s' % file, shell=True).decode('utf-8')
-                lines=lines.split('\n') 
-                linenumbers=[]
-                labels=[]
-                for line in lines:
-                    parts=line.split(':')
-                    if len(parts) > 1: # Line should now contain linenumber in first element, ioname in second
-                        line = 0
-                        try:
-                            line=int(parts[0])
-                            linenumbers.append(line)
-                        except ValueError:
-                            self.print_log(type='W', msg='Couldn\'t decode linenumber from file %s' %  self.file)
-                        label=label_match.search(parts[1])
-                        if label:
-                            labels.append(label.group(1)) # Capture inner group (== ioname)
-                        else:
-                            self.print_log(type='W', msg='Couldn\'t fine IO on line %d from file %s' %  (line, self.file))
-                if len(labels) == len(linenumbers):
-                    numlines=sum(1 for line in open(file, 'r'))
-                    for k in range(len(linenumbers)-1):
-                        start=linenumbers[k] # Indexing starts from zero
-                        stop=numlines-(linenumbers[k+1]-6) # Previous data column ends 5 rows before start of next one
-                        dtype=self.datatype if self.datatype=='complex' else 'float' # Default is int for thesdk_spicefile, let's infer from data
-                        arr=np.genfromtxt(file, dtype=dtype,skip_header=start, skip_footer=stop,encoding='utf-8')
-                        try:
-                            self.parent.iofile_eventdict[labels[k]]=arr
-                        except KeyError:
-                            self.print_log(type='W', msg='No such ioname %s in file %s' % (label, file))
-                else:
-                    self.print_log(type='W', msg='Couldn\'t read IOs from file %s. Missing ioname?' % file)
+        if self.iotype=='event' and self.parent.model=='spectre':
+            label_match=re.compile(r'\(([A-Za-z0-9._]+)\)')
+            file=self.file[0] # File is the same for all event type outputs
+            lines=subprocess.check_output('grep -n \"time\|freq\" %s' % file, shell=True).decode('utf-8')
+            lines=lines.split('\n') 
+            linenumbers=[]
+            labels=[]
+            for line in lines:
+                parts=line.split(':')
+                if len(parts) > 1: # Line should now contain linenumber in first element, ioname in second
+                    line = 0
+                    try:
+                        line=int(parts[0])
+                        linenumbers.append(line)
+                    except ValueError:
+                        self.print_log(type='W', msg='Couldn\'t decode linenumber from file %s' %  self.file)
+                    label=label_match.search(parts[1])
+                    if label:
+                        labels.append(label.group(1)) # Capture inner group (== ioname)
+                    else:
+                        self.print_log(type='W', msg='Couldn\'t fine IO on line %d from file %s' %  (line, self.file))
+            if len(labels) == len(linenumbers):
+                numlines=sum(1 for line in open(file, 'r'))
+                for k in range(len(linenumbers)-1):
+                    start=linenumbers[k] # Indexing starts from zero
+                    stop=numlines-(linenumbers[k+1]-6) # Previous data column ends 5 rows before start of next one
+                    dtype=self.datatype if self.datatype=='complex' else 'float' # Default is int for thesdk_spicefile, let's infer from data
+                    arr=np.genfromtxt(file, dtype=dtype,skip_header=start, skip_footer=stop,encoding='utf-8')
+                    try:
+                        self.parent.iofile_eventdict[labels[k]]=arr
+                    except KeyError:
+                        self.print_log(type='W', msg='No such ioname %s in file %s' % (label, file))
+            else:
+                self.print_log(type='W', msg='Couldn\'t read IOs from file %s. Missing ioname?' % file)
         else:
             for i in range(len(self.file)):
                 if os.path.isfile(self.file[i]):
                     try:
+                        if self.iotype=='event':
+                            if self.parent.model=='ngspice':
+                                #ngspice delimiter is two whitespaces for positive data and one whitespace for negative.
+                                tmparr = genfromtxt(self.file[i], \
+                                        skip_header=self.parent.syntaxdict['csvskip'])
+                                if self.datatype == 'complex':
+                                    arr = np.column_stack((tmparr[:,0], tmparr[:,1] + 1j*tmparr[:,2]))
+                                else:
+                                    arr=tmparr
                             else:
-                                if self.parent.model=='ngspice':
-                                    #ngspice delimiter is two whitespaces for positive data and one whitespace for negative.
-                                    tmparr = genfromtxt(self.file[i], \
-                                            skip_header=self.parent.syntaxdict['csvskip'])
-                                    if self.datatype == 'complex':
-                                        arr = np.column_stack((tmparr[:,0], tmparr[:,1] + 1j*tmparr[:,2]))
-                                    else:
-                                        arr=tmparr
-                                else:
-                                    arr = genfromtxt(self.file[i],delimiter=self.parent.syntaxdict['eventoutdelim'], \
-                                            skip_header=self.parent.syntaxdict['csvskip'])
-                                if self.Data is None: 
-                                    self.Data = np.array(arr)
-                                else:
-                                    self.Data = np.hstack((self.Data,np.array(arr)))
+                                arr = genfromtxt(self.file[i],delimiter=self.parent.syntaxdict['eventoutdelim'], \
+                                        skip_header=self.parent.syntaxdict['csvskip'])
+                            if self.Data is None: 
+                                self.Data = np.array(arr)
+                            else:
+                                self.Data = np.hstack((self.Data,np.array(arr)))
                             # TODO: verify csvskip
                         elif self.iotype=='vsample':
                             if self.parent.model=='ngspice':
