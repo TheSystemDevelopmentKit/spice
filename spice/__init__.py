@@ -10,7 +10,7 @@ automatically generate testbenches for the most common simulation cases.
 
 Initially written by Okko Järvinen, 2019
 
-Last modification by Okko Järvinen, 23.09.2021 09:54
+Last modification by Okko Järvinen, 23.09.2021 12:35
 
 Release 1.6, Jun 2020 supports Eldo and Spectre
 """
@@ -22,6 +22,7 @@ import pdb
 import shutil
 import time
 import traceback
+import threading
 from datetime import datetime
 from abc import * 
 from thesdk import *
@@ -310,7 +311,15 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         Automatically generated name for the simulation. 
         
         Formatted as timestamp_randomtag, i.e. '20201002103638_tmpdbw11nr4'.
-        Can be overridden by assigning self.runname = 'myname'."""
+        Can be overridden by assigning self.runname = 'myname'.
+
+        Example::
+
+            self.runname = 'test'
+
+        would generate the simulation files in `Simulations/spicesim/test/`.
+
+        """
         if hasattr(self,'_runname'):
             return self._runname
         else:
@@ -646,59 +655,34 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def spicetbsrc(self):
         """String
 
-        Path to the spice testbench ('./spice/tb_entityname.<suffix>').
+        Path to the spice testbench ('./Simulations/spicesim/<runname>/tb_entityname.<suffix>').
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicetbsrc'):
-
-            if self.interactive_spice:
-                self._spicetbsrc=self.spicesrcpath + '/tb_' + self.name + self.syntaxdict["cmdfile_ext"]
-            else:
-                self._spicetbsrc=self.spicesimpath + '/tb_' + self.name + self.syntaxdict["cmdfile_ext"]
+            self._spicetbsrc=self.spicesimpath + '/tb_' + self.name + self.syntaxdict["cmdfile_ext"]
         return self._spicetbsrc
-
-    @property
-    def eldowdbsrc(self):
-        """String
-
-        Path to the Eldo EZwave database ('./spice/tb_entityname.wdb').
-        Only applies to Eldo simulations.
-        This shouldn't be set manually.
-        """
-        if not hasattr(self, '_eldowdbsrc'):
-            if self.interactive_spice:
-                self._eldowdbsrc=self.spicesrcpath + '/tb_' + self.name + '.wdb'
-            else:
-                self._eldowdbsrc=self.spicesimpath + '/tb_' + self.name + '.wdb'
-        return self._eldowdbsrc
 
     @property
     def eldochisrc(self):
         """String
 
-        Path to the Eldo chi-file. ('./spice/tb_entityname.chi').
+        Path to the Eldo chi-file. ('./Simulations/spicesim/<runname>/tb_entityname.chi').
         Only applies to Eldo simulations.
         This shouldn't be set manually.
         """
         if not hasattr(self, '_eldochisrc'):
-            if self.interactive_spice:
-                self._eldochisrc=self.spicesrcpath + '/tb_' + self.name + '.chi'
-            else:
-                self._eldochisrc=self.spicesimpath + '/tb_' + self.name + '.chi'
+            self._eldochisrc=self.spicesimpath + '/tb_' + self.name + '.chi'
         return self._eldochisrc
 
     @property
     def spicesubcktsrc(self):
         """String
 
-        Path to the parsed subcircuit file. ('./spice/subckt_entityname.<suffix>').
+        Path to the parsed subcircuit file. ('./Simulations/spicesim/<runname>/subckt_entityname.<suffix>').
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicesubcktsrc'):
-            if self.interactive_spice:
-                self._spicesubcktsrc=self.spicesrcpath + '/subckt_' + self.name + self.syntaxdict["cmdfile_ext"]
-            else:
-                self._spicesubcktsrc=self.spicesimpath + '/subckt_' + self.name + self.syntaxdict["cmdfile_ext"]
+            self._spicesubcktsrc=self.spicesimpath + '/subckt_' + self.name + self.syntaxdict["cmdfile_ext"]
         return self._spicesubcktsrc
 
     @property
@@ -772,11 +756,8 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     plottingprogram=self.syntaxdict['plotprog'] 
                 elif self.model=='spectre':
                     plottingprogram = '' # Plotting for spectre handled differently. See self.plotprogcmd
-                #submission=""
-                submission=self.spice_submission
             else:
                 plottingprogram = ""
-                submission=self.spice_submission
 
             if self.nproc:
                 nprocflag = "%s%d" % (self.syntaxdict["nprocflag"],self.nproc)
@@ -797,12 +778,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 #spicesimcmd = "\"sleep 10; spectre %s %s \"" % (plottingprogram,nprocflag)
                 #spicesimcmd = "spectre %s %s " % (plottingprogram,nprocflag)
                 spicesimcmd = ("spectre -64 +lqtimeout=0 ++aps=%s %s %s %s -outdir %s " 
-                        % (self.errpreset, plflag,plottingprogram,nprocflag,self.spicesimpath))
+                        % (self.errpreset,plflag,plottingprogram,nprocflag,self.spicesimpath))
             elif self.model=='ngspice':
                 spicesimcmd = self.syntaxdict["simulatorcmd"] + ' '
 
-            #spicesimcmd = "%s %s %s " % (self.syntaxdict["simulatorcmd"],plottingprogram,nprocflag)
             spicetbfile = self.spicetbsrc
+            submission=self.spice_submission
             self._spicecmd = submission +\
                             spicesimcmd +\
                             spicetbfile
@@ -818,8 +799,8 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         Sets the command to be run for interactive Spectre simulations.
         """
         if not hasattr(self, '_plotprogcmd') and self.model=='spectre':
-            path=self.spicesrcpath + '/tb_' + self.name + self.syntaxdict["resultfile_ext"]
-            self._plotprogcmd='%s -datadir %s &' % (self.syntaxdict['plotprog'], path)
+            path=self.spicesimpath + '/tb_' + self.name + self.syntaxdict["resultfile_ext"]
+            self._plotprogcmd='%s -datadir %s -nocdsinit &' % (self.syntaxdict['plotprog'], path)
         return self._plotprogcmd
     @plotprogcmd.setter
     def plotprogcmd(self, value):
@@ -915,6 +896,21 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """ Run plotting program for interactive Spectre simulations
             NOTE: This feature is for Spectre simulations ONLY!
         """
+        path=self.spicesimpath + '/tb_' + self.name + self.syntaxdict["resultfile_ext"]
+        tries = 0
+        while tries < 100:
+            if os.path.exists(path):
+                # More than just the logfile exists
+                if len(os.listdir(path)) > 1:
+                    # Database file has something written to it
+                    filesize = []
+                    for f in os.listdir(path):
+                        filesize.append(os.stat('%s/%s' % (path,f)).st_size)
+                    if all(filesize) > 0:
+                        break
+            else:
+                time.sleep(2)
+                tries += 1
         cmd=self.plotprogcmd
         self.print_log(type='I', msg='Running external command: %s' % cmd)
         try:
@@ -1096,9 +1092,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self.tb.export_subckt(force=True)
             self.tb.export(force=True)
             self.write_infile()
-            self.execute_spice_sim()
             if self.interactive_spice and self.model=='spectre':
-                self.run_viva()
+                vivathread = threading.Thread(target=self.run_viva,name='Viva')
+                vivathread.start()
+                #self.run_viva()
+            self.execute_spice_sim()
             self.read_outfile()
             self.connect_outputs()
             self.extract_powers()
@@ -1116,9 +1114,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     results = glob.glob(self.entitypath+'/Simulations/spicesim/*')
                     latest = max(results, key=os.path.getctime)
                     self.runname = latest.split('/')[-1]
-                    simpath = latest
-                else:
-                    simpath = self.entitypath+'/Simulations/spicesim/'+self.runname
                 simpath = self.entitypath+'/Simulations/spicesim/'+self.runname
                 if not (os.path.exists(simpath)):
                     self.print_log(type='E',msg='Existing results not found in %s.' % simpath)

@@ -42,16 +42,10 @@ class testbench(spice_module):
         else:
             self.parent=parent
         try:  
-            if self.parent.interactive_spice:
-                self._file=self.parent.spicesrcpath + '/tb_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
-                self._subcktfile=self.parent.spicesrcpath + '/subckt_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
-            else:
-                self._file=self.parent.spicesimpath + '/tb_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
-                #self._dutfile=self.parent.spicesimpath + '/subckt_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
-                self._subcktfile=self.parent.spicesimpath + '/subckt_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
-            self._dutfile=self.parent.spicesrcpath + '/' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
-
-            # This variable holds duration of longest input vector after reading input files
+            self._file=self.parent.spicetbsrc # Testbench
+            self._subcktfile=self.parent.spicesubcktsrc # Parsed subcircuit file
+            self._dutfile=self.parent.spicesrc # Source netlist file
+            # This attribute holds duration of longest input vector after reading input files
             self._trantime=0
         except:
             self.print_log(type='F', msg="Spice Testbench file definition failed")
@@ -922,6 +916,7 @@ class testbench(spice_module):
                         dcsourcestr + "\n" +\
                         inputsignals + "\n" +\
                         plotcmd + "\n" +\
+                        simcmd + "\n" +\
                         self.parent.syntaxdict["lastline"])
 if __name__=="__main__":
     pass

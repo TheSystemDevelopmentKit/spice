@@ -8,7 +8,7 @@ testbench.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 03.12.2020 19:14
+Last modification by Okko Järvinen, 23.09.2021 11:45
 
 """
 
@@ -168,7 +168,7 @@ class spice_dcsource(thesdk):
         """Set by argument 'extract'."""
         if hasattr(self,'_extract'):
             # Power transient will be extracted to this file for spectre
-            self._extfile = '%s/%s_%s%s_curr.txt' % (self.parent.spicesimpath,self.parent.runname,self.sourcetype.lower(),self.name.lower())
+            self.extfile = '%s/%s_%s%s_curr.txt' % (self.parent.spicesimpath,self.parent.runname,self.sourcetype.lower(),self.name.lower())
             return self._extract
         else:
             self._extract=False
