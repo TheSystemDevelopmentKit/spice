@@ -8,7 +8,7 @@ testbench.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 23.09.2021 13:34
+Last modification by Okko Järvinen, 23.09.2021 14:41
 
 """
 
@@ -221,11 +221,3 @@ class spice_dcsource(thesdk):
     @ramp.setter
     def ramp(self,value):
         self._ramp=value
-
-    # Remove the file when no longer needed
-    def remove(self):
-        """Removes the transient current file."""
-        try:
-            pass
-        except:
-            pass

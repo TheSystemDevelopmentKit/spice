@@ -8,7 +8,7 @@ for TheSDK spice.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 23.09.2021 13:22
+Last modification by Okko Järvinen, 23.09.2021 14:44
 
 """
 import os
@@ -348,23 +348,6 @@ class spice_iofile(iofile):
     def ionames(self,val):
         self._ionames=val
         return self._ionames
-
-    # Overloading the remove functionality to remove tmp files
-    def remove(self):
-        """
-        Function to remove files associated with this spice_iofile.
-        """
-        if self.preserve:
-            self.print_log(type='I', msg='Preserving files for %s.' % self.name)
-        else:
-            try:
-                self.print_log(type='I',msg='Removing files for %s.' % self.name)
-                for f in self.file:
-                    if os.path.exists(f):
-                        os.remove(f)
-            except:
-                self.print_log(type='E',msg=traceback.format_exc())
-                self.print_log(type='W',msg='Failed while removing files for %s.' % self.name)
 
     # Overloaded write from thesdk.iofile
     def write(self,**kwargs):

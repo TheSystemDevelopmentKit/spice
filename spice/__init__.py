@@ -10,7 +10,7 @@ automatically generate testbenches for the most common simulation cases.
 
 Initially written by Okko Järvinen, 2019
 
-Last modification by Okko Järvinen, 23.09.2021 13:46
+Last modification by Okko Järvinen, 23.09.2021 14:43
 
 Release 1.6, Jun 2020 supports Eldo and Spectre
 """
@@ -141,6 +141,21 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     #Name derived from the file
 
     @property
+    def preserve_result(self):  
+        """True | False (default)
+
+        If True, do not delete result files after simulations.
+        """
+        if hasattr(self,'_preserve_result'):
+            return self._preserve_result
+        else:
+            self._preserve_result=False
+        return self._preserve_result
+    @preserve_result.setter
+    def preserve_result(self,value):
+        self._preserve_result=value
+
+    @property
     def preserve_iofiles(self):  
         """True | False (default)
 
@@ -153,7 +168,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         return self._preserve_iofiles
     @preserve_iofiles.setter
     def preserve_iofiles(self,value):
+        self.print_log(type='O',msg='preserve_iofiles is replaced with preserve_result since v1.7')
         self._preserve_iofiles=value
+        self.print_log(msg='Setting preserve_result to %s' % str(value))
+        self._preserve_result=value
         
     @property
     def preserve_spicefiles(self):  
@@ -168,7 +186,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         return self._preserve_spicefiles
     @preserve_spicefiles.setter
     def preserve_spicefiles(self,value):
+        self.print_log(type='O',msg='preserve_spicefiles is replaced with preserve_result since v1.7')
         self._preserve_spicefiles=value
+        self.print_log(msg='Setting preserve_result to %s' % str(value))
+        self._preserve_result=value
 
     @property
     def distributed_run(self):
@@ -433,23 +454,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @iofile_bundle.setter
     def iofile_bundle(self,value):
         self._iofile_bundle=value
-    @iofile_bundle.deleter
-    def iofile_bundle(self):
-        for name, val in self.iofile_bundle.Members.items():
-            if val.preserve:
-                self.print_log(type="I", msg="Preserving files for %s." % val.name)
-            else:
-                val.remove()
-        if not self.preserve_iofiles:
-            if self.interactive_spice:
-                simpathname = self.spicesimpath
-            else:
-                simpathname = self.spicesimpath
-            try:
-                shutil.rmtree(simpathname)
-                self.print_log(type='I',msg='Removing %s.' % simpathname)
-            except:
-                self.print_log(type='W',msg='Could not remove %s.' % simpathname)
 
     @property
     def dcsource_bundle(self):
@@ -464,10 +468,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @dcsource_bundle.setter
     def dcsource_bundle(self,value):
         self._dcsource_bundle=value
-    @dcsource_bundle.deleter
-    def dcsource_bundle(self):
-        for name, val in self.dcsource_bundle.Members.items():
-            val.remove()
 
     @property
     def simcmd_bundle(self):
@@ -482,10 +482,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @simcmd_bundle.setter
     def simcmd_bundle(self,value):
         self._simcmd_bundle=value
-    @simcmd_bundle.deleter
-    def simcmd_bundle(self):
-        for name, val in self.simcmd_bundle.Members.items():
-            val.remove()
 
     @property
     def extracts(self):
@@ -699,45 +695,28 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         return self._spicesimpath
     @spicesimpath.deleter
     def spicesimpath(self):
-        if not self.interactive_spice and not self.preserve_spicefiles:
-            # Removing generated files
-            filelist = [
-                self.spicetbsrc,
-                self.spicesubcktsrc
-                ]
-            for f in filelist:
+        if os.path.exists(self.spicesimpath) and not self.preserve_result:
+            keepdb = False
+            for target in os.listdir(self.spicesimpath):
+                targetpath = '%s/%s' % (self.spicesimpath,target)
                 try:
-                    if os.path.exists(f):
-                        os.remove(f)
-                        self.print_log(type='I',msg='Removing %s.' % f)
+                    if targetpath == self.spicedbpath and self.interactive_spice:
+                        keepdb = True
+                        self.print_log(msg='Preserving ./%s due to interactive_spice' % os.path.relpath(targetpath,start='../'))
+                        continue
+                    if os.path.isdir(targetpath):
+                        shutil.rmtree(targetpath)
+                    else:
+                        os.remove(targetpath)
+                    self.print_log(type='D',msg='Removing ./%s' % os.path.relpath(targetpath,start='../'))
                 except:
-                    self.print_log(type='W',msg='Could not remove %s.' % f)
-                    pass
-
-            # Cleaning up extra files
-            if os.path.exists(self.spicesimpath):
-                remaining = os.listdir(self.spicesimpath)
-                for f in remaining:
-                    try:
-                        fpath = '%s/%s' % (self.spicesimpath,f)
-                        if f.startswith('tb_%s' % self.name):
-                            os.remove(fpath)
-                            self.print_log(type='I',msg='Removing %s.' % fpath)
-                    except:
-                        self.print_log(type='W',msg='Could not remove %s.' % fpath)
-
-            #TODO currently always remove everything 
-            # IO files were also removed -> remove the directory
-            if os.path.exists(self.spicesimpath) and not self.preserve_iofiles:
+                    self.print_log(type='W',msg='Could not remove ./%s' % os.path.relpath(targetpath,start='../'))
+            if not keepdb:
                 try:
-                    # This fails sometimes because of .nfs files
                     shutil.rmtree(self.spicesimpath)
-                    self.print_log(type='I',msg='Removing %s.' % self.spicesimpath)
+                    self.print_log(type='D',msg='Removing ./%s' % os.path.relpath(self.spicesimpath,start='../'))
                 except:
-                    self.print_log(type='W',msg='Could not remove %s.' % self.spicesimpath)
-        else:
-            self.print_log(type='I',msg='Preserving spice files in %s.' % self.spicesrcpath)
-
+                    self.print_log(type='W',msg='Could not remove ./%s' % os.path.relpath(spicesimpath,start='../'))
 
     @property
     def spicecmd(self):
@@ -790,13 +769,27 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         self._spicecmd=value
 
     @property
+    def spicedbpath(self):
+        """String
+
+        Path to output waveform database. (./Simulations/spicesim/<runname>/tb_<entityname>.<resultfile_ext>)
+        For now only for spectre.
+        This shouldn't be set manually.
+        """
+        if not hasattr(self,'_spicedbpath'):
+            self._spicedbpath=self.spicesimpath+'/tb_'+self.name+self.syntaxdict["resultfile_ext"]
+        return self._spicedbpath
+    @spicedbpath.setter
+    def spicedbpath(self, value):
+        self._spicedbpath=value
+
+    @property
     def plotprogcmd(self):
         """
         Sets the command to be run for interactive Spectre simulations.
         """
         if not hasattr(self, '_plotprogcmd') and self.model=='spectre':
-            path=self.spicesimpath + '/tb_' + self.name + self.syntaxdict["resultfile_ext"]
-            self._plotprogcmd='%s -datadir %s -nocdsinit &' % (self.syntaxdict['plotprog'], path)
+            self._plotprogcmd='%s -datadir %s -nocdsinit &' % (self.syntaxdict['plotprog'], self.spicedbpath)
         return self._plotprogcmd
     @plotprogcmd.setter
     def plotprogcmd(self, value):
@@ -892,16 +885,15 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """ Run plotting program for interactive Spectre simulations
             NOTE: This feature is for Spectre simulations ONLY!
         """
-        path=self.spicesimpath + '/tb_' + self.name + self.syntaxdict["resultfile_ext"]
         tries = 0
         while tries < 100:
-            if os.path.exists(path):
+            if os.path.exists(self.spicedbpath):
                 # More than just the logfile exists
-                if len(os.listdir(path)) > 1:
+                if len(os.listdir(self.spicedbpath)) > 1:
                     # Database file has something written to it
                     filesize = []
-                    for f in os.listdir(path):
-                        filesize.append(os.stat('%s/%s' % (path,f)).st_size)
+                    for f in os.listdir(self.spicedbpath):
+                        filesize.append(os.stat('%s/%s' % (self.spicedbpath,f)).st_size)
                     if all(filesize) > 0:
                         break
             else:
@@ -1098,10 +1090,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self.connect_outputs()
             self.extract_powers()
             self.read_oppts()
-            # Calling deleter of iofiles
-            del self.dcsource_bundle
-            del self.iofile_bundle
-            # And eldo files (tb, subcircuit, wdb)
+            ## Calling deleter of iofiles
+            #del self.dcsource_bundle
+            #del self.iofile_bundle
+            # Clean simulation results
             del self.spicesimpath
         else:
             #Loading previous simulation results and not simulating again
