@@ -10,7 +10,7 @@ automatically generate testbenches for the most common simulation cases.
 
 Initially written by Okko Järvinen, 2019
 
-Last modification by Okko Järvinen, 23.09.2021 15:27
+Last modification by Okko Järvinen, 23.09.2021 15:39
 
 Release 1.6, Jun 2020 supports Eldo and Spectre
 """
@@ -741,7 +741,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                         % (self.errpreset,plflag,nprocflag,self.spicesimpath))
             elif self.model=='ngspice':
                 spicesimcmd = self.syntaxdict["simulatorcmd"] + ' '
-            self._spicecmd = self.spicesubmission+spicesimcmd+self.spicetbsrc
+            self._spicecmd = self.spice_submission+spicesimcmd+self.spicetbsrc
         return self._spicecmd
     @spicecmd.setter
     def spicecmd(self,value):
