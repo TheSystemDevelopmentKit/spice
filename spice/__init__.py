@@ -10,7 +10,7 @@ automatically generate testbenches for the most common simulation cases.
 
 Initially written by Okko Järvinen, 2019
 
-Last modification by Okko Järvinen, 08.04.2021 19:55
+Last modification by Okko Järvinen, 23.09.2021 09:54
 
 Release 1.6, Jun 2020 supports Eldo and Spectre
 """
@@ -402,6 +402,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """
         if not hasattr(self, '_iofile_eventdict'):
             self._iofile_eventdict=dict()
+            for name, val in self.iofile_bundle.Members.items():
+                if (val.dir.lower()=='out' or val.dir.lower()=='output') and val.iotype=='event':
+                    for key in val.ionames:
+                        self._iofile_eventdict[key] = None
         return self._iofile_eventdict
     @iofile_eventdict.setter
     def iofile_eventdict(self,val):
@@ -520,7 +524,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                             self._spice_submission = thesdk.GLOBALS['LSFINTERACTIVE'] + ' '
                         else: # Spectre LSF doesn't support interactive queues
                             self.print_log(type='W', msg='Cannot run in interactive mode if distributed mode is on!')
-                        self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
+                            self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
                     else:
                         self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
 
@@ -852,11 +856,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         iofile with direction 'output'."""
         # Handle spectre differently..
         if self.model=='spectre':
-            if not self.iofile_eventdict:
-                for name, val in self.iofile_bundle.Members.items():
-                    if (val.dir.lower()=='out' or val.dir.lower()=='output') and val.iotype=='event':
-                        for key in val.ionames:
-                            self.iofile_eventdict[key] = None
             first=True
             for name, val in self.iofile_bundle.Members.items():
                 if val.dir.lower()=='out' or val.dir.lower()=='output':
@@ -879,7 +878,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                                         try:
                                             data=np.r_['1', data, self.iofile_eventdict[key]]
                                         except ValueError:
-                                            self.print_log(type='W', msg='Invalid dimensions for concatinating arrays for IO %s!' % name)
+                                            self.print_log(type='W', msg='Invalid dimensions for concatenating arrays for IO %s!' % name)
                                 except KeyError:
                                     self.print_log(type='W', msg='Invalid ioname %s for iofile %s' % (key, name))
                             self.iofile_bundle.Members[name].Data=data
@@ -1100,9 +1099,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self.execute_spice_sim()
             if self.interactive_spice and self.model=='spectre':
                 self.run_viva()
-            self.extract_powers()
             self.read_outfile()
             self.connect_outputs()
+            self.extract_powers()
             self.read_oppts()
             # Calling deleter of iofiles
             del self.dcsource_bundle

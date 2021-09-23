@@ -751,8 +751,6 @@ class testbench(spice_module):
                                                 (val.sourcetype,val.ionames[i].upper())
                                         self._plotcmd += "wrdata %s %s(%s)\n" % \
                                                 (val.file[i], val.sourcetype,val.ionames[i].upper())
-
-
                             elif val.iotype=='sample':
                                 for i in range(len(val.ionames)):
                                     # Checking the given trigger(s)
@@ -801,34 +799,26 @@ class testbench(spice_module):
                                             bitname = self.esc_bus('%s<%d>' % (signame[0],j))
                                             #self._plotcmd += 'save %s\n' % bitname
                                             self._plotcmd += "sampleout_%s_%d (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
-                                                    (signame[0],j,self.esc_bus(trig),bitname,val.file[i].replace('.txt','_%d.txt'%j),val.vth,-1 if val.edgetype.lower() == 'falling' else 1)
+                                                    (signame[0],j,self.esc_bus(trig),bitname,val.file[i].replace('.txt','_%d.txt'%j),\
+                                                     val.vth,-1 if val.edgetype.lower() == 'falling' else 1)
 
                             elif val.iotype=='time':
                                 for i in range(len(val.ionames)):
                                     if self.parent.model == 'eldo':
                                         self._plotcmd += ".printfile %s(%s) file=\"%s\"\n" % \
                                                 (val.sourcetype,val.ionames[i].upper(),val.file[i])
-                                        #for i in range(len(val.ionames)):
-                                        #    vthstr = ',%s' % str(val.vth)
-                                        #    if val.edgetype.lower()=='falling':
-                                        #        edge = 'xdown'
-                                        #    elif val.edgetype.lower()=='both':
-                                        #        edge = 'tcross'
-                                        #        vthstr = ',vth=%s' % str(val.vth)
-                                        #    elif val.edgetype.lower()=='risetime':
-                                        #        edge = 'trise'
-                                        #        vthstr = ''
-                                        #    elif val.edgetype.lower()=='falltime':
-                                        #        edge = 'tfall'
-                                        #        vthstr = ''
-                                        #    else:
-                                        #        edge = 'xup'
-                                        #    self._plotcmd += ".extract file=\"%s\" vect label=%s %s(v(%s)%s)\n" % (val.file[i],val.ionames[i],edge,val.ionames[i].upper(),vthstr)
                                     elif self.parent.model == 'spectre':
-                                        signame = self.esc_bus(val.ionames[i].upper())
-                                        #self._plotcmd += 'save %s\n' % signame
-                                        self._plotcmd += "timeout_%s_%s (%s) veriloga_csv_write_allpoints filename=\"%s\"\n" % \
-                                                (val.edgetype.lower(),val.ionames[i].upper().replace('.','_').replace('<','').replace('>',''),signame,val.file[i])
+                                        signame = self.esc_bus(val.ionames[i])
+                                        # Check if this same node was already saved as event type
+                                        if val.ionames[i] not in self.parent.iofile_eventdict:
+                                            # Requested node was not saved as event
+                                            # -> add to eventdict + save to output database
+                                            self.parent.iofile_eventdict[val.ionames[i]] = None
+                                            self._plotcmd += 'save %s\n' % signame
+                                            self._plotcmd += 'simulator lang=spice\n'
+                                            self._plotcmd += '.option ingold 2\n'
+                                            self._plotcmd += ".print %s(%s)\n" % (val.sourcetype,val.ionames[i])
+                                            self._plotcmd += 'simulator lang=spectre\n'
                             elif val.iotype=='vsample':
                                 for i in range(len(val.ionames)):
                                     # Checking the given trigger(s)
@@ -931,7 +921,6 @@ class testbench(spice_module):
                         misccmd + "\n" +
                         dcsourcestr + "\n" +\
                         inputsignals + "\n" +\
-                        simcmd + "\n" +\
                         plotcmd + "\n" +\
                         self.parent.syntaxdict["lastline"])
 if __name__=="__main__":
