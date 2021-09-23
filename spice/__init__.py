@@ -10,7 +10,7 @@ automatically generate testbenches for the most common simulation cases.
 
 Initially written by Okko Järvinen, 2019
 
-Last modification by Okko Järvinen, 23.09.2021 14:43
+Last modification by Okko Järvinen, 23.09.2021 15:27
 
 Release 1.6, Jun 2020 supports Eldo and Spectre
 """
@@ -81,7 +81,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self._syntaxdict = {
                     "cmdfile_ext" : '.cir',
                     "resultfile_ext" : '.wdb',
-                    'plotprog' : 'ezwave',
                     "commentchar" : '*',
                     "commentline" : '***********************\n',
                     "nprocflag" : '-use_proc ', #space required
@@ -99,7 +98,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         elif self.model=='spectre':
             self._syntaxdict = {
                     "cmdfile_ext" : '.scs',
-                    'plotprog' : 'viva',
                     "resultfile_ext" : '.raw',
                     "commentchar" : '//',
                     "commentline" : '///////////////////////\n',
@@ -119,7 +117,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self._syntaxdict = {
                     "cmdfile_ext" : '.ngcir',
                     "resultfile_ext" : '',
-                    'plotprog' : '',
                     "commentchar" : '*',
                     "commentline" : '***********************\n',
                     "nprocflag" : 'set num_threads=', #Goes to .control section
@@ -500,7 +497,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """
         Returs True if LSF submissions are properly defined. Default False
         """
-        if ( not thesdk.GLOBALS['LSFINTERACTIVE'] == '' ) and (not thesdk.GLOBALS['LSFINTERACTIVE'] == ''):
+        if ( not thesdk.GLOBALS['LSFINTERACTIVE'] == '' ) and (not thesdk.GLOBALS['LSFSUBMISSION'] == ''):
             self._has_lsf = True
         else:
             self._has_lsf = False
@@ -726,44 +723,26 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         Automatically generated.
         """
         if not hasattr(self,'_spicecmd'):
-            if self.interactive_spice:
-                if self.model=='eldo':
-                    plottingprogram=self.syntaxdict['plotprog'] 
-                elif self.model=='spectre':
-                    plottingprogram = '' # Plotting for spectre handled differently. See self.plotprogcmd
-            else:
-                plottingprogram = ""
-
             if self.nproc:
                 nprocflag = "%s%d" % (self.syntaxdict["nprocflag"],self.nproc)
                 self.print_log(type='I',msg='Enabling multithreading \'%s\'.' % nprocflag)
             else:
                 nprocflag = ""
-
             if self.tb.postlayout:
                 plflag = '+postlayout=upa'
                 self.print_log(type='I',msg='Enabling post-layout optimization \'%s\'.' % plflag)
             else:
                 plflag = ''
-
             if self.model=='eldo':
                 # Shouldn't this use self.syntaxdict["simulatorcmd"] ?
-                spicesimcmd = "eldo -64b %s %s " % (plottingprogram,nprocflag)
+                spicesimcmd = "eldo -64b %s " % (nprocflag)
             elif self.model=='spectre':
-                #spicesimcmd = "\"sleep 10; spectre %s %s \"" % (plottingprogram,nprocflag)
-                #spicesimcmd = "spectre %s %s " % (plottingprogram,nprocflag)
-                spicesimcmd = ("spectre -64 +lqtimeout=0 ++aps=%s %s %s %s -outdir %s " 
-                        % (self.errpreset,plflag,plottingprogram,nprocflag,self.spicesimpath))
+                spicesimcmd = ("spectre -64 +lqtimeout=0 ++aps=%s %s %s -outdir %s " 
+                        % (self.errpreset,plflag,nprocflag,self.spicesimpath))
             elif self.model=='ngspice':
                 spicesimcmd = self.syntaxdict["simulatorcmd"] + ' '
-
-            spicetbfile = self.spicetbsrc
-            submission=self.spice_submission
-            self._spicecmd = submission +\
-                            spicesimcmd +\
-                            spicetbfile
+            self._spicecmd = self.spicesubmission+spicesimcmd+self.spicetbsrc
         return self._spicecmd
-    # Just to give the freedom to set this if needed
     @spicecmd.setter
     def spicecmd(self,value):
         self._spicecmd=value
@@ -784,12 +763,33 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         self._spicedbpath=value
 
     @property
+    def plotprogram(self):
+        """
+        Sets the program to be used for visualizing waveform databases.
+        Options are ezwave (default) or viva.
+        """
+        if not hasattr(self, '_plotprogram'):
+            self._plotprogram='ezwave'
+        return self._plotprogram
+    @plotprogram.setter
+    def plotprogram(self, value):
+        self._plotprogram=value
+
+    @property
     def plotprogcmd(self):
         """
-        Sets the command to be run for interactive Spectre simulations.
+        Sets the command to be run for interactive simulations.
         """
-        if not hasattr(self, '_plotprogcmd') and self.model=='spectre':
-            self._plotprogcmd='%s -datadir %s -nocdsinit &' % (self.syntaxdict['plotprog'], self.spicedbpath)
+        if not hasattr(self, '_plotprogcmd'):
+            if self.plotprogram == 'ezwave':
+                self._plotprogcmd='%s -MAXWND -LOGfile %s/ezwave.log %s &' % \
+                        (self.plotprogram,self.spicesimpath,self.spicedbpath)
+            elif self.plotprogram == 'viva':
+                self._plotprogcmd='%s -datadir %s -nocdsinit &' % \
+                        (self.plotprogram,self.spicedbpath)
+            else:
+                self._plotprogcmd = ''
+                self.print_log(type='W',msg='Unsupported plot program \'%s\'.' % self.plotprogram)
         return self._plotprogcmd
     @plotprogcmd.setter
     def plotprogcmd(self, value):
@@ -881,10 +881,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         else:
             os.system(self.spicecmd)
 
-    def run_viva(self):
+    def run_plotprogram(self):
         """ Run plotting program for interactive Spectre simulations
             NOTE: This feature is for Spectre simulations ONLY!
         """
+        # This waiting method assumes spectre output.
+        # TODO: test for eldo (and ngspice?)
         tries = 0
         while tries < 100:
             if os.path.exists(self.spicedbpath):
@@ -904,9 +906,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         try:
             ret=os.system(cmd)
             if ret != 0:
-                self.print_log(type='W', msg='%s returned with exit status %d!' % (self.syntaxdict['plotprog'], ret))
+                self.print_log(type='W', msg='%s returned with exit status %d!' % (self.plotprogram, ret))
         except: 
-            self.print_log(type='W',msg='Something went wrong while launcing %s.' % self.syntaxdict['plotprog'])
+            self.print_log(type='W',msg='Something went wrong while launcing %s.' % self.plotprogram)
             self.print_log(type='W',msg=traceback.format_exc())
 
     def extract_powers(self):
@@ -1081,18 +1083,14 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self.tb.export_subckt(force=True)
             self.tb.export(force=True)
             self.write_infile()
-            if self.interactive_spice and self.model=='spectre':
-                vivathread = threading.Thread(target=self.run_viva,name='Viva')
-                vivathread.start()
-                #self.run_viva()
+            if self.interactive_spice:
+                plotthread = threading.Thread(target=self.run_plotprogram,name='plotting')
+                plotthread.start()
             self.execute_spice_sim()
             self.read_outfile()
             self.connect_outputs()
             self.extract_powers()
             self.read_oppts()
-            ## Calling deleter of iofiles
-            #del self.dcsource_bundle
-            #del self.iofile_bundle
             # Clean simulation results
             del self.spicesimpath
         else:
