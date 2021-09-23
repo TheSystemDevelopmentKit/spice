@@ -10,7 +10,7 @@ automatically generate testbenches for the most common simulation cases.
 
 Initially written by Okko Järvinen, 2019
 
-Last modification by Okko Järvinen, 23.09.2021 15:39
+Last modification by Okko Järvinen, 23.09.2021 18:48
 
 Release 1.6, Jun 2020 supports Eldo and Spectre
 """
@@ -143,9 +143,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
         If True, do not delete result files after simulations.
         """
-        if hasattr(self,'_preserve_result'):
-            return self._preserve_result
-        else:
+        if not hasattr(self,'_preserve_result'):
             self._preserve_result=False
         return self._preserve_result
     @preserve_result.setter
@@ -158,9 +156,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
         If True, do not delete file IO files after simulations. Useful for
         debugging the file IO"""
-        if hasattr(self,'_preserve_iofiles'):
-            return self._preserve_iofiles
-        else:
+        if not hasattr(self,'_preserve_iofiles'):
             self._preserve_iofiles=False
         return self._preserve_iofiles
     @preserve_iofiles.setter
@@ -176,9 +172,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
         If True, do not delete generated Spice files (testbench, subcircuit,
         etc.) after simulations.  Useful for debugging."""
-        if hasattr(self,'_preserve_spicefiles'):
-            return self._preserve_spicefiles
-        else:
+        if not hasattr(self,'_preserve_spicefiles'):
             self._preserve_spicefiles=False
         return self._preserve_spicefiles
     @preserve_spicefiles.setter
