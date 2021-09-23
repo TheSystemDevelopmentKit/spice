@@ -307,9 +307,9 @@ class spice_iofile(iofile):
         for ioname in self.ionames:
             filepath = self.parent.spicesimpath+'/'
             if self.iotype is not 'event': 
-                filename = ( '%s_%s_%s_%s_%s.txt' 
+                filename = ( '%s_%s_ioname_%s_bundlename_%s_%s_%s.txt' 
                         % ( self.parent.runname,self.dir,ioname.replace('<','').replace('>','').replace('.','_'),
-                            self.iotype,self.edgetype))
+                            self.name.replace('<','').replace('>','').replace('.','_'),self.iotype,self.edgetype))
             else:
                 # We cant control the filename. Location is defined with -odir option
                 if self.parent.model == 'spectre' and self.dir == 'out':

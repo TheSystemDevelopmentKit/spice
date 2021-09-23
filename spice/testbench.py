@@ -6,6 +6,8 @@ Spice Testbench
 Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
+=======
+Last modification by Okko Järvinen, 22.09.2021 18:36
 
 """
 import os
@@ -383,6 +385,7 @@ class testbench(spice_module):
         if not hasattr(self,'_inputsignals'):
             self._inputsignals = "%s Input signals\n" % self.parent.syntaxdict["commentchar"]
             for name, val in self.iofiles.Members.items():
+                self._trantime_name = name
                 # Input file becomes a source
                 if val.dir.lower()=='in' or val.dir.lower()=='input':
                     # Event signals are analog
@@ -392,7 +395,6 @@ class testbench(spice_module):
                             maxtime = val.Data[-1,0]
                             if float(self._trantime) < float(maxtime):
                                 self._trantime = maxtime
-                                self._trantime_name = name
                             # Adding the source
                             if self.parent.model=='eldo':
                                 self._inputsignals += "%s%s %s 0 pwl(file=\"%s\")\n" % \
@@ -791,7 +793,10 @@ class testbench(spice_module):
                                             buswidth = busstop-busstart+1
                                         # Writing every individual bit of a bus to its own file (TODO: maybe to one file?)
                                         for j in range(buswidth):
-                                            bitname = self.esc_bus('%s<%d>' % (signame[0],j))
+                                            if buswidth == 1:
+                                                bitname = self.esc_bus('%s' % signame[0])
+                                            else:
+                                                bitname = self.esc_bus('%s<%d>' % (signame[0],j))
                                             #self._plotcmd += 'save %s\n' % bitname
                                             self._plotcmd += "sampleout_%s_%d (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
                                                     (signame[0],j,self.esc_bus(trig),bitname,val.file[i].replace('.txt','_%d.txt'%j),\
