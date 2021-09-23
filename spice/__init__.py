@@ -10,7 +10,7 @@ automatically generate testbenches for the most common simulation cases.
 
 Initially written by Okko Järvinen, 2019
 
-Last modification by Okko Järvinen, 23.09.2021 12:35
+Last modification by Okko Järvinen, 23.09.2021 13:46
 
 Release 1.6, Jun 2020 supports Eldo and Spectre
 """
@@ -467,11 +467,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @dcsource_bundle.deleter
     def dcsource_bundle(self):
         for name, val in self.dcsource_bundle.Members.items():
-            if self.preserve_iofiles:
-                if val.extract:
-                    self.print_log(type="I", msg="Preserving file %s." % val.extfile)
-            else:
-                val.remove()
+            val.remove()
 
     @property
     def simcmd_bundle(self):
@@ -958,20 +954,21 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 for name, val in self.tb.dcsources.Members.items():
                     # Read transient power consumption of the extracted source
                     if val.extract and val.sourcetype.lower() == 'v':
-                        arr = genfromtxt(val._extfile,delimiter=', ',skip_header=self.syntaxdict["csvskip"])
-                        if val.ext_start is not None:
-                            arr = arr[np.where(arr[:,0] >= val.ext_start)[0],:]
-                        if val.ext_stop is not None:
-                            arr = arr[np.where(arr[:,0] <= val.ext_stop)[0],:]
-                        # The time points are non-uniform -> use deltas as weights
-                        dt = np.diff(arr[:,0])
-                        totaltime = arr[-1,0]-arr[0,0]
-                        meancurr = np.sum(np.abs(arr[1:,1])*dt)/totaltime
-                        meanpwr = meancurr*val.value
-                        sourcename = '%s%s' % (val.sourcetype.upper(),val.name.upper())
-                        self.extracts.Members['currents'][sourcename] = meancurr
-                        self.extracts.Members['powers'][sourcename] = meanpwr
-                        self.extracts.Members['curr_tran'][sourcename] = arr
+                        sourcename = '%s%s' % (val.sourcetype.upper(),val.name.lower())
+                        if sourcename in self.iofile_eventdict:
+                            arr = self.iofile_eventdict[sourcename]
+                            if val.ext_start is not None:
+                                arr = arr[np.where(arr[:,0] >= val.ext_start)[0],:]
+                            if val.ext_stop is not None:
+                                arr = arr[np.where(arr[:,0] <= val.ext_stop)[0],:]
+                            # The time points are non-uniform -> use deltas as weights
+                            dt = np.diff(arr[:,0])
+                            totaltime = arr[-1,0]-arr[0,0]
+                            meancurr = np.sum(np.abs(arr[1:,1])*dt)/totaltime
+                            meanpwr = meancurr*val.value
+                            self.extracts.Members['currents'][val.name] = meancurr
+                            self.extracts.Members['powers'][val.name] = meanpwr
+                            self.extracts.Members['curr_tran'][val.name] = arr
             self.print_log(type='I',msg='Extracted power consumption from transient:')
             # This is newer Python syntax
             maxlen = len(max([*self.extracts.Members['powers'],'total'],key=len))

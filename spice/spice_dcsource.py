@@ -8,7 +8,7 @@ testbench.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 23.09.2021 11:45
+Last modification by Okko Järvinen, 23.09.2021 13:34
 
 """
 
@@ -95,7 +95,6 @@ class spice_dcsource(thesdk):
             self._ext_stop=kwargs.get('ext_stop',None)
             self._noise=kwargs.get('noise',True)
             self._ramp=kwargs.get('ramp',0)
-            self._extfile = ''
 
         except:
             self.print_log(type='F', msg="Spice DC source definition failed.")
@@ -167,8 +166,6 @@ class spice_dcsource(thesdk):
     def extract(self):
         """Set by argument 'extract'."""
         if hasattr(self,'_extract'):
-            # Power transient will be extracted to this file for spectre
-            self.extfile = '%s/%s_%s%s_curr.txt' % (self.parent.spicesimpath,self.parent.runname,self.sourcetype.lower(),self.name.lower())
             return self._extract
         else:
             self._extract=False
@@ -225,26 +222,10 @@ class spice_dcsource(thesdk):
     def ramp(self,value):
         self._ramp=value
 
-    @property
-    def extfile(self):
-        """String
-        
-        Contains filepath for transient current waveform for current/power
-        extraction.  Only applies to Spectre simulations.
-        """
-        if hasattr(self,'_extfile'):
-            return self._extfile
-        else:
-            self._extfile=''
-        return self._extfile
-    @extfile.setter
-    def extfile(self,value):
-        self._extfile=value
-
     # Remove the file when no longer needed
     def remove(self):
         """Removes the transient current file."""
         try:
-            os.remove(self.extfile)
+            pass
         except:
             pass

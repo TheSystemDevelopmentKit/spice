@@ -8,7 +8,7 @@ for TheSDK spice.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 23.09.2021 09:59
+Last modification by Okko Järvinen, 23.09.2021 13:22
 
 """
 import os
@@ -307,8 +307,8 @@ class spice_iofile(iofile):
         for ioname in self.ionames:
             filepath = self.parent.spicesimpath+'/'
             if self.iotype is not 'event': 
-                filename = ( '%s_%s_%s_%s.txt' 
-                        % ( self.parent.runname,ioname.replace('<','').replace('>','').replace('.','_'),
+                filename = ( '%s_%s_%s_%s_%s.txt' 
+                        % ( self.parent.runname,self.dir,ioname.replace('<','').replace('>','').replace('.','_'),
                             self.iotype,self.edgetype))
             else:
                 # We cant control the filename. Location is defined with -odir option

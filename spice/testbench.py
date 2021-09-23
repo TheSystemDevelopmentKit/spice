@@ -332,26 +332,28 @@ class testbench(spice_module):
                         self._dcsourcestr += ".extract label=power_%s abs(average(w(p_%s),%s,%s))\n" % \
                                 (supply.lower(),supply.lower(),val.ext_start,val.ext_stop)
                 elif self.parent.model == 'spectre':
-                    if val.extract:
-                        probenode = '_p'
-                    else:
-                        probenode = ''
+                    supply = '%s%s' % (val.sourcetype.upper(),val.name.lower())
                     if val.ramp == 0:
-                        self._dcsourcestr += "%s%s %s%s %s %s%g\n" % \
-                                (val.sourcetype.upper(),val.name.lower(),self.esc_bus(val.pos),
-                                        probenode,self.esc_bus(val.neg),
+                        self._dcsourcestr += "%s %s %s %s%g\n" % \
+                                (supply,self.esc_bus(val.pos),self.esc_bus(val.neg),\
                                 ('%ssource dc=' % val.sourcetype.lower()),val.value)
                     else:
-                        self._dcsourcestr += "%s%s %s%s %s %s type=pulse val0=0 val1=%g rise=%g\n" % \
-                                (val.sourcetype.upper(),val.name.lower(),self.esc_bus(val.pos),probenode,
-                                        self.esc_bus(val.neg),('%ssource' % val.sourcetype.lower()),val.value,val.ramp)
+                        self._dcsourcestr += "%s %s %s %s type=pulse val0=0 val1=%g rise=%g\n" % \
+                                (supply,self.esc_bus(val.pos),self.esc_bus(val.neg),\
+                                ('%ssource' % val.sourcetype.lower()),val.value,val.ramp)
                     if val.extract:
+                        if supply not in self.parent.iofile_eventdict:
+                            self.parent.iofile_eventdict[supply] = None
                         # Plotting power and current waveforms for this supply
-                        self._dcsourcestr += 'save %s%s:pwr\n' % (val.sourcetype.upper(),val.name.lower())
-                        self._dcsourcestr += 'save %s%s:p\n' % (val.sourcetype.upper(),val.name.lower())
+                        self._dcsourcestr += 'save %s:pwr\n' % supply
+                        self._dcsourcestr += 'save %s:p\n' % supply
                         # Writing source current consumption to a file
-                        self._dcsourcestr += "pwrout_%s%s (%s_p %s) veriloga_csv_write_allpoints_current filename=\"%s\"\n" % \
-                            (val.sourcetype.lower(),val.name.lower().replace('.','_'),self.esc_bus(val.pos),self.esc_bus(val.pos),val._extfile)
+                        self._dcsourcestr += 'simulator lang=spice\n'
+                        self._dcsourcestr += '.option ingold 2\n'
+                        self._dcsourcestr += ".print I(%s)\n" % supply
+                        self._dcsourcestr += 'simulator lang=spectre\n'
+                        #self._dcsourcestr += "pwrout_%s%s (%s_p %s) veriloga_csv_write_allpoints_current filename=\"%s\"\n" % \
+                        #    (val.sourcetype.lower(),val.name.lower().replace('.','_'),self.esc_bus(val.pos),self.esc_bus(val.pos),val._extfile)
                 elif self.parent.model == 'ngspice':
                     if val.ramp == 0:
                         self._dcsourcestr += "%s%s %s %s %g %s\n" % \
@@ -362,7 +364,6 @@ class testbench(spice_module):
                                 (val.sourcetype.upper(),val.name.lower(),val.pos,val.neg, \
                                 'pulse(0 %g 0 %g)' % (val.value,abs(val.ramp)), \
                                 'NONOISE' if not val.noise else '')
-                    # If the DC source is a supply, the power consumption is extracted for it automatically
         return self._dcsourcestr
     @dcsourcestr.setter
     def dcsourcestr(self,value):
