@@ -8,7 +8,7 @@ for TheSDK spice.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 23.09.2021 14:44
+Last modification by Okko Järvinen, 23.09.2021 17:29
 
 """
 import os
@@ -315,8 +315,8 @@ class spice_iofile(iofile):
                 if self.parent.model == 'spectre' and self.dir == 'out':
                     filename = 'tb_%s.print' % (self.parent.name)
                 else:
-                    filename = ( '%s_%s_%s.txt' 
-                        % ( self.parent.runname,ioname.replace('<','').replace('>','').replace('.','_'),
+                    filename = ( '%s_%s_%s_%s.txt' 
+                        % ( self.parent.runname,self.dir,ioname.replace('<','').replace('>','').replace('.','_'),
                             self.iotype))
 
             if self.parent.model == 'ngspice' and self.dir == 'in':
