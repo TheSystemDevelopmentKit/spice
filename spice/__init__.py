@@ -10,7 +10,7 @@ automatically generate testbenches for the most common simulation cases.
 
 Initially written by Okko Järvinen, 2019
 
-Last modification by Okko Järvinen, 08.04.2021 19:55
+Last modification by Okko Järvinen, 23.09.2021 18:48
 
 Release 1.6, Jun 2020 supports Eldo and Spectre
 """
@@ -22,6 +22,7 @@ import pdb
 import shutil
 import time
 import traceback
+import threading
 from datetime import datetime
 from abc import * 
 from thesdk import *
@@ -80,7 +81,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self._syntaxdict = {
                     "cmdfile_ext" : '.cir',
                     "resultfile_ext" : '.wdb',
-                    'plotprog' : 'ezwave',
                     "commentchar" : '*',
                     "commentline" : '***********************\n',
                     "nprocflag" : '-use_proc ', #space required
@@ -98,7 +98,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         elif self.model=='spectre':
             self._syntaxdict = {
                     "cmdfile_ext" : '.scs',
-                    'plotprog' : 'viva',
                     "resultfile_ext" : '.raw',
                     "commentchar" : '//',
                     "commentline" : '///////////////////////\n',
@@ -118,7 +117,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self._syntaxdict = {
                     "cmdfile_ext" : '.ngcir',
                     "resultfile_ext" : '',
-                    'plotprog' : '',
                     "commentchar" : '*',
                     "commentline" : '***********************\n',
                     "nprocflag" : 'set num_threads=', #Goes to .control section
@@ -140,19 +138,33 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     #Name derived from the file
 
     @property
+    def preserve_result(self):  
+        """True | False (default)
+
+        If True, do not delete result files after simulations.
+        """
+        if not hasattr(self,'_preserve_result'):
+            self._preserve_result=False
+        return self._preserve_result
+    @preserve_result.setter
+    def preserve_result(self,value):
+        self._preserve_result=value
+
+    @property
     def preserve_iofiles(self):  
         """True | False (default)
 
         If True, do not delete file IO files after simulations. Useful for
         debugging the file IO"""
-        if hasattr(self,'_preserve_iofiles'):
-            return self._preserve_iofiles
-        else:
+        if not hasattr(self,'_preserve_iofiles'):
             self._preserve_iofiles=False
         return self._preserve_iofiles
     @preserve_iofiles.setter
     def preserve_iofiles(self,value):
+        self.print_log(type='O',msg='preserve_iofiles is replaced with preserve_result since v1.7')
         self._preserve_iofiles=value
+        self.print_log(msg='Setting preserve_result to %s' % str(value))
+        self._preserve_result=value
         
     @property
     def preserve_spicefiles(self):  
@@ -160,14 +172,15 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
         If True, do not delete generated Spice files (testbench, subcircuit,
         etc.) after simulations.  Useful for debugging."""
-        if hasattr(self,'_preserve_spicefiles'):
-            return self._preserve_spicefiles
-        else:
+        if not hasattr(self,'_preserve_spicefiles'):
             self._preserve_spicefiles=False
         return self._preserve_spicefiles
     @preserve_spicefiles.setter
     def preserve_spicefiles(self,value):
+        self.print_log(type='O',msg='preserve_spicefiles is replaced with preserve_result since v1.7')
         self._preserve_spicefiles=value
+        self.print_log(msg='Setting preserve_result to %s' % str(value))
+        self._preserve_result=value
 
     @property
     def distributed_run(self):
@@ -310,7 +323,15 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         Automatically generated name for the simulation. 
         
         Formatted as timestamp_randomtag, i.e. '20201002103638_tmpdbw11nr4'.
-        Can be overridden by assigning self.runname = 'myname'."""
+        Can be overridden by assigning self.runname = 'myname'.
+
+        Example::
+
+            self.runname = 'test'
+
+        would generate the simulation files in `Simulations/spicesim/test/`.
+
+        """
         if hasattr(self,'_runname'):
             return self._runname
         else:
@@ -396,6 +417,22 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         self._dspf=value
 
     @property
+    def iofile_eventdict(self):
+        """
+        Dictionary to store event type output from spectre simulations. This should speed up reading the results.
+        """
+        if not hasattr(self, '_iofile_eventdict'):
+            self._iofile_eventdict=dict()
+            for name, val in self.iofile_bundle.Members.items():
+                if (val.dir.lower()=='out' or val.dir.lower()=='output') and val.iotype=='event':
+                    for key in val.ionames:
+                        self._iofile_eventdict[key] = None
+        return self._iofile_eventdict
+    @iofile_eventdict.setter
+    def iofile_eventdict(self,val):
+        self._iofile_eventdict=val
+
+    @property
     def iofile_bundle(self):
         """ 
         A thesdk.Bundle containing spice_iofile objects. The iofile objects
@@ -408,23 +445,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @iofile_bundle.setter
     def iofile_bundle(self,value):
         self._iofile_bundle=value
-    @iofile_bundle.deleter
-    def iofile_bundle(self):
-        for name, val in self.iofile_bundle.Members.items():
-            if val.preserve:
-                self.print_log(type="I", msg="Preserving files for %s." % val.name)
-            else:
-                val.remove()
-        if not self.preserve_iofiles:
-            if self.interactive_spice:
-                simpathname = self.spicesimpath
-            else:
-                simpathname = self.spicesimpath
-            try:
-                shutil.rmtree(simpathname)
-                self.print_log(type='I',msg='Removing %s.' % simpathname)
-            except:
-                self.print_log(type='W',msg='Could not remove %s.' % simpathname)
 
     @property
     def dcsource_bundle(self):
@@ -439,14 +459,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @dcsource_bundle.setter
     def dcsource_bundle(self,value):
         self._dcsource_bundle=value
-    @dcsource_bundle.deleter
-    def dcsource_bundle(self):
-        for name, val in self.dcsource_bundle.Members.items():
-            if self.preserve_iofiles:
-                if val.extract:
-                    self.print_log(type="I", msg="Preserving file %s." % val.extfile)
-            else:
-                val.remove()
 
     @property
     def simcmd_bundle(self):
@@ -461,10 +473,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @simcmd_bundle.setter
     def simcmd_bundle(self,value):
         self._simcmd_bundle=value
-    @simcmd_bundle.deleter
-    def simcmd_bundle(self):
-        for name, val in self.simcmd_bundle.Members.items():
-            val.remove()
 
     @property
     def extracts(self):
@@ -483,7 +491,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """
         Returs True if LSF submissions are properly defined. Default False
         """
-        if ( not thesdk.GLOBALS['LSFINTERACTIVE'] == '' ) and (not thesdk.GLOBALS['LSFINTERACTIVE'] == ''):
+        if ( not thesdk.GLOBALS['LSFINTERACTIVE'] == '' ) and (not thesdk.GLOBALS['LSFSUBMISSION'] == ''):
             self._has_lsf = True
         else:
             self._has_lsf = False
@@ -630,59 +638,34 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def spicetbsrc(self):
         """String
 
-        Path to the spice testbench ('./spice/tb_entityname.<suffix>').
+        Path to the spice testbench ('./Simulations/spicesim/<runname>/tb_entityname.<suffix>').
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicetbsrc'):
-
-            if self.interactive_spice:
-                self._spicetbsrc=self.spicesrcpath + '/tb_' + self.name + self.syntaxdict["cmdfile_ext"]
-            else:
-                self._spicetbsrc=self.spicesimpath + '/tb_' + self.name + self.syntaxdict["cmdfile_ext"]
+            self._spicetbsrc=self.spicesimpath + '/tb_' + self.name + self.syntaxdict["cmdfile_ext"]
         return self._spicetbsrc
-
-    @property
-    def eldowdbsrc(self):
-        """String
-
-        Path to the Eldo EZwave database ('./spice/tb_entityname.wdb').
-        Only applies to Eldo simulations.
-        This shouldn't be set manually.
-        """
-        if not hasattr(self, '_eldowdbsrc'):
-            if self.interactive_spice:
-                self._eldowdbsrc=self.spicesrcpath + '/tb_' + self.name + '.wdb'
-            else:
-                self._eldowdbsrc=self.spicesimpath + '/tb_' + self.name + '.wdb'
-        return self._eldowdbsrc
 
     @property
     def eldochisrc(self):
         """String
 
-        Path to the Eldo chi-file. ('./spice/tb_entityname.chi').
+        Path to the Eldo chi-file. ('./Simulations/spicesim/<runname>/tb_entityname.chi').
         Only applies to Eldo simulations.
         This shouldn't be set manually.
         """
         if not hasattr(self, '_eldochisrc'):
-            if self.interactive_spice:
-                self._eldochisrc=self.spicesrcpath + '/tb_' + self.name + '.chi'
-            else:
-                self._eldochisrc=self.spicesimpath + '/tb_' + self.name + '.chi'
+            self._eldochisrc=self.spicesimpath + '/tb_' + self.name + '.chi'
         return self._eldochisrc
 
     @property
     def spicesubcktsrc(self):
         """String
 
-        Path to the parsed subcircuit file. ('./spice/subckt_entityname.<suffix>').
+        Path to the parsed subcircuit file. ('./Simulations/spicesim/<runname>/subckt_entityname.<suffix>').
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicesubcktsrc'):
-            if self.interactive_spice:
-                self._spicesubcktsrc=self.spicesrcpath + '/subckt_' + self.name + self.syntaxdict["cmdfile_ext"]
-            else:
-                self._spicesubcktsrc=self.spicesimpath + '/subckt_' + self.name + self.syntaxdict["cmdfile_ext"]
+            self._spicesubcktsrc=self.spicesimpath + '/subckt_' + self.name + self.syntaxdict["cmdfile_ext"]
         return self._spicesubcktsrc
 
     @property
@@ -703,45 +686,28 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         return self._spicesimpath
     @spicesimpath.deleter
     def spicesimpath(self):
-        if not self.interactive_spice and not self.preserve_spicefiles:
-            # Removing generated files
-            filelist = [
-                self.spicetbsrc,
-                self.spicesubcktsrc
-                ]
-            for f in filelist:
+        if os.path.exists(self.spicesimpath) and not self.preserve_result:
+            keepdb = False
+            for target in os.listdir(self.spicesimpath):
+                targetpath = '%s/%s' % (self.spicesimpath,target)
                 try:
-                    if os.path.exists(f):
-                        os.remove(f)
-                        self.print_log(type='I',msg='Removing %s.' % f)
+                    if targetpath == self.spicedbpath and self.interactive_spice:
+                        keepdb = True
+                        self.print_log(msg='Preserving ./%s due to interactive_spice' % os.path.relpath(targetpath,start='../'))
+                        continue
+                    if os.path.isdir(targetpath):
+                        shutil.rmtree(targetpath)
+                    else:
+                        os.remove(targetpath)
+                    self.print_log(type='D',msg='Removing ./%s' % os.path.relpath(targetpath,start='../'))
                 except:
-                    self.print_log(type='W',msg='Could not remove %s.' % f)
-                    pass
-
-            # Cleaning up extra files
-            if os.path.exists(self.spicesimpath):
-                remaining = os.listdir(self.spicesimpath)
-                for f in remaining:
-                    try:
-                        fpath = '%s/%s' % (self.spicesimpath,f)
-                        if f.startswith('tb_%s' % self.name):
-                            os.remove(fpath)
-                            self.print_log(type='I',msg='Removing %s.' % fpath)
-                    except:
-                        self.print_log(type='W',msg='Could not remove %s.' % fpath)
-
-            #TODO currently always remove everything 
-            # IO files were also removed -> remove the directory
-            if os.path.exists(self.spicesimpath) and not self.preserve_iofiles:
+                    self.print_log(type='W',msg='Could not remove ./%s' % os.path.relpath(targetpath,start='../'))
+            if not keepdb:
                 try:
-                    # This fails sometimes because of .nfs files
                     shutil.rmtree(self.spicesimpath)
-                    self.print_log(type='I',msg='Removing %s.' % self.spicesimpath)
+                    self.print_log(type='D',msg='Removing ./%s' % os.path.relpath(self.spicesimpath,start='../'))
                 except:
-                    self.print_log(type='W',msg='Could not remove %s.' % self.spicesimpath)
-        else:
-            self.print_log(type='I',msg='Preserving spice files in %s.' % self.spicesrcpath)
-
+                    self.print_log(type='W',msg='Could not remove ./%s' % os.path.relpath(spicesimpath,start='../'))
 
     @property
     def spicecmd(self):
@@ -751,59 +717,73 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         Automatically generated.
         """
         if not hasattr(self,'_spicecmd'):
-            if self.interactive_spice:
-                if self.model=='eldo':
-                    plottingprogram=self.syntaxdict['plotprog'] 
-                elif self.model=='spectre':
-                    plottingprogram = '' # Plotting for spectre handled differently. See self.plotprogcmd
-                #submission=""
-                submission=self.spice_submission
-            else:
-                plottingprogram = ""
-                submission=self.spice_submission
-
             if self.nproc:
                 nprocflag = "%s%d" % (self.syntaxdict["nprocflag"],self.nproc)
                 self.print_log(type='I',msg='Enabling multithreading \'%s\'.' % nprocflag)
             else:
                 nprocflag = ""
-
             if self.tb.postlayout:
                 plflag = '+postlayout=upa'
                 self.print_log(type='I',msg='Enabling post-layout optimization \'%s\'.' % plflag)
             else:
                 plflag = ''
-
             if self.model=='eldo':
                 # Shouldn't this use self.syntaxdict["simulatorcmd"] ?
-                spicesimcmd = "eldo -64b %s %s " % (plottingprogram,nprocflag)
+                spicesimcmd = "eldo -64b %s " % (nprocflag)
             elif self.model=='spectre':
-                #spicesimcmd = "\"sleep 10; spectre %s %s \"" % (plottingprogram,nprocflag)
-                #spicesimcmd = "spectre %s %s " % (plottingprogram,nprocflag)
-                spicesimcmd = ("spectre -64 +lqtimeout=0 ++aps=%s %s %s %s -outdir %s " 
-                        % (self.errpreset, plflag,plottingprogram,nprocflag,self.spicesimpath))
+                spicesimcmd = ("spectre -64 +lqtimeout=0 ++aps=%s %s %s -outdir %s " 
+                        % (self.errpreset,plflag,nprocflag,self.spicesimpath))
             elif self.model=='ngspice':
                 spicesimcmd = self.syntaxdict["simulatorcmd"] + ' '
-
-            #spicesimcmd = "%s %s %s " % (self.syntaxdict["simulatorcmd"],plottingprogram,nprocflag)
-            spicetbfile = self.spicetbsrc
-            self._spicecmd = submission +\
-                            spicesimcmd +\
-                            spicetbfile
+            self._spicecmd = self.spice_submission+spicesimcmd+self.spicetbsrc
         return self._spicecmd
-    # Just to give the freedom to set this if needed
     @spicecmd.setter
     def spicecmd(self,value):
         self._spicecmd=value
 
     @property
+    def spicedbpath(self):
+        """String
+
+        Path to output waveform database. (./Simulations/spicesim/<runname>/tb_<entityname>.<resultfile_ext>)
+        For now only for spectre.
+        This shouldn't be set manually.
+        """
+        if not hasattr(self,'_spicedbpath'):
+            self._spicedbpath=self.spicesimpath+'/tb_'+self.name+self.syntaxdict["resultfile_ext"]
+        return self._spicedbpath
+    @spicedbpath.setter
+    def spicedbpath(self, value):
+        self._spicedbpath=value
+
+    @property
+    def plotprogram(self):
+        """
+        Sets the program to be used for visualizing waveform databases.
+        Options are ezwave (default) or viva.
+        """
+        if not hasattr(self, '_plotprogram'):
+            self._plotprogram='ezwave'
+        return self._plotprogram
+    @plotprogram.setter
+    def plotprogram(self, value):
+        self._plotprogram=value
+
+    @property
     def plotprogcmd(self):
         """
-        Sets the command to be run for interactive Spectre simulations.
+        Sets the command to be run for interactive simulations.
         """
-        if not hasattr(self, '_plotprogcmd') and self.model=='spectre':
-            path=self.spicesrcpath + '/tb_' + self.name + self.syntaxdict["resultfile_ext"]
-            self._plotprogcmd='%s -datadir %s &' % (self.syntaxdict['plotprog'], path)
+        if not hasattr(self, '_plotprogcmd'):
+            if self.plotprogram == 'ezwave':
+                self._plotprogcmd='%s -MAXWND -LOGfile %s/ezwave.log %s &' % \
+                        (self.plotprogram,self.spicesimpath,self.spicedbpath)
+            elif self.plotprogram == 'viva':
+                self._plotprogcmd='%s -datadir %s -nocdsinit &' % \
+                        (self.plotprogram,self.spicedbpath)
+            else:
+                self._plotprogcmd = ''
+                self.print_log(type='W',msg='Unsupported plot program \'%s\'.' % self.plotprogram)
         return self._plotprogcmd
     @plotprogcmd.setter
     def plotprogcmd(self, value):
@@ -838,9 +818,41 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def read_outfile(self):
         """Automatically called function to call read() functions of each
         iofile with direction 'output'."""
-        for name, val in self.iofile_bundle.Members.items():
-            if val.dir.lower()=='out' or val.dir.lower()=='output':
-                self.iofile_bundle.Members[name].read()
+        # Handle spectre differently..
+        if self.model=='spectre':
+            first=True
+            for name, val in self.iofile_bundle.Members.items():
+                if val.dir.lower()=='out' or val.dir.lower()=='output':
+                    if val.iotype=='event': # Event type outs are in same file, read only once to speed up things
+                        if first:
+                            self.iofile_bundle.Members[name].read()
+                            first=False
+                        if len(val.ionames) == 1:
+                            try:
+                                self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0]]
+                            except KeyError:
+                                self.print_log(type='W', msg='Invalid ioname %s for iofile %s' % (val.ionames[0], name))
+                        else: # Iofile is a bus?
+                            data=[]
+                            for i, key in enumerate(val.ionames):
+                                try:
+                                    if i == 0:
+                                        data=self.iofile_eventdict[key]
+                                    else:
+                                        try:
+                                            data=np.r_['1', data, self.iofile_eventdict[key]]
+                                        except ValueError:
+                                            self.print_log(type='W', msg='Invalid dimensions for concatenating arrays for IO %s!' % name)
+                                except KeyError:
+                                    self.print_log(type='W', msg='Invalid ioname %s for iofile %s' % (key, name))
+                            self.iofile_bundle.Members[name].Data=data
+                    else:
+                        self.iofile_bundle.Members[name].read()
+
+        else:
+            for name, val in self.iofile_bundle.Members.items():
+                if val.dir.lower()=='out' or val.dir.lower()=='output':
+                    self.iofile_bundle.Members[name].read()
     
     def execute_spice_sim(self):
         """Automatically called function to execute spice simulation."""
@@ -863,18 +875,34 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         else:
             os.system(self.spicecmd)
 
-    def run_viva(self):
+    def run_plotprogram(self):
         """ Run plotting program for interactive Spectre simulations
             NOTE: This feature is for Spectre simulations ONLY!
         """
+        # This waiting method assumes spectre output.
+        # TODO: test for eldo (and ngspice?)
+        tries = 0
+        while tries < 100:
+            if os.path.exists(self.spicedbpath):
+                # More than just the logfile exists
+                if len(os.listdir(self.spicedbpath)) > 1:
+                    # Database file has something written to it
+                    filesize = []
+                    for f in os.listdir(self.spicedbpath):
+                        filesize.append(os.stat('%s/%s' % (self.spicedbpath,f)).st_size)
+                    if all(filesize) > 0:
+                        break
+            else:
+                time.sleep(2)
+                tries += 1
         cmd=self.plotprogcmd
         self.print_log(type='I', msg='Running external command: %s' % cmd)
         try:
             ret=os.system(cmd)
             if ret != 0:
-                self.print_log(type='W', msg='%s returned with exit status %d!' % (self.syntaxdict['plotprog'], ret))
+                self.print_log(type='W', msg='%s returned with exit status %d!' % (self.plotprogram, ret))
         except: 
-            self.print_log(type='W',msg='Something went wrong while launcing %s.' % self.syntaxdict['plotprog'])
+            self.print_log(type='W',msg='Something went wrong while launcing %s.' % self.plotprogram)
             self.print_log(type='W',msg=traceback.format_exc())
 
     def extract_powers(self):
@@ -914,20 +942,21 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 for name, val in self.tb.dcsources.Members.items():
                     # Read transient power consumption of the extracted source
                     if val.extract and val.sourcetype.lower() == 'v':
-                        arr = genfromtxt(val._extfile,delimiter=', ',skip_header=self.syntaxdict["csvskip"])
-                        if val.ext_start is not None:
-                            arr = arr[np.where(arr[:,0] >= val.ext_start)[0],:]
-                        if val.ext_stop is not None:
-                            arr = arr[np.where(arr[:,0] <= val.ext_stop)[0],:]
-                        # The time points are non-uniform -> use deltas as weights
-                        dt = np.diff(arr[:,0])
-                        totaltime = arr[-1,0]-arr[0,0]
-                        meancurr = np.sum(np.abs(arr[1:,1])*dt)/totaltime
-                        meanpwr = meancurr*val.value
-                        sourcename = '%s%s' % (val.sourcetype.upper(),val.name.upper())
-                        self.extracts.Members['currents'][sourcename] = meancurr
-                        self.extracts.Members['powers'][sourcename] = meanpwr
-                        self.extracts.Members['curr_tran'][sourcename] = arr
+                        sourcename = '%s%s' % (val.sourcetype.upper(),val.name.lower())
+                        if sourcename in self.iofile_eventdict:
+                            arr = self.iofile_eventdict[sourcename]
+                            if val.ext_start is not None:
+                                arr = arr[np.where(arr[:,0] >= val.ext_start)[0],:]
+                            if val.ext_stop is not None:
+                                arr = arr[np.where(arr[:,0] <= val.ext_stop)[0],:]
+                            # The time points are non-uniform -> use deltas as weights
+                            dt = np.diff(arr[:,0])
+                            totaltime = arr[-1,0]-arr[0,0]
+                            meancurr = np.sum(np.abs(arr[1:,1])*dt)/totaltime
+                            meanpwr = meancurr*val.value
+                            self.extracts.Members['currents'][val.name] = meancurr
+                            self.extracts.Members['powers'][val.name] = meanpwr
+                            self.extracts.Members['curr_tran'][val.name] = arr
             self.print_log(type='I',msg='Extracted power consumption from transient:')
             # This is newer Python syntax
             maxlen = len(max([*self.extracts.Members['powers'],'total'],key=len))
@@ -1048,17 +1077,15 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self.tb.export_subckt(force=True)
             self.tb.export(force=True)
             self.write_infile()
+            if self.interactive_spice:
+                plotthread = threading.Thread(target=self.run_plotprogram,name='plotting')
+                plotthread.start()
             self.execute_spice_sim()
-            if self.interactive_spice and self.model=='spectre':
-                self.run_viva()
-            self.extract_powers()
             self.read_outfile()
             self.connect_outputs()
+            self.extract_powers()
             self.read_oppts()
-            # Calling deleter of iofiles
-            del self.dcsource_bundle
-            del self.iofile_bundle
-            # And eldo files (tb, subcircuit, wdb)
+            # Clean simulation results
             del self.spicesimpath
         else:
             #Loading previous simulation results and not simulating again
@@ -1068,9 +1095,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     results = glob.glob(self.entitypath+'/Simulations/spicesim/*')
                     latest = max(results, key=os.path.getctime)
                     self.runname = latest.split('/')[-1]
-                    simpath = latest
-                else:
-                    simpath = self.entitypath+'/Simulations/spicesim/'+self.runname
                 simpath = self.entitypath+'/Simulations/spicesim/'+self.runname
                 if not (os.path.exists(simpath)):
                     self.print_log(type='E',msg='Existing results not found in %s.' % simpath)

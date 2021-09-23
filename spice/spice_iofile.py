@@ -8,11 +8,13 @@ for TheSDK spice.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Kalle Spoof, kalle.spoof@aalto.fi, 07.06.2021 11:37
+Last modification by Okko Järvinen, 23.09.2021 17:29
 
 """
 import os
 import sys
+import subprocess
+import multiprocessing
 import pdb
 from abc import * 
 from thesdk import *
@@ -305,16 +307,16 @@ class spice_iofile(iofile):
         for ioname in self.ionames:
             filepath = self.parent.spicesimpath+'/'
             if self.iotype is not 'event': 
-                filename = ( '%s_ioname_%s_bundlename_%s_%s_%s.txt' 
-                        % ( self.parent.runname,ioname.replace('<','').replace('>','').replace('.','_'),
+                filename = ( '%s_%s_ioname_%s_bundlename_%s_%s_%s.txt' 
+                        % ( self.parent.runname,self.dir,ioname.replace('<','').replace('>','').replace('.','_'),
                             self.name.replace('<','').replace('>','').replace('.','_'),self.iotype,self.edgetype))
             else:
                 # We cant control the filename. Location is defined with -odir option
                 if self.parent.model == 'spectre' and self.dir == 'out':
                     filename = 'tb_%s.print' % (self.parent.name)
                 else:
-                    filename = ( '%s_%s_%s.txt' 
-                        % ( self.parent.runname,ioname.replace('<','').replace('>','').replace('.','_'),
+                    filename = ( '%s_%s_%s_%s.txt' 
+                        % ( self.parent.runname,self.dir,ioname.replace('<','').replace('>','').replace('.','_'),
                             self.iotype))
 
             if self.parent.model == 'ngspice' and self.dir == 'in':
@@ -322,6 +324,9 @@ class spice_iofile(iofile):
                 filename = filename.lower()
             filename = filepath + filename    
             self._file.append(filename)
+        # Keep unique filenames only for event-type outputs to keep load times at minimum
+        if self.parent.model=='spectre' and self.iotype=='event' and self.dir=='out':
+            self._file=list(set(self._file))
         return self._file
     @file.setter
     def file(self,val):
@@ -343,23 +348,6 @@ class spice_iofile(iofile):
     def ionames(self,val):
         self._ionames=val
         return self._ionames
-
-    # Overloading the remove functionality to remove tmp files
-    def remove(self):
-        """
-        Function to remove files associated with this spice_iofile.
-        """
-        if self.preserve:
-            self.print_log(type='I', msg='Preserving files for %s.' % self.name)
-        else:
-            try:
-                self.print_log(type='I',msg='Removing files for %s.' % self.name)
-                for f in self.file:
-                    if os.path.exists(f):
-                        os.remove(f)
-            except:
-                self.print_log(type='E',msg=traceback.format_exc())
-                self.print_log(type='W',msg='Failed while removing files for %s.' % self.name)
 
     # Overloaded write from thesdk.iofile
     def write(self,**kwargs):
@@ -436,93 +424,90 @@ class spice_iofile(iofile):
         else:
             pass
 
+    def parse_io_from_file(self,filepath,start,stop,dtype,label,queue):
+        """ Parse specific lines from a spectre print file.
+
+        This is wrapped to a function to allow parallelism.
+        """
+        try:
+            arr=np.genfromtxt(filepath,dtype=dtype,skip_header=start,skip_footer=stop,encoding='utf-8')
+            self.print_log(type='D',msg='Reading event output %s' % label)
+            queue.put((label,arr))
+        except:
+            self.print_log(type='E',msg='Failed reading event output %s' % label)
+            queue.put((label,None))
+
     # Overloaded read from thesdk.iofile
     def read(self,**kwargs):
         """
         Function to read files associated with this spice_iofile.
         """
-        for i in range(len(self.file)):
-            if os.path.isfile(self.file[i]):
+
+        if self.iotype=='event' and self.parent.model=='spectre':
+            label_match=re.compile(r'\((.*)\)')
+            file=self.file[0] # File is the same for all event type outputs
+            lines=subprocess.check_output('grep -n \"time\|freq\" %s' % file, shell=True).decode('utf-8')
+            lines=lines.split('\n') 
+            linenumbers=[]
+            labels=[]
+            for line in lines:
+                parts=line.split(':')
+                if len(parts) > 1: # Line should now contain linenumber in first element, ioname in second
+                    line = 0
+                    try:
+                        line=int(parts[0])
+                        linenumbers.append(line)
+                    except ValueError:
+                        self.print_log(type='W', msg='Couldn\'t decode linenumber from file %s' %  file)
+                    label=label_match.search(parts[1])
+                    if label:
+                        labels.append(label.group(1)) # Capture inner group (== ioname)
+                    else:
+                        self.print_log(type='W', msg='Couldn\'t find IO on line %d from file %s' %  (line, file))
+            if len(labels) == len(linenumbers):
+                numlines = int(subprocess.check_output("wc -l %s | awk '{print $1}'" % file,shell=True).decode('utf-8'))
+                procs = []
+                queues = []
+                for k in range(len(linenumbers)):
+                    start=linenumbers[k] # Indexing starts from zero
+                    if k == len(linenumbers)-1:
+                        stop=1
+                    else:
+                        stop=numlines-(linenumbers[k+1]-6) # Previous data column ends 5 rows before start of next one
+                    dtype=self.datatype if self.datatype=='complex' else 'float' # Default is int for thesdk_spicefile, let's infer from data
+                    queue = multiprocessing.Queue()
+                    queues.append(queue)
+                    proc = multiprocessing.Process(target=self.parse_io_from_file,args=(file,start,stop,dtype,labels[k],queue))
+                    procs.append(proc)
+                    proc.start() 
+                for i,p in enumerate(procs):
+                    try:
+                        ret = queues[i].get()
+                        self.parent.iofile_eventdict[ret[0]]=ret[1]
+                        p.join()
+                    except KeyError:
+                        self.print_log(type='W', msg='Failed reading %s' % (ret[0]))
+            else:
+                self.print_log(type='W', msg='Couldn\'t read IOs from file %s. Missing ioname?' % file)
+        else:
+            for i in range(len(self.file)):
                 try:
                     if self.iotype=='event':
-                        if self.parent.model=='spectre':
-                            ''' Logic of parsing:
-                                Parse throught the file, match to (<ionam>), if found,
-                                start storing the values to self.Data. self.Data is initialized 
-                                with the first matching <ioname>. The following <ionames> are appended as columns.
-                            '''
-                            with open(self.file[i]) as infile:
-                                wholefile=infile.readlines()
-                                found = False
-                                inited = False
-                                append = False
-                                predata = []
-                                # The 'y' marks the end of segment  
-                                stopmatch=re.compile(r".*?y.*?")
-                                for line in wholefile:
-                                    if not found:
-                                        for i in range(len(self.ionames)):
-                                            startmatch=re.compile(r".+?\(%s\).*?" %(self.ionames[i]))
-                                            if startmatch.search(line) != None:
-                                                found = True
-                                                if i==0:
-                                                    first = True
-                                                else:
-                                                    first = False
-                                                break
-                                    elif found and first:
-                                        if stopmatch.search(line) == None:
-                                                data=np.array(line.split()).astype('double')
-                                                if self.datatype == 'complex':
-                                                    if not inited:
-                                                        self.Data=np.array([data[0], data[1]+1j*data[2]]).reshape(1,2)
-                                                        inited = True
-                                                    else:
-                                                        self.Data=np.r_['0', self.Data, np.array([data[0], data[1]+1j*data[2]]).reshape(1,2)]
-                                                else:
-                                                    if not inited:
-                                                        self.Data=np.array([data[0], data[1]]).reshape(1,2)
-                                                        inited = True
-                                                    else:
-                                                        self.Data=np.r_['0', self.Data, np.array([data[0], data[1]]).reshape(1,2)]
-                                        else:
-                                            found = False
-                                    elif found:
-                                        if stopmatch.search(line) == None:
-                                                data=np.array(line.split()).astype('double')
-                                                if self.datatype == 'complex':
-                                                    if predata == []:
-                                                        predata=np.array([data[1]+1j*data[2]]).reshape(1,1)
-                                                    else:
-                                                        predata=np.r_['0', predata, np.array([data[1]+1j*data[2]]).reshape(1,1)]
-                                                else:
-                                                    if predata == []:
-                                                        predata=np.array([data[1]]).reshape(1,1)
-                                                    else:
-                                                        predata=np.r_['0', predata, np.array([data[1]]).reshape(1,1)]
-                                        else:
-                                            found = False
-                                            append = True
-                                    if append:
-                                        self.Data=np.r_['1', self.Data, predata]
-                                        predata = []
-                                        append = False
+                        if self.parent.model=='ngspice':
+                            #ngspice delimiter is two whitespaces for positive data and one whitespace for negative.
+                            tmparr = genfromtxt(self.file[i], \
+                                    skip_header=self.parent.syntaxdict['csvskip'])
+                            if self.datatype == 'complex':
+                                arr = np.column_stack((tmparr[:,0], tmparr[:,1] + 1j*tmparr[:,2]))
+                            else:
+                                arr=tmparr
                         else:
-                            if self.parent.model=='ngspice':
-                                #ngspice delimiter is two whitespaces for positive data and one whitespace for negative.
-                                tmparr = genfromtxt(self.file[i], \
-                                        skip_header=self.parent.syntaxdict['csvskip'])
-                                if self.datatype == 'complex':
-                                    arr = np.column_stack((tmparr[:,0], tmparr[:,1] + 1j*tmparr[:,2]))
-                                else:
-                                    arr=tmparr
-                            else:
-                                arr = genfromtxt(self.file[i],delimiter=self.parent.syntaxdict['eventoutdelim'], \
-                                        skip_header=self.parent.syntaxdict['csvskip'])
-                            if self.Data is None: 
-                                self.Data = np.array(arr)
-                            else:
-                                self.Data = np.hstack((self.Data,np.array(arr)))
+                            arr = genfromtxt(self.file[i],delimiter=self.parent.syntaxdict['eventoutdelim'], \
+                                    skip_header=self.parent.syntaxdict['csvskip'])
+                        if self.Data is None: 
+                            self.Data = np.array(arr)
+                        else:
+                            self.Data = np.hstack((self.Data,np.array(arr)))
                         # TODO: verify csvskip
                     elif self.iotype=='vsample':
                         if self.parent.model=='ngspice':
@@ -538,36 +523,15 @@ class spice_iofile(iofile):
                             self.Data = np.hstack((self.Data,np.array(arr)))
                         # TODO: verify csvskip
                     elif self.iotype=='time':
-                        #if self.parent.model == 'eldo':
-                        #    nodematch=re.compile(r"%s" % self.ionames[i].upper())
-                        #    with open(self.file[i]) as infile:
-                        #        wholefile=infile.readlines()
-                        #        arr = []
-                        #        for line in wholefile:
-                        #            if nodematch.search(line) != None:
-                        #                arr.append(float(line.split()[-1]))
-                        #        nparr = np.array(arr).reshape(-1,1)
-                        #        if self.Data is None: 
-                        #            self.Data = nparr
-                        #        else:
-                        #            if len(self.Data[:,-1]) > len(nparr):
-                        #                # Old max length is bigger -> padding new array
-                        #                nans = np.empty(self.Data[:,-1].shape).reshape(-1,1)
-                        #                nans.fill(np.nan)
-                        #                nans[:nparr.shape[0],:nparr.shape[1]] = nparr
-                        #                nparr = nans
-                        #            elif len(self.Data[:,-1]) < len(nparr):
-                        #                # Old max length is smaller -> padding old array
-                        #                nans = np.empty((nparr.shape[0],self.Data.shape[1]))
-                        #                nans.fill(np.nan)
-                        #                nans[:self.Data.shape[0],:self.Data.shape[1]] = self.Data
-                        #                self.Data = nans
-                        #            self.Data = np.hstack((self.Data,nparr))
-                        #    infile.close()
-                        #elif self.parent.model == 'spectre':
-
+                        if self.parent.model=='eldo':
+                            arr = genfromtxt(self.file[i],delimiter=', ',skip_header=self.parent.syntaxdict["csvskip"])
+                        else:
+                            # TODO: Make sure all 'event' iofiles are parsed before 'time' iofiles
+                            if self.ionames[i] in self.parent.iofile_eventdict:
+                                arr = self.parent.iofile_eventdict[self.ionames[i]]
+                            else:
+                                self.print_log(type='W',msg='No event data found for %s while parsing time signal.' % self.ionames[i])
                         # This should work for both spectre and eldo now
-                        arr = genfromtxt(self.file[i],delimiter=', ',skip_header=self.parent.syntaxdict["csvskip"])
                         if self.edgetype.lower() == 'both':
                             trise = self.interp_crossings(arr,self.vth,256,'rising')
                             tfall = self.interp_crossings(arr,self.vth,256,'falling')
@@ -709,8 +673,6 @@ class spice_iofile(iofile):
                 except:
                     self.print_log(type='E',msg=traceback.format_exc())
                     self.print_log(type='F',msg='Failed while reading files for %s.' % self.name)
-            else:
-                        self.print_log(type='I',msg='File \'%s\' does not exist.' % self.file[i])
 
     def interp_crossings(self,data,vth,nint,edgetype):
         """ 

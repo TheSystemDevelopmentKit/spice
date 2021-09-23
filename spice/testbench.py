@@ -44,16 +44,10 @@ class testbench(spice_module):
         else:
             self.parent=parent
         try:  
-            if self.parent.interactive_spice:
-                self._file=self.parent.spicesrcpath + '/tb_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
-                self._subcktfile=self.parent.spicesrcpath + '/subckt_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
-            else:
-                self._file=self.parent.spicesimpath + '/tb_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
-                #self._dutfile=self.parent.spicesimpath + '/subckt_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
-                self._subcktfile=self.parent.spicesimpath + '/subckt_' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
-            self._dutfile=self.parent.spicesrcpath + '/' + self.parent.name + self.parent.syntaxdict["cmdfile_ext"]
-
-            # This variable holds duration of longest input vector after reading input files
+            self._file=self.parent.spicetbsrc # Testbench
+            self._subcktfile=self.parent.spicesubcktsrc # Parsed subcircuit file
+            self._dutfile=self.parent.spicesrc # Source netlist file
+            # This attribute holds duration of longest input vector after reading input files
             self._trantime=0
         except:
             self.print_log(type='F', msg="Spice Testbench file definition failed")
@@ -340,26 +334,28 @@ class testbench(spice_module):
                         self._dcsourcestr += ".extract label=power_%s abs(average(w(p_%s),%s,%s))\n" % \
                                 (supply.lower(),supply.lower(),val.ext_start,val.ext_stop)
                 elif self.parent.model == 'spectre':
-                    if val.extract:
-                        probenode = '_p'
-                    else:
-                        probenode = ''
+                    supply = '%s%s' % (val.sourcetype.upper(),val.name.lower())
                     if val.ramp == 0:
-                        self._dcsourcestr += "%s%s %s%s %s %s%g\n" % \
-                                (val.sourcetype.upper(),val.name.lower(),self.esc_bus(val.pos),
-                                        probenode,self.esc_bus(val.neg),
+                        self._dcsourcestr += "%s %s %s %s%g\n" % \
+                                (supply,self.esc_bus(val.pos),self.esc_bus(val.neg),\
                                 ('%ssource dc=' % val.sourcetype.lower()),val.value)
                     else:
-                        self._dcsourcestr += "%s%s %s%s %s %s type=pulse val0=0 val1=%g rise=%g\n" % \
-                                (val.sourcetype.upper(),val.name.lower(),self.esc_bus(val.pos),probenode,
-                                        self.esc_bus(val.neg),('%ssource' % val.sourcetype.lower()),val.value,val.ramp)
+                        self._dcsourcestr += "%s %s %s %s type=pulse val0=0 val1=%g rise=%g\n" % \
+                                (supply,self.esc_bus(val.pos),self.esc_bus(val.neg),\
+                                ('%ssource' % val.sourcetype.lower()),val.value,val.ramp)
                     if val.extract:
+                        if supply not in self.parent.iofile_eventdict:
+                            self.parent.iofile_eventdict[supply] = None
                         # Plotting power and current waveforms for this supply
-                        self._dcsourcestr += 'save %s%s:pwr\n' % (val.sourcetype.upper(),val.name.lower())
-                        self._dcsourcestr += 'save %s%s:p\n' % (val.sourcetype.upper(),val.name.lower())
+                        self._dcsourcestr += 'save %s:pwr\n' % supply
+                        self._dcsourcestr += 'save %s:p\n' % supply
                         # Writing source current consumption to a file
-                        self._dcsourcestr += "pwrout_%s%s (%s_p %s) veriloga_csv_write_allpoints_current filename=\"%s\"\n" % \
-                            (val.sourcetype.lower(),val.name.lower().replace('.','_'),self.esc_bus(val.pos),self.esc_bus(val.pos),val._extfile)
+                        self._dcsourcestr += 'simulator lang=spice\n'
+                        self._dcsourcestr += '.option ingold 2\n'
+                        self._dcsourcestr += ".print I(%s)\n" % supply
+                        self._dcsourcestr += 'simulator lang=spectre\n'
+                        #self._dcsourcestr += "pwrout_%s%s (%s_p %s) veriloga_csv_write_allpoints_current filename=\"%s\"\n" % \
+                        #    (val.sourcetype.lower(),val.name.lower().replace('.','_'),self.esc_bus(val.pos),self.esc_bus(val.pos),val._extfile)
                 elif self.parent.model == 'ngspice':
                     if val.ramp == 0:
                         self._dcsourcestr += "%s%s %s %s %g %s\n" % \
@@ -370,7 +366,6 @@ class testbench(spice_module):
                                 (val.sourcetype.upper(),val.name.lower(),val.pos,val.neg, \
                                 'pulse(0 %g 0 %g)' % (val.value,abs(val.ramp)), \
                                 'NONOISE' if not val.noise else '')
-                    # If the DC source is a supply, the power consumption is extracted for it automatically
         return self._dcsourcestr
     @dcsourcestr.setter
     def dcsourcestr(self,value):
@@ -753,8 +748,6 @@ class testbench(spice_module):
                                                 (val.sourcetype,val.ionames[i].upper())
                                         self._plotcmd += "wrdata %s %s(%s)\n" % \
                                                 (val.file[i], val.sourcetype,val.ionames[i].upper())
-
-
                             elif val.iotype=='sample':
                                 for i in range(len(val.ionames)):
                                     # Checking the given trigger(s)
@@ -806,34 +799,26 @@ class testbench(spice_module):
                                                 bitname = self.esc_bus('%s<%d>' % (signame[0],j))
                                             #self._plotcmd += 'save %s\n' % bitname
                                             self._plotcmd += "sampleout_%s_%d (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
-                                                    (signame[0],j,self.esc_bus(trig),bitname,val.file[i].replace('.txt','_%d.txt'%j),val.vth,-1 if val.edgetype.lower() == 'falling' else 1)
+                                                    (signame[0],j,self.esc_bus(trig),bitname,val.file[i].replace('.txt','_%d.txt'%j),\
+                                                     val.vth,-1 if val.edgetype.lower() == 'falling' else 1)
 
                             elif val.iotype=='time':
                                 for i in range(len(val.ionames)):
                                     if self.parent.model == 'eldo':
                                         self._plotcmd += ".printfile %s(%s) file=\"%s\"\n" % \
                                                 (val.sourcetype,val.ionames[i].upper(),val.file[i])
-                                        #for i in range(len(val.ionames)):
-                                        #    vthstr = ',%s' % str(val.vth)
-                                        #    if val.edgetype.lower()=='falling':
-                                        #        edge = 'xdown'
-                                        #    elif val.edgetype.lower()=='both':
-                                        #        edge = 'tcross'
-                                        #        vthstr = ',vth=%s' % str(val.vth)
-                                        #    elif val.edgetype.lower()=='risetime':
-                                        #        edge = 'trise'
-                                        #        vthstr = ''
-                                        #    elif val.edgetype.lower()=='falltime':
-                                        #        edge = 'tfall'
-                                        #        vthstr = ''
-                                        #    else:
-                                        #        edge = 'xup'
-                                        #    self._plotcmd += ".extract file=\"%s\" vect label=%s %s(v(%s)%s)\n" % (val.file[i],val.ionames[i],edge,val.ionames[i].upper(),vthstr)
                                     elif self.parent.model == 'spectre':
-                                        signame = self.esc_bus(val.ionames[i].upper())
-                                        #self._plotcmd += 'save %s\n' % signame
-                                        self._plotcmd += "timeout_%s_%s_%d (%s) veriloga_csv_write_allpoints filename=\"%s\"\n" % \
-                                                (val.edgetype.lower(),val.name.upper().replace('.','_').replace('<','').replace('>',''),i,signame,val.file[i])
+                                        signame = self.esc_bus(val.ionames[i])
+                                        # Check if this same node was already saved as event type
+                                        if val.ionames[i] not in self.parent.iofile_eventdict:
+                                            # Requested node was not saved as event
+                                            # -> add to eventdict + save to output database
+                                            self.parent.iofile_eventdict[val.ionames[i]] = None
+                                            self._plotcmd += 'save %s\n' % signame
+                                            self._plotcmd += 'simulator lang=spice\n'
+                                            self._plotcmd += '.option ingold 2\n'
+                                            self._plotcmd += ".print %s(%s)\n" % (val.sourcetype,val.ionames[i])
+                                            self._plotcmd += 'simulator lang=spectre\n'
                             elif val.iotype=='vsample':
                                 for i in range(len(val.ionames)):
                                     # Checking the given trigger(s)
@@ -936,8 +921,8 @@ class testbench(spice_module):
                         misccmd + "\n" +
                         dcsourcestr + "\n" +\
                         inputsignals + "\n" +\
-                        simcmd + "\n" +\
                         plotcmd + "\n" +\
+                        simcmd + "\n" +\
                         self.parent.syntaxdict["lastline"])
 if __name__=="__main__":
     pass

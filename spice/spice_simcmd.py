@@ -7,7 +7,7 @@ Class for spice simulation commands.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 18.03.2021 15:37
+Last modification by Okko Järvinen, 23.09.2021 15:54
 
 """
 
@@ -38,114 +38,123 @@ class spice_simcmd(thesdk):
         _=spice_simcmd(self,sim='tran')
     
     Parameters
-    -----------
+    ----------
     parent : object 
         The parent object initializing the spice_simcmd instance. Default None
     
     **kwargs :  
-            sim: str
-                Simulation type. Currently only 'tran' and 'dc' supported.
-            plotlist: list(str)
-                List of node names or operating points to be plotted. Node names follow simulator
-                syntax.  For Eldo, the voltage/current specifier is expected::
+        sim: str
+            Simulation type. Currently only 'tran' and 'dc' supported.
+        plotlist: list(str)
+            List of node names or operating points to be plotted. Node names follow simulator
+            syntax.  For Eldo, the voltage/current specifier is expected::
 
-                    self.plotlist = ['v(OUT)','v(CLK)']
-                
-                For Spectre, the node name is enough::
+                self.plotlist = ['v(OUT)','v(CLK)']
+            
+            For Spectre, the node name is enough::
 
-                    self.plotlist = ['OUT','CLK']
+                self.plotlist = ['OUT','CLK']
+            
+            NOTE: Below applies only for Spectre!
+            When capturing operating point information with Spectre, adding the
+            instance name to plotlist saves all operating points for the device, e.g:
                 
-                NOTE: Below applies only for Spectre!
-                When capturing operating point information with Spectre, adding the
-                instance name to plotlist saves all operating points for the device, e.g:
-                    
-                    self.plotlist = [XTB_NAME.XSUBCKT/M0]
-                
-                saves all operating points defined by the model for the device M0 in
-                subckt XSUBCKT.
-                
-                Wildcards are supported, but should be used with caution as the output
-                file can quickly become excessively large. For example to capture the
-                gm of all transistor use:
+                self.plotlist = [XTB_NAME.XSUBCKT/M0]
+            
+            saves all operating points defined by the model for the device M0 in
+            subckt XSUBCKT.
+            
+            Wildcards are supported, but should be used with caution as the output
+            file can quickly become excessively large. For example to capture the
+            gm of all transistor use:
 
-                    self.plotlist = [*:gm]
+                self.plotlist = [*:gm]
 
-                It is highly recommended to exclude the devices that are not needed from
-                the output to reduce file size. Examples of such devices are RC-parasitics
-                (include option 'savefilter=rc' in self.spiceoptions to exclude them) and
-                dummy transistors. See exclude_list below. 
-            excludelist: list(str)
-                NOTE: Below applies for Spectre only!
-                List of device names NOT to be included in the output report. Wildcards are
-                supported. Exclude list is especially useful for DC simulations when 
-                specifiying outputs with wildcards. 
+            It is highly recommended to exclude the devices that are not needed from
+            the output to reduce file size. Examples of such devices are RC-parasitics
+            (include option 'savefilter=rc' in self.spiceoptions to exclude them) and
+            dummy transistors. See exclude_list below. 
+        excludelist: list(str)
+            NOTE: Below applies for Spectre only!
+            List of device names NOT to be included in the output report. Wildcards are
+            supported. Exclude list is especially useful for DC simulations when 
+            specifiying outputs with wildcards. 
 
-                For example, when capturing gm for all transistors, use exclude list to
-                exclude all dummy transistors with:
-                    
-                    self.excludelist = [XTB_NAME*DUMMY_ID*],
+            For example, when capturing gm for all transistors, use exclude list to
+            exclude all dummy transistors with:
+                
+                self.excludelist = [XTB_NAME*DUMMY_ID*],
 
-                where DUMMY_ID is extraction tool / runset specific dummy identifier.
-            sweep: str
-                DC & Spectre models only. If given, sweeps the top-level
-                parameter given as value. For example::
-                
-                    _spice_simcmd(sim='dc',sweep='temp',swpstart=27,swpstop=87)
-                
-                sweeps the top-level parameter temp (temperature) from 27 to 87
-                at 10 degree increments.
-            subcktname: str
-                If given, sweeps the parameter defined by property sweep from
-                the subcircuit given by this property.  For example::
-                
-                    _=spice_simcmd(sim='dc',sweep='Vb',subcktname='XSUBCKT',
-                                   swpstart=0.1,swpstop=1.5,step=0.05)
-                
-                sweeps the Vb parameter from subcircuit XSUBCKT from 0.1 volts
-                to 1.5 volts with 0.05 volt increments.
-            devname: str
-                If given, sweeps the parameter defined by property sweep from
-                the device given by this property.  For example::
-                
-                    _=spice_simcmd(sim='dc', sweep='w', deviceswp='XSUBCKT.XNMOS',
-                                   swpstart=10u, swpstop=14u, step=0.1u)
-                
-                sweeps the width of transistor XNMOS of subckt XSUBCKT from 10u
-                to 14u in 0.1u increments.
-            swpstart: union(int, float, str)
-                Starting point of DC sweep. Default: 0.
-            swpstop: union(int, float, str)
-                Stop point of DC sweep. Default: 0.
-            swpstep: union(int, float, str)
-                Step size of the sweep simulation. Default: 10  
-            tprint: float/str
-                Print interval. Default '1p' or 1e-12.
-            tstop: float/str
-                Transient simulation duration. When not defined, the simulation
-                time is the duration of the longest input signal.
-            uic: bool
-                Use initial conditions flag. Default False.
-            noise: bool
-                Noise transient flag. Default False.
-            fmin: float/str
-                Minimum noise frequency. Default 1 (Hz).
-            fmax: float/str
-                Maximum noise frequency. Default 5e9.
-            fscale: str
-                log | lin . Logarithmic or linear scale for frequency. Default log
-            fpoints: int
-                number of points for frequency analysis. Default 0.
-            fstepsize: int 
-                step size for AC analysis, if scale if lin. If fscale is log,
-                this parameter gives number of points per decade. Default 0.
-            seed: int
-                Random generator seed for noise transient. Default None (random).
-            method: str
-                Transient integration method. Default None (spectre takes
-                method from errpreset).
-            cmin: float
-                Spectre cmin parameter: this much cap from each node to ground.
-                Might speed up simulation. Default None (not used).
+            where DUMMY_ID is extraction tool / runset specific dummy identifier.
+        sweep: str
+            DC & Spectre models only. If given, sweeps the top-level
+            parameter given as value. For example::
+            
+                _spice_simcmd(sim='dc',sweep='temp',swpstart=27,swpstop=87)
+            
+            sweeps the top-level parameter temp (temperature) from 27 to 87
+            at 10 degree increments.
+        subcktname: str
+            If given, sweeps the parameter defined by property sweep from
+            the subcircuit given by this property.  For example::
+            
+                _=spice_simcmd(sim='dc',sweep='Vb',subcktname='XSUBCKT',
+                               swpstart=0.1,swpstop=1.5,step=0.05)
+            
+            sweeps the Vb parameter from subcircuit XSUBCKT from 0.1 volts
+            to 1.5 volts with 0.05 volt increments.
+        devname: str
+            If given, sweeps the parameter defined by property sweep from
+            the device given by this property.  For example::
+            
+                _=spice_simcmd(sim='dc', sweep='w', deviceswp='XSUBCKT.XNMOS',
+                               swpstart=10u, swpstop=14u, step=0.1u)
+            
+            sweeps the width of transistor XNMOS of subckt XSUBCKT from 10u
+            to 14u in 0.1u increments.
+        swpstart: union(int, float, str)
+            Starting point of DC sweep. Default: 0.
+        swpstop: union(int, float, str)
+            Stop point of DC sweep. Default: 0.
+        swpstep: union(int, float, str)
+            Step size of the sweep simulation. Default: 10  
+        tprint: float/str
+            Print interval. Default '1p' or 1e-12.
+        tstop: float/str
+            Transient simulation duration. When not defined, the simulation
+            time is the duration of the longest input signal.
+        uic: bool
+            Use initial conditions flag. Default False.
+        noise: bool
+            Noise transient flag. Default False.
+        fmin: float/str
+            Minimum noise frequency. Default 1 (Hz).
+        fmax: float/str
+            Maximum noise frequency. Default 5e9.
+        fscale: str
+            log | lin . Logarithmic or linear scale for frequency. Default log
+        fpoints: int
+            number of points for frequency analysis. Default 0.
+        fstepsize: int 
+            step size for AC analysis, if scale if lin. If fscale is log,
+            this parameter gives number of points per decade. Default 0.
+        seed: int
+            Random generator seed for noise transient. Default None (random).
+        method: str
+            Transient integration method. Default None (spectre takes
+            method from errpreset).
+        cmin: float
+            Spectre cmin parameter: this much cap from each node to ground.
+            Might speed up simulation. Default None (not used).
+        mc: bool
+            Enable Monte Carlo simulation. This flag will enable Monte Carlo
+            modeling for a single simulation. It will NOT execute multiple runs
+            or do any statistical analysis. Intended use case is to generate a
+            group of entities in TheSyDeKick with each having mc=True,
+            simulating them in parallel (see run_parallel() of thesdk-class),
+            post-processing results in TheSyDeKick.
+        mc_seed: int
+            Random seed for the Monte Carlo instance. Default None (random seed).
 
     """
 
@@ -189,7 +198,8 @@ class spice_simcmd(thesdk):
 
     @property
     def sim(self):
-        """Set by argument 'sim'."""
+        """Set by argument 'sim'.
+        """
         if hasattr(self,'_sim'):
             return self._sim
         else:
@@ -201,7 +211,8 @@ class spice_simcmd(thesdk):
 
     @property
     def plotlist(self):
-        """Set by argument 'plotlist'."""
+        """Set by argument 'plotlist'.
+        """
         if hasattr(self,'_plotlist'):
             return self._plotlist
         else:
@@ -213,7 +224,8 @@ class spice_simcmd(thesdk):
 
     @property
     def excludelist(self):
-        """Set by argument 'excludelist'."""
+        """Set by argument 'excludelist'.
+        """
         if hasattr(self,'_excludelist'):
             return self._excludelist
         else:
@@ -225,7 +237,8 @@ class spice_simcmd(thesdk):
 
     @property
     def sweep(self):
-        """Set by argument 'sweep'."""
+        """Set by argument 'sweep'.
+        """
         if hasattr(self,'_sweep'):
             return self._sweep
         else:
@@ -237,7 +250,8 @@ class spice_simcmd(thesdk):
 
     @property
     def subcktname(self):
-        """Set by argument 'subcktname'."""
+        """Set by argument 'subcktname'.
+        """
         if hasattr(self,'_subcktname'):
             return self._subcktname
         else:
@@ -249,7 +263,8 @@ class spice_simcmd(thesdk):
 
     @property
     def devname(self):
-        """Set by argument 'devname'."""
+        """Set by argument 'devname'.
+        """
         if hasattr(self,'_devname'):
             return self._devname
         else:
@@ -261,7 +276,8 @@ class spice_simcmd(thesdk):
 
     @property
     def swpstart(self):
-        """Set by argument 'swpstart'."""
+        """Set by argument 'swpstart'.
+        """
         if hasattr(self,'_swpstart'):
             return self._swpstart
         else:
@@ -273,7 +289,8 @@ class spice_simcmd(thesdk):
 
     @property
     def swpstop(self):
-        """Set by argument 'swpstop'."""
+        """Set by argument 'swpstop'.
+        """
         if hasattr(self,'_swpstop'):
             return self._swpstop
         else:
@@ -285,7 +302,8 @@ class spice_simcmd(thesdk):
 
     @property
     def swpstep(self):
-        """Set by argument 'swpstep'."""
+        """Set by argument 'swpstep'.
+        """
         if hasattr(self,'_swpstep'):
             return self._swpstep
         else:
@@ -297,7 +315,8 @@ class spice_simcmd(thesdk):
 
     @property
     def tprint(self):
-        """Set by argument 'tprint'."""
+        """Set by argument 'tprint'.
+        """
         if hasattr(self,'_tprint'):
             return self._tprint
         else:
@@ -309,7 +328,8 @@ class spice_simcmd(thesdk):
 
     @property
     def tstop(self):
-        """Set by argument 'tstop'."""
+        """Set by argument 'tstop'.
+        """
         if hasattr(self,'_tstop'):
             return self._tstop
         else:
@@ -321,7 +341,8 @@ class spice_simcmd(thesdk):
 
     @property
     def uic(self):
-        """Set by argument 'uic'."""
+        """Set by argument 'uic'.
+        """
         if hasattr(self,'_uic'):
             return self._uic
         else:
@@ -333,7 +354,8 @@ class spice_simcmd(thesdk):
 
     @property
     def noise(self):
-        """Set by argument 'noise'."""
+        """Set by argument 'noise'.
+        """
         if hasattr(self,'_noise'):
             return self._noise
         else:
@@ -345,7 +367,8 @@ class spice_simcmd(thesdk):
 
     @property
     def fmin(self):
-        """Set by argument 'fmin'."""
+        """Set by argument 'fmin'.
+        """
         if hasattr(self,'_fmin'):
             return self._fmin
         else:
@@ -357,7 +380,8 @@ class spice_simcmd(thesdk):
 
     @property
     def fmax(self):
-        """Set by argument 'fmax'."""
+        """Set by argument 'fmax'.
+        """
         if hasattr(self,'_fmax'):
             return self._fmax
         else:
@@ -369,7 +393,8 @@ class spice_simcmd(thesdk):
 
     @property
     def fscale(self):
-        """Set by argument 'fscale'."""
+        """Set by argument 'fscale'.
+        """
         if hasattr(self,'_fscale'):
             return self._fscale
         else:
@@ -380,7 +405,8 @@ class spice_simcmd(thesdk):
         self._scale=value
     @property
     def fpoints(self):
-        """Set by argument 'fpoints'."""
+        """Set by argument 'fpoints'.
+        """
         if hasattr(self,'_fpoints'):
             return self._fpoints
         else:
@@ -392,7 +418,8 @@ class spice_simcmd(thesdk):
 
     @property
     def fstepsize(self):
-        """Set by argument 'fstepsize'."""
+        """Set by argument 'fstepsize'.
+        """
         if hasattr(self,'_fstepsize'):
             return self._fstepsize
         else:
@@ -404,7 +431,8 @@ class spice_simcmd(thesdk):
 
     @property
     def seed(self):
-        """Set by argument 'seed'."""
+        """Set by argument 'seed'.
+        """
         if hasattr(self,'_seed'):
             return self._seed
         else:
@@ -416,7 +444,8 @@ class spice_simcmd(thesdk):
 
     @property
     def method(self):
-        """Set by argument 'method'."""
+        """Set by argument 'method'.
+        """
         if hasattr(self,'_method'):
             return self._method
         else:
@@ -428,7 +457,8 @@ class spice_simcmd(thesdk):
 
     @property
     def cmin(self):
-        """Set by argument 'cmin'."""
+        """Set by argument 'cmin'.
+        """
         if hasattr(self,'_cmin'):
             return self._cmin
         else:
@@ -440,7 +470,8 @@ class spice_simcmd(thesdk):
 
     @property
     def mc(self):
-        """Set by argument 'mc'."""
+        """Set by argument 'mc'.
+        """
         if hasattr(self,'_mc'):
             return self._mc
         else:
@@ -452,7 +483,8 @@ class spice_simcmd(thesdk):
 
     @property
     def mc_seed(self):
-        """Set by argument 'mc_seed'."""
+        """Set by argument 'mc_seed'.
+        """
         if hasattr(self,'_mc_seed'):
             return self._mc_seed
         else:
