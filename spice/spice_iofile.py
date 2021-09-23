@@ -468,9 +468,12 @@ class spice_iofile(iofile):
                 numlines = int(subprocess.check_output("wc -l %s | awk '{print $1}'" % file,shell=True).decode('utf-8'))
                 procs = []
                 queues = []
-                for k in range(len(linenumbers)-1):
+                for k in range(len(linenumbers)):
                     start=linenumbers[k] # Indexing starts from zero
-                    stop=numlines-(linenumbers[k+1]-6) # Previous data column ends 5 rows before start of next one
+                    if k == len(linenumbers)-1:
+                        stop=1
+                    else:
+                        stop=numlines-(linenumbers[k+1]-6) # Previous data column ends 5 rows before start of next one
                     dtype=self.datatype if self.datatype=='complex' else 'float' # Default is int for thesdk_spicefile, let's infer from data
                     queue = multiprocessing.Queue()
                     queues.append(queue)
