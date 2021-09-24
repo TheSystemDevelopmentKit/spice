@@ -8,7 +8,7 @@ for TheSDK spice.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 24.09.2021 12:56
+Last modification by Okko Järvinen, 24.09.2021 14:26
 
 """
 import os
@@ -438,6 +438,8 @@ class spice_iofile(iofile):
         """
         try:
             arr=np.genfromtxt(filepath,dtype=dtype,skip_header=start,skip_footer=stop,encoding='utf-8')
+            # TODO: This is not enabled by setting self.DEBUG = True for some
+            # reason.. Should this class inherit thesdk?
             self.print_log(type='D',msg='Reading event output %s' % label)
             queue.put((label,arr))
         except:
