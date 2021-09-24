@@ -10,7 +10,7 @@ automatically generate testbenches for the most common simulation cases.
 
 Initially written by Okko Järvinen, 2019
 
-Last modification by Okko Järvinen, 23.09.2021 18:48
+Last modification by Okko Järvinen, 24.09.2021 12:34
 
 Release 1.6, Jun 2020 supports Eldo and Spectre
 """
@@ -971,6 +971,46 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         except:
             self.print_log(type='W',msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting power consumptions.')
+
+    def get_buswidth(self,signame):
+        """ Extract buswidth from signal name.
+        
+        Little-endian example::
+                
+            start,stop,width,range = get_buswidth('BUS<10:0>')
+            # start = 10
+            # stop = 0
+            # width = 11
+            # range = range(10,-1,-1)
+
+        Big-endian example::
+                
+            start,stop,width,range = get_buswidth('BUS<0:8>')
+            # start = 0
+            # stop = 8
+            # width = 9
+            # range = range(0,9)
+            
+        """
+        signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
+        if '' in signame:
+            signame.remove('')
+        if len(signame) == 1:
+            busstart = 0
+            busstop = 0
+        elif len(signame) == 2:
+            busstart = int(signame[1])
+            busstop = int(signame[1])
+        else:
+            busstart = int(signame[1])
+            busstop = int(signame[2])
+        if busstart > busstop:
+            buswidth = busstart-busstop+1
+            busrange = range(busstart,busstop-1,-1)
+        else:
+            buswidth = busstop-busstart+1
+            busrange = range(busstart,busstop+1)
+        return busstart,busstop,buswidth,busrange
     
     def si_string_to_float(self, strval):
         """ Convert SI-formatted string to float

@@ -7,7 +7,7 @@ Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
 =======
-Last modification by Okko Järvinen, 22.09.2021 18:36
+Last modification by Okko Järvinen, 24.09.2021 12:37
 
 """
 import os
@@ -352,7 +352,7 @@ class testbench(spice_module):
                         # Writing source current consumption to a file
                         self._dcsourcestr += 'simulator lang=spice\n'
                         self._dcsourcestr += '.option ingold 2\n'
-                        self._dcsourcestr += ".print I(%s)\n" % supply
+                        self._dcsourcestr += '.print I(%s)\n' % supply
                         self._dcsourcestr += 'simulator lang=spectre\n'
                         #self._dcsourcestr += "pwrout_%s%s (%s_p %s) veriloga_csv_write_allpoints_current filename=\"%s\"\n" % \
                         #    (val.sourcetype.lower(),val.name.lower().replace('.','_'),self.esc_bus(val.pos),self.esc_bus(val.pos),val._extfile)
@@ -736,11 +736,11 @@ class testbench(spice_module):
                                         self._plotcmd += '.option ingold 2\n'
                                         # Implement complex value probing
                                         if val.datatype.lower() == 'complex':
-                                            self._plotcmd += ".print %sr(%s) %si(%s) \n" % \
+                                            self._plotcmd += '.print %sr(%s) %si(%s) \n' % \
                                                     (val.sourcetype,val.ionames[i],
                                                             val.sourcetype,val.ionames[i])
                                         else:
-                                            self._plotcmd += ".print %s(%s)\n" % \
+                                            self._plotcmd += '.print %s(%s)\n' % \
                                                 (val.sourcetype,val.ionames[i])
                                         self._plotcmd += 'simulator lang=spectre\n'
                                     elif self.parent.model=='ngspice':
@@ -778,30 +778,31 @@ class testbench(spice_module):
                                     if self.parent.model=='eldo':
                                         self._plotcmd += ".extract file=\"%s\" vect label=%s yval(v(%s<*>),%s(v(%s)%s%s%s))\n" % (val.file[i],val.ionames[i],val.ionames[i].upper(),polarity,trig,vthstr,afterstr,beforestr)
                                     elif self.parent.model=='spectre':
-                                        # Extracting the bus width from the ioname
-                                        signame = val.ionames[i].upper()
+                                        # Extracting the bus width (TODO: this is copy-pasted a lot -> make into a function)
+                                        signame = val.ionames[i]
+                                        busstart,busstop,buswidth,busrange = self.parent.get_buswidth(signame)
                                         signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
-                                        if len(signame) == 1:
-                                            busstart = 0
-                                            busstop = 0
-                                        else:
-                                            busstart = int(signame[1])
-                                            busstop = int(signame[2])
-                                        if busstart > busstop:
-                                            buswidth = busstart-busstop+1
-                                        else:
-                                            buswidth = busstop-busstart+1
-                                        # Writing every individual bit of a bus to its own file (TODO: maybe to one file?)
-                                        for j in range(buswidth):
-                                            if buswidth == 1:
-                                                bitname = self.esc_bus('%s' % signame[0])
+                                        # If not already, add the respective clock signal voltage to iofile_eventdict
+                                        if trig not in self.parent.iofile_eventdict:
+                                            self.parent.iofile_eventdict[trig] = None
+                                            self._plotcmd += 'save %s\n' % self.esc_bus(trig)
+                                            self._plotcmd += 'simulator lang=spice\n'
+                                            self._plotcmd += '.option ingold 2\n'
+                                            self._plotcmd += '.print v(%s)\n' % trig
+                                            self._plotcmd += 'simulator lang=spectre\n'
+                                        for j in busrange:
+                                            if buswidth == 1 and '<' not in val.ionames[i]:
+                                                bitname = signame[0]
                                             else:
-                                                bitname = self.esc_bus('%s<%d>' % (signame[0],j))
-                                            #self._plotcmd += 'save %s\n' % bitname
-                                            self._plotcmd += "sampleout_%s_%d (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
-                                                    (signame[0],j,self.esc_bus(trig),bitname,val.file[i].replace('.txt','_%d.txt'%j),\
-                                                     val.vth,-1 if val.edgetype.lower() == 'falling' else 1)
-
+                                                bitname = '%s<%d>' % (signame[0],j)
+                                            # If not already, add the bit voltage to iofile_eventdict
+                                            if bitname not in self.parent.iofile_eventdict:
+                                                self.parent.iofile_eventdict[bitname] = None
+                                                self._plotcmd += 'save %s\n' % self.esc_bus(bitname)
+                                                self._plotcmd += 'simulator lang=spice\n'
+                                                self._plotcmd += '.option ingold 2\n'
+                                                self._plotcmd += '.print %s(%s)\n' % (val.sourcetype,bitname)
+                                                self._plotcmd += 'simulator lang=spectre\n'
                             elif val.iotype=='time':
                                 for i in range(len(val.ionames)):
                                     if self.parent.model == 'eldo':
@@ -817,7 +818,7 @@ class testbench(spice_module):
                                             self._plotcmd += 'save %s\n' % signame
                                             self._plotcmd += 'simulator lang=spice\n'
                                             self._plotcmd += '.option ingold 2\n'
-                                            self._plotcmd += ".print %s(%s)\n" % (val.sourcetype,val.ionames[i])
+                                            self._plotcmd += '.print %s(%s)\n' % (val.sourcetype,val.ionames[i])
                                             self._plotcmd += 'simulator lang=spectre\n'
                             elif val.iotype=='vsample':
                                 for i in range(len(val.ionames)):
@@ -842,7 +843,7 @@ class testbench(spice_module):
                             else:
                                 self.print_log(type='W',msg='Output filetype incorrectly defined.')
             if self.parent.model=='ngspice':
-                    self._plotcmd += ".endc\n"
+                self._plotcmd += ".endc\n"
         return self._plotcmd
     @plotcmd.setter
     def plotcmd(self,value):

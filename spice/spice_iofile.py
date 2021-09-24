@@ -8,7 +8,7 @@ for TheSDK spice.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 24.09.2021 08:05
+Last modification by Okko Järvinen, 24.09.2021 12:36
 
 """
 import os
@@ -24,6 +24,7 @@ import pandas as pd
 from numpy import genfromtxt
 #from spice.connector import intend
 import traceback
+from bitstring import BitArray
 
 class spice_iofile(iofile):
     """
@@ -70,9 +71,6 @@ class spice_iofile(iofile):
     **kwargs :  
             name (str)
                 Name of the IO.
-            ioformat (str)
-                Formatting of the IO signal: 'dec'/'bin'.
-                Default 'dec'.
             dir (str)
                 Direction of the IO: 'in'/'out'.
             iotype (str)
@@ -81,6 +79,15 @@ class spice_iofile(iofile):
                 while sample type signals are sampled by a clock signal (digital bus).
                 Time type signals return a vector of timestamps corresponding
                 to threshold crossings.
+            ioformat {'dec','bin','volt'}
+                Formatting of the sampled signals. Digital output buses are
+                formatted to unsigned integers when ioformat = 'dec'. For
+                'bin', the digital output bus is returned as a string
+                containing ones and zeros. When ioformat = 'volt', the output
+                signal is sampled at the clock and the floating point value is
+                returned. Voltage sampling is only supported for non-bus
+                signals.
+                Default 'dec'.
             datatype (str)
                 Inherited from the parent.
                 If complex, the ioname is handled as a complex signal.
@@ -133,7 +140,7 @@ class spice_iofile(iofile):
         try:  
             super(spice_iofile,self).__init__(parent=parent,**kwargs)
             self.paramname=kwargs.get('param','-g g_file_')
-            self._ioformat=kwargs.get('ioformat','dec') #by default, the io values are decimal integer numbers
+            self._ioformat=kwargs.get('ioformat','dec')
             self._trigger=kwargs.get('trigger','')
             self._vth=kwargs.get('vth',0.5)
             self._edgetype=kwargs.get('edgetype','rising')
@@ -359,14 +366,14 @@ class spice_iofile(iofile):
                 data = self.Data
                 for i in range(len(self.file)):
                     np.savetxt(self.file[i],data[:,[2*i,2*i+1]],delimiter=',')
-                    self.print_log(type='I',msg='Writing input file %s' % self.file[i])
+                    self.print_log(type='I',msg='Writing event input %s' % self.file[i])
             except:
                     self.print_log(type='E',msg=traceback.format_exc())
-                    self.print_log(type='E',msg='Failed while writing files for %s' % self.file[i])
+                    self.print_log(type='E',msg='Failed writing %s' % self.file[i])
         elif self.iotype == 'sample':
             try:
                 for i in range(len(self.file)):
-                    self.print_log(type='I',msg='Writing digital input file %s' % self.file[i])
+                    self.print_log(type='I',msg='Writing sample input %s' % self.file[i])
                     if not isinstance(self.Data,int):
                         # Input is a vector
                         vec = self.Data[:,i]
@@ -375,17 +382,8 @@ class spice_iofile(iofile):
                         vec = [self.Data]
                     # Extracting the bus width
                     signame = self.ionames[i]
+                    busstart,busstop,buswidth,busrange = self.parent.get_buswidth(signame)
                     signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
-                    if len(signame) == 1:
-                        busstart = 0
-                        busstop = 0
-                    else:
-                        busstart = int(signame[1])
-                        busstop = int(signame[2])
-                    if busstart > busstop:
-                        buswidth = busstart-busstop+1
-                    else:
-                        buswidth = busstop-busstart+1
                 with open(self.file[i],'w') as outfile:
                     if self.parent.model == 'spectre':
                         # This is Spectre vector file syntax
@@ -431,10 +429,10 @@ class spice_iofile(iofile):
         """
         try:
             arr=np.genfromtxt(filepath,dtype=dtype,skip_header=start,skip_footer=stop,encoding='utf-8')
-            self.print_log(type='D',msg='Reading %s from %s' % (label,filepath))
+            self.print_log(type='D',msg='Reading event output %s' % label)
             queue.put((label,arr))
         except:
-            self.print_log(type='E',msg='Failed reading event output for %s' % label)
+            self.print_log(type='E',msg='Failed reading event output %s' % label)
             queue.put((label,None))
 
     # Overloaded read from thesdk.iofile
@@ -601,40 +599,51 @@ class spice_iofile(iofile):
                                     self.Data = np.hstack((self.Data,np.array(arr).reshape(-1,1)))
                             infile.close()
                         elif self.parent.model == 'spectre':
-                            # Extracting the bus width (TODO: this is copy-pasted a lot -> make into a function)
+                            # Extracting the bus width
                             signame = self.ionames[i]
+                            busstart,busstop,buswidth,busrange = self.parent.get_buswidth(signame)
                             signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
-                            if len(signame) == 1:
-                                busstart = 0
-                                busstop = 0
+
+                            # Find trigger signal threshold crossings
+                            if isinstance(self.trigger,list):
+                                if len(self.trigger) == len(self.ionames):
+                                    trig = self.trigger[i]
+                                else:
+                                    trig = self.trigger[0]
                             else:
-                                busstart = int(signame[1])
-                                busstop = int(signame[2])
-                            if busstart > busstop:
-                                buswidth = busstart-busstop+1
+                                trig = self.trigger
+                            if trig not in self.parent.iofile_eventdict:
+                                self.print_log(type='E',msg='Event data not found for trigger signal %s' % trig)
                             else:
-                                buswidth = busstop-busstart+1
-                            if self.big_endian:
-                                bitrange = range(buswidth)
-                            else:
-                                bitrange = range(buswidth-1,-1,-1)
-                            self.print_log(type='I',msg='Reading bus %s from file to %s.'%(self.ionames[i],self.name))
-                            # Reading each bit of the bus from a file
+                                trig_event = self.parent.iofile_eventdict[trig]
+                            tsamp = self.interp_crossings(trig_event,self.vth,256,self.edgetype)
+
+                            # Processing each bit in the bus
+                            self.print_log(type='I',msg='Sampling %s with %s (%s).'%(self.ionames[i],trig,self.edgetype))
                             failed = False
                             bitmat = None
-                            for j in bitrange:
-                                fname = self.file[i].replace('.txt','_%d.txt' % j)
-                                # Check if file is empty
-                                if os.stat(fname).st_size > 1:
-                                    arr = genfromtxt(fname,delimiter=', ',skip_header=self.parent.syntaxdict["csvskip"])
+                            for j in busrange:
+                                # Get event data for the bit voltage
+                                if buswidth == 1 and '<' not in self.ionames[i]:
+                                    bitname = signame[0]
+                                else:
+                                    bitname = '%s<%d>' % (signame[0],j)
+                                if bitname not in self.parent.iofile_eventdict:
+                                    event = np.array(['0']).reshape(-1,1)
+                                    failed = True
+                                else:
+                                    event = self.parent.iofile_eventdict[bitname]
+
+                                # Sample the signal
+                                arr = self.sample_signal(event,tsamp)
+
+                                # Binary or decimal io format, rounding to bits
+                                if self.ioformat != 'volt':
                                     if len(arr.shape) > 1:
                                         arr = (arr[:,1]>=self.vth).reshape(-1,1).astype(int).astype(str)
                                     else:
                                         arr = np.array(['0']).reshape(-1,1)
                                         failed = True
-                                else:
-                                    arr = np.array(['0']).reshape(-1,1)
-                                    failed = True
                                 if bitmat is None:
                                     # First bit is read, it becomes the first column of the bit matrix
                                     bitmat = arr
@@ -643,12 +652,20 @@ class spice_iofile(iofile):
                                     bitmat = np.hstack((bitmat,arr))
                             if failed:
                                 self.print_log(type='W',msg='Failed reading sample type output vector.')
-                            # Bits collected, mashing the rows into binary strings
-                            # There's probably a one-liner to do this, I'm lazy
-                            arr = []
-                            for j in range(len(bitmat[:,0])):
-                                arr.append(''.join(bitmat[j,:]))
-                            nparr = np.array(arr).reshape(-1,1)
+
+                            if self.ioformat == 'volt':
+                                nparr = bitmat
+                            else:
+                                # Merging bits to buses
+                                arr = []
+                                for j in range(len(bitmat[:,0])):
+                                    arr.append(''.join(bitmat[j,:]))
+                                nparr = np.array(arr).reshape(-1,1)
+                                # Convert binary strings to decimals
+                                if self.ioformat == 'dec':
+                                    b2i = np.vectorize(self._bin2int)
+                                    # For now only little-endian unsigned
+                                    nparr = b2i(nparr)
                             # TODO: also this should be a function
                             if self.Data is None: 
                                 self.Data = nparr
@@ -675,7 +692,7 @@ class spice_iofile(iofile):
                     self.print_log(type='F',msg='Failed while reading files for %s.' % self.name)
 
     def interp_crossings(self,data,vth,nint,edgetype):
-        """ Helper function that is called for 'time' type outputs.
+        """ Helper function called for 'time' and 'sample' type outputs.
 
         Interpolates the requested threshold crossings (rising or falling) from
         the 'event' type input signal. Returns the time-stamps of the crossing
@@ -707,6 +724,7 @@ class spice_iofile(iofile):
         else:
             edges = np.flatnonzero((data[:-1,1]>=vth) & (data[1:,1]<vth))+1
         tcross = np.zeros((len(edges)))
+        # Potentially slow (TODO?)
         for i in range(len(edges)):
             try:
                 prev = edges[i]-1
@@ -726,3 +744,53 @@ class spice_iofile(iofile):
                 pdb.set_trace()
         # Removing edges happening before self.after
         return tcross[tcross>=self.after]
+
+    def sample_signal(self,signal,trigger,nint=1):
+        """ Helper function called for 'sample' type outputs.
+
+        Finds the signal y-values at time instants defined by the clock signal
+        (trigger).
+
+        Parameters
+        ----------
+        data : ndarray
+            Input data array. Expected an 'event' type 2D-vector where first
+            column is time and second is voltage.
+        vth : float
+            Threshold voltage.
+        nint : int
+            Interpolation factor. The two closest points on each side of a
+            threshold crossing are used for linear interpolation endpoints,
+            where nint points are added to find as close x-value of the
+            threshold crossing as possible. 
+        edgetype : str
+            Direction of the crossing: 'rising', 'falling' or 'both'.
+
+        Returns
+        -------
+        ndarray
+            1D-vector with time-stamps of interpolated threshold crossings.
+
+        """
+
+        sampled = np.ones((len(trigger),2))*np.nan
+        for i in range(len(trigger)):
+            tsamp = trigger[i]
+            closest_idx = np.argmin(np.abs(signal[:,0]-tsamp))
+            sampled[i,0] = signal[closest_idx,0]
+            sampled[i,1] = signal[closest_idx,1]
+        return sampled
+
+    def _bin2int(self,binary,big_endian=False,signed=False):
+        ''' Function to convert binary string to integer.
+        '''
+        if big_endian:
+            if signed:
+                return BitArray(bin=binary).int
+            else:
+                return int(binary,2)
+        else:
+            if signed:
+                return BitArray(bin=binary[::-1]).int
+            else:
+                return int(binary[::-1],2)
