@@ -8,7 +8,7 @@ for TheSDK spice.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 23.09.2021 17:29
+Last modification by Okko Järvinen, 24.09.2021 08:05
 
 """
 import os
@@ -359,14 +359,14 @@ class spice_iofile(iofile):
                 data = self.Data
                 for i in range(len(self.file)):
                     np.savetxt(self.file[i],data[:,[2*i,2*i+1]],delimiter=',')
-                    self.print_log(type='I',msg='Writing input file: %s.' % self.file[i])
+                    self.print_log(type='I',msg='Writing input file %s' % self.file[i])
             except:
                     self.print_log(type='E',msg=traceback.format_exc())
-                    self.print_log(type='E',msg='Failed while writing files for %s.' % self.file[i])
+                    self.print_log(type='E',msg='Failed while writing files for %s' % self.file[i])
         elif self.iotype == 'sample':
             try:
                 for i in range(len(self.file)):
-                    self.print_log(type='I',msg='Writing digital input file: %s.' % self.file[i])
+                    self.print_log(type='I',msg='Writing digital input file %s' % self.file[i])
                     if not isinstance(self.Data,int):
                         # Input is a vector
                         vec = self.Data[:,i]
@@ -420,7 +420,7 @@ class spice_iofile(iofile):
                             outfile.write('%s\n' % line)
             except:
                 self.print_log(type='E',msg=traceback.format_exc())
-                self.print_log(type='E',msg='Failed while writing files for %s.' % self.file[i])
+                self.print_log(type='E',msg='Failed while writing files for %s' % self.file[i])
         else:
             pass
 
@@ -431,10 +431,10 @@ class spice_iofile(iofile):
         """
         try:
             arr=np.genfromtxt(filepath,dtype=dtype,skip_header=start,skip_footer=stop,encoding='utf-8')
-            self.print_log(type='D',msg='Reading event output %s' % label)
+            self.print_log(type='D',msg='Reading %s from %s' % (label,filepath))
             queue.put((label,arr))
         except:
-            self.print_log(type='E',msg='Failed reading event output %s' % label)
+            self.print_log(type='E',msg='Failed reading event output for %s' % label)
             queue.put((label,None))
 
     # Overloaded read from thesdk.iofile
@@ -463,7 +463,7 @@ class spice_iofile(iofile):
                     if label:
                         labels.append(label.group(1)) # Capture inner group (== ioname)
                     else:
-                        self.print_log(type='W', msg='Couldn\'t find IO on line %d from file %s' %  (line, file))
+                        self.print_log(type='W', msg='Couldn\'t find IO on line %d from file %s' %  (line,file))
             if len(labels) == len(linenumbers):
                 numlines = int(subprocess.check_output("wc -l %s | awk '{print $1}'" % file,shell=True).decode('utf-8'))
                 procs = []
@@ -530,7 +530,7 @@ class spice_iofile(iofile):
                             if self.ionames[i] in self.parent.iofile_eventdict:
                                 arr = self.parent.iofile_eventdict[self.ionames[i]]
                             else:
-                                self.print_log(type='W',msg='No event data found for %s while parsing time signal.' % self.ionames[i])
+                                self.print_log(type='E',msg='No event data found for %s while parsing time signal.' % self.ionames[i])
                         # This should work for both spectre and eldo now
                         if self.edgetype.lower() == 'both':
                             trise = self.interp_crossings(arr,self.vth,256,'rising')
@@ -618,7 +618,7 @@ class spice_iofile(iofile):
                                 bitrange = range(buswidth)
                             else:
                                 bitrange = range(buswidth-1,-1,-1)
-                            self.print_log(type='I',msg='Reading bus %s from file to %s.'%(self.ionames[i].upper(),self.name))
+                            self.print_log(type='I',msg='Reading bus %s from file to %s.'%(self.ionames[i],self.name))
                             # Reading each bit of the bus from a file
                             failed = False
                             bitmat = None
@@ -675,11 +675,32 @@ class spice_iofile(iofile):
                     self.print_log(type='F',msg='Failed while reading files for %s.' % self.name)
 
     def interp_crossings(self,data,vth,nint,edgetype):
-        """ 
-        Helper function that is called for 'time' type outputs.
-        Interpolates the requested threshold crossings (rising or falling)
-        from the 'event' type input signal.
-        Returns the time-stamps of the crossing instants in a 1-d vector.
+        """ Helper function that is called for 'time' type outputs.
+
+        Interpolates the requested threshold crossings (rising or falling) from
+        the 'event' type input signal. Returns the time-stamps of the crossing
+        instants in a 1D-vector.
+
+        Parameters
+        ----------
+        data : ndarray
+            Input data array. Expected an 'event' type 2D-vector where first
+            column is time and second is voltage.
+        vth : float
+            Threshold voltage.
+        nint : int
+            Interpolation factor. The two closest points on each side of a
+            threshold crossing are used for linear interpolation endpoints,
+            where nint points are added to find as close x-value of the
+            threshold crossing as possible. 
+        edgetype : str
+            Direction of the crossing: 'rising', 'falling' or 'both'.
+
+        Returns
+        -------
+        ndarray
+            1D-vector with time-stamps of interpolated threshold crossings.
+
         """
         if edgetype.lower() == 'rising':
             edges = np.flatnonzero((data[:-1,1]<vth) & (data[1:,1]>=vth))+1
