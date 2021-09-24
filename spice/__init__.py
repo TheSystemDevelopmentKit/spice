@@ -10,7 +10,7 @@ automatically generate testbenches for the most common simulation cases.
 
 Initially written by Okko Järvinen, 2019
 
-Last modification by Okko Järvinen, 24.09.2021 12:34
+Last modification by Okko Järvinen, 24.09.2021 12:59
 
 Release 1.6, Jun 2020 supports Eldo and Spectre
 """
@@ -562,20 +562,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @spicemisc.setter
     def spicemisc(self,value): 
             self._spicemisc = value
-
-    @property
-    def ahdlpath(self): 
-        """List<String>
-
-        List of strings containing file paths to Verilog-A files to be included
-        into a Spectre simulation.
-        """
-        if not hasattr(self, '_ahdlpath'):
-            self._ahdlpath = []
-        return self._ahdlpath
-    @ahdlpath.setter
-    def ahdlpath(self,value): 
-            self._ahdlpath = value
 
     @property
     def name(self):

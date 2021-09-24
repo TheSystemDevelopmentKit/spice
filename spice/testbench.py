@@ -7,7 +7,7 @@ Testbench generation class for spice simulations.
 Generates testbenches for eldo and spectre.
 
 =======
-Last modification by Okko Järvinen, 24.09.2021 12:37
+Last modification by Okko Järvinen, 24.09.2021 12:59
 
 """
 import os
@@ -275,33 +275,6 @@ class testbench(spice_module):
     @misccmd.deleter
     def misccmd(self,value):
         self._misccmd=None
-
-    @property
-    def ahdlincludecmd(self):
-        """String
-        
-        Verilog-A inclusion string pointing to file-IO utility blocks, as well
-        as manually added Verilog-A files defined in self.ahdlpath in the
-        parent entity.
-        """
-        if not hasattr(self,'_ahdlincludecmd'):
-            if self.parent.model == 'spectre':
-                self._ahdlincludecmd="%s VerilogA block includes\n" % (self.parent.syntaxdict["commentchar"])
-                self._ahdlincludecmd += 'ahdl_include "' + self.parent.entitypath + '/../spice/spice/veriloga_csv_write_edge.va"\n'
-                self._ahdlincludecmd += 'ahdl_include "' + self.parent.entitypath + '/../spice/spice/veriloga_csv_write_allpoints.va"\n'
-                self._ahdlincludecmd += 'ahdl_include "' + self.parent.entitypath + '/../spice/spice/veriloga_csv_write_allpoints_current.va"\n'
-                ahldincludes = self.parent.ahdlpath
-                for ahdlfile in ahldincludes:
-                    self._ahdlincludecmd += 'ahdl_include' + ahdlfile + "\n"
-            else:
-                self._ahdlincludecmd = ''
-        return self._ahdlincludecmd
-    @ahdlincludecmd.setter
-    def ahdlincludecmd(self,value):
-        self._ahdlincludecmd=value
-    @ahdlincludecmd.deleter
-    def ahdlincludecmd(self,value):
-        self._ahdlincludecmd=None
 
     # Generating spice dcsources string
     @property
@@ -778,7 +751,7 @@ class testbench(spice_module):
                                     if self.parent.model=='eldo':
                                         self._plotcmd += ".extract file=\"%s\" vect label=%s yval(v(%s<*>),%s(v(%s)%s%s%s))\n" % (val.file[i],val.ionames[i],val.ionames[i].upper(),polarity,trig,vthstr,afterstr,beforestr)
                                     elif self.parent.model=='spectre':
-                                        # Extracting the bus width (TODO: this is copy-pasted a lot -> make into a function)
+                                        # Extracting the bus width
                                         signame = val.ionames[i]
                                         busstart,busstop,buswidth,busrange = self.parent.get_buswidth(signame)
                                         signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
@@ -821,25 +794,8 @@ class testbench(spice_module):
                                             self._plotcmd += '.print %s(%s)\n' % (val.sourcetype,val.ionames[i])
                                             self._plotcmd += 'simulator lang=spectre\n'
                             elif val.iotype=='vsample':
-                                for i in range(len(val.ionames)):
-                                    # Checking the given trigger(s)
-                                    if isinstance(val.trigger,list):
-                                        if len(val.trigger) == len(val.ionames):
-                                            trig = val.trigger[i]
-                                        else:
-                                            trig = val.trigger[0]
-                                            self.print_log(type='W',msg='%d triggers given for %d ionames. Using the first trigger for all ionames.' % (len(val.trigger),len(val.ionames)))
-                                    else:
-                                        trig = val.trigger
-                                    if self.parent.model=='eldo':
-                                        self.print_log(type='F',msg='not yet done') #TODO
-                                    elif self.parent.model=='spectre':
-                                        #self._plotcmd += 'save %s\n' % val.ionames[i].upper()
-                                        self._plotcmd += ("vsampleout_%s (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" 
-                                                %(val.ionames[i].upper().replace('.','_'),trig,val.ionames[i].upper(),
-                                                    val.file[i],val.vth,-1 if val.edgetype.lower() == 'falling' else 1))
-                                    elif self.parent.model=='ngspice':
-                                        self.print_log(type='F',msg='Iotype vsample not implemented for Ngspice') #TODO
+                                self.print_log(type='O',msg='IO type \'vsample\' is obsolete. Please use type \'sample\' and set ioformat=\'volt\'.')
+                                self.print_log(type='F',msg='Please do it now :)')
                             else:
                                 self.print_log(type='W',msg='Output filetype incorrectly defined.')
             if self.parent.model=='ngspice':
@@ -903,7 +859,6 @@ class testbench(spice_module):
         includecmd = self.includecmd
         subinst = self.subinst
         dspfincludecmd = self.dspfincludecmd
-        ahdlincludecmd = self.ahdlincludecmd
         options = self.options
         params = self.parameters
         dcsourcestr = self.dcsourcestr
@@ -915,7 +870,6 @@ class testbench(spice_module):
                         libcmd + "\n" +\
                         includecmd + "\n" +
                         dspfincludecmd + "\n" +
-                        ahdlincludecmd + "\n" +
                         options + "\n" +\
                         params + "\n" +
                         subinst + "\n\n" +\

@@ -8,7 +8,7 @@ for TheSDK spice.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 24.09.2021 12:36
+Last modification by Okko Järvinen, 24.09.2021 12:56
 
 """
 import os
@@ -51,8 +51,15 @@ class spice_iofile(iofile):
 
     Defining digital output signal triggered with a falling edge of the analog clock::
 
-        _=spice_iofile(self,name='dout',dir='out',iotype='sample',sourcetype='V',
+        _=spice_iofile(self,name='dout',dir='out',iotype='sample',sourcetype='V',ioformat='bin',
                        ionames='DOUT<7:0>',edgetype='falling',vth=self.vdd/2,trigger='CLK')
+
+    Defining a discrete time & continuous amplitude output signal triggered
+    with a rising edge of the analog clock. The iofile returns a 2D-vector
+    similar to 'event' type signals::
+
+        _=spice_iofile(self,name='sampled_input',dir='out',iotype='sample',sourcetype='V',ioformat='volt',
+                       ionames='INP',edgetype='rising',vth=self.vdd/2,trigger='CLK')
 
     Defining digital input signal with decimal format. The input vector is a
     list of integers, which get converted to binary bus of 4-bits (inferred
@@ -74,11 +81,13 @@ class spice_iofile(iofile):
             dir (str)
                 Direction of the IO: 'in'/'out'.
             iotype (str)
-                Type of the IO signal: 'event'/'sample'/'time'.
-                Event type signals are time-value pairs (analog signal),
-                while sample type signals are sampled by a clock signal (digital bus).
-                Time type signals return a vector of timestamps corresponding
-                to threshold crossings.
+                Type of the IO signal: 'event'/'sample'/'time'.  Event type
+                signals are time-value pairs (analog signal), while sample type
+                signals are sampled by a clock signal (digital bus).  Sample
+                type signals can be used for discrete time & continuous
+                amplitude outputs (sampled voltage for example), by setting
+                iotype='sample' and ioformat='volt'. Time type signals return
+                a vector of timestamps corresponding to threshold crossings.
             ioformat {'dec','bin','volt'}
                 Formatting of the sampled signals. Digital output buses are
                 formatted to unsigned integers when ioformat = 'dec'. For
@@ -506,20 +515,9 @@ class spice_iofile(iofile):
                             self.Data = np.array(arr)
                         else:
                             self.Data = np.hstack((self.Data,np.array(arr)))
-                        # TODO: verify csvskip
                     elif self.iotype=='vsample':
-                        if self.parent.model=='ngspice':
-                            #ngspice delimiter is two whitespaces for positive data and one whitespace for negative.
-                            arr = genfromtxt(self.file[i], \
-                                    skip_header=self.parent.syntaxdict['csvskip'])
-                        else:
-                            arr = genfromtxt(self.file[i],delimiter=self.parent.syntaxdict['eventoutdelim'], \
-                                    skip_header=self.parent.syntaxdict['csvskip'])
-                        if self.Data is None: 
-                            self.Data = np.array(arr)
-                        else:
-                            self.Data = np.hstack((self.Data,np.array(arr)))
-                        # TODO: verify csvskip
+                        self.print_log(type='O',msg='IO type \'vsample\' is obsolete. Please use type \'sample\' and set ioformat=\'volt\'.')
+                        self.print_log(type='F',msg='Please do it now :)')
                     elif self.iotype=='time':
                         if self.parent.model=='eldo':
                             arr = genfromtxt(self.file[i],delimiter=', ',skip_header=self.parent.syntaxdict["csvskip"])
@@ -633,10 +631,8 @@ class spice_iofile(iofile):
                                     failed = True
                                 else:
                                     event = self.parent.iofile_eventdict[bitname]
-
                                 # Sample the signal
                                 arr = self.sample_signal(event,tsamp)
-
                                 # Binary or decimal io format, rounding to bits
                                 if self.ioformat != 'volt':
                                     if len(arr.shape) > 1:
