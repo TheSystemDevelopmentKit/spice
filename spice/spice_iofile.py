@@ -332,7 +332,7 @@ class spice_iofile(iofile):
             filename = filepath + filename    
             self._file.append(filename)
         # Keep unique filenames only for event-type outputs to keep load times at minimum
-        if self.parent.model in ['spectre','eldo'] and self.iotype=='event' and self.dir=='out':
+        if self.iotype=='event' and self.dir=='out':
             self._file=list(set(self._file))
         return self._file
     @file.setter
@@ -445,7 +445,7 @@ class spice_iofile(iofile):
         if self.iotype=='event':
             file=self.file[0] # File is the same for all event type outputs
             label_match=re.compile(r'\((.*)\)')
-            if self.parent.model == 'spectre':
+            if self.parent.model in ['spectre','ngspice']:
                 lines=subprocess.check_output('grep -n \"time\|freq\" %s' % file, shell=True).decode('utf-8')
                 lines=lines.split('\n') 
                 linenumbers=[]
@@ -510,23 +510,7 @@ class spice_iofile(iofile):
         else:
             for i in range(len(self.file)):
                 try:
-                    if self.iotype=='event':
-                        if self.parent.model=='ngspice':
-                            #ngspice delimiter is two whitespaces for positive data and one whitespace for negative.
-                            tmparr = genfromtxt(self.file[i], \
-                                    skip_header=self.parent.syntaxdict['csvskip'])
-                            if self.datatype == 'complex':
-                                arr = np.column_stack((tmparr[:,0], tmparr[:,1] + 1j*tmparr[:,2]))
-                            else:
-                                arr=tmparr
-                        else:
-                            arr = genfromtxt(self.file[i],delimiter=self.parent.syntaxdict['eventoutdelim'], \
-                                    skip_header=self.parent.syntaxdict['csvskip'])
-                        if self.Data is None: 
-                            self.Data = np.array(arr)
-                        else:
-                            self.Data = np.hstack((self.Data,np.array(arr)))
-                    elif self.iotype=='vsample':
+                    if self.iotype=='vsample':
                         self.print_log(type='O',msg='IO type \'vsample\' is obsolete. Please use type \'sample\' and set ioformat=\'volt\'.')
                         self.print_log(type='F',msg='Please do it now :)')
                     elif self.iotype=='time':
@@ -731,7 +715,6 @@ class spice_iofile(iofile):
             1D-vector with time-stamps of interpolated threshold crossings.
 
         """
-
         sampled = np.ones((len(trigger),2))*np.nan
         for i in range(len(trigger)):
             tsamp = trigger[i]

@@ -803,39 +803,33 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def read_spice_outputs(self):
         """Automatically called function to call read() functions of each
         iofile with direction 'output'."""
-        # Handle spectre differently..
-        if self.model=='spectre' or self.model=='eldo':
-            first=True
-            for name, val in self.iofile_bundle.Members.items():
-                if val.dir.lower()=='out' or val.dir.lower()=='output':
-                    if val.iotype=='event': # Event type outs are in same file, read only once to speed up things
-                        if first:
-                            self.iofile_bundle.Members[name].read()
-                            first=False
-                        if len(val.ionames) == 1:
-                            try:
-                                self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()]
-                            except KeyError:
-                                self.print_log(type='W', msg='Invalid ioname %s for iofile %s' % (val.ionames[0], name))
-                        else: # Iofile is a bus?
-                            data=[]
-                            for i, key in enumerate(val.ionames):
-                                try:
-                                    if i == 0:
-                                        data=self.iofile_eventdict[key.upper()]
-                                    else:
-                                        try:
-                                            data=np.r_['1', data, self.iofile_eventdict[key.upper()]]
-                                        except ValueError:
-                                            self.print_log(type='W', msg='Invalid dimensions for concatenating arrays for IO %s!' % name)
-                                except KeyError:
-                                    self.print_log(type='W', msg='Invalid ioname %s for iofile %s' % (key, name))
-                            self.iofile_bundle.Members[name].Data=data
-                    else:
+        first=True
+        for name, val in self.iofile_bundle.Members.items():
+            if val.dir.lower()=='out' or val.dir.lower()=='output':
+                if val.iotype=='event': # Event type outs are in same file, read only once to speed up things
+                    if first:
                         self.iofile_bundle.Members[name].read()
-        else:
-            for name, val in self.iofile_bundle.Members.items():
-                if val.dir.lower()=='out' or val.dir.lower()=='output':
+                        first=False
+                    if len(val.ionames) == 1:
+                        try:
+                            self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()]
+                        except KeyError:
+                            self.print_log(type='W', msg='Invalid ioname %s for iofile %s' % (val.ionames[0], name))
+                    else: # Iofile is a bus?
+                        data=[]
+                        for i, key in enumerate(val.ionames):
+                            try:
+                                if i == 0:
+                                    data=self.iofile_eventdict[key.upper()]
+                                else:
+                                    try:
+                                        data=np.r_['1', data, self.iofile_eventdict[key.upper()]]
+                                    except ValueError:
+                                        self.print_log(type='W', msg='Invalid dimensions for concatenating arrays for IO %s!' % name)
+                            except KeyError:
+                                self.print_log(type='W', msg='Invalid ioname %s for iofile %s' % (key, name))
+                        self.iofile_bundle.Members[name].Data=data
+                else:
                     self.iofile_bundle.Members[name].read()
     
     def execute_spice_sim(self):
