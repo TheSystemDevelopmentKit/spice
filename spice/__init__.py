@@ -692,7 +692,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     shutil.rmtree(self.spicesimpath)
                     self.print_log(type='D',msg='Removing ./%s' % os.path.relpath(self.spicesimpath,start='../'))
                 except:
-                    self.print_log(type='W',msg='Could not remove ./%s' % os.path.relpath(spicesimpath,start='../'))
+                    self.print_log(type='W',msg='Could not remove ./%s' % os.path.relpath(self.spicesimpath,start='../'))
 
     @property
     def spicecmd(self):
