@@ -29,7 +29,7 @@ author = 'Okko Järvinen'
 # The short X.Y version
 version = ''
 # The full version, including alpha/beta/rc tags
-release = '1.4'
+release = '1.7_RC'
 
 #autoclass_content='both'
 
@@ -137,7 +137,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'spice.tex', 'Eldo Documentation',
+    (master_doc, 'spice.tex', 'Spice Documentation',
      'Your Name', 'manual'),
 ]
 

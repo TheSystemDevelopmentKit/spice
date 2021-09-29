@@ -10,8 +10,6 @@ automatically generate testbenches for the most common simulation cases.
 
 Initially written by Okko Järvinen, 2019
 
-Last modification by Okko Järvinen, 24.09.2021 12:59
-
 Release 1.6, Jun 2020 supports Eldo and Spectre
 """
 import os
@@ -227,9 +225,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self.load_state = '20201002103638_tmpdbw11nr4' # load results matching this name
             self.load_state = 'zzzz' (non-existent directory) # list available directories to load
         """
-        if hasattr(self,'_load_state'):
-            return self._load_state
-        else:
+        if not hasattr(self,'_load_state'):
             self._load_state=''
         return self._load_state
     @load_state.setter
@@ -426,7 +422,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             for name, val in self.iofile_bundle.Members.items():
                 if (val.dir.lower()=='out' or val.dir.lower()=='output') and val.iotype=='event':
                     for key in val.ionames:
-                        self._iofile_eventdict[key] = None
+                        # Eldo seems to force output names to uppercase, let's
+                        # uppercase everything here to avoid key mismatches
+                        self._iofile_eventdict[key.upper()] = None
         return self._iofile_eventdict
     @iofile_eventdict.setter
     def iofile_eventdict(self,val):
@@ -673,6 +671,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @spicesimpath.deleter
     def spicesimpath(self):
         if os.path.exists(self.spicesimpath) and not self.preserve_result:
+            self.print_log(msg='Cleaning ./%s (set preserve_result=True to keep)' % os.path.relpath(self._spicesimpath,start='../'))
             keepdb = False
             for target in os.listdir(self.spicesimpath):
                 targetpath = '%s/%s' % (self.spicesimpath,target)
@@ -775,7 +774,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def plotprogcmd(self, value):
         self._plotprogcmd=value
 
-    def connect_inputs(self):
+    def connect_spice_inputs(self):
         """Automatically called function to connect iofiles (inputs) to top
         entity IOS Bundle items."""
         for ioname,io in self.IOS.Members.items():
@@ -787,25 +786,25 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     # Data must be properly shaped
                     self.iofile_bundle.Members[ioname].Data=self.IOS.Members[ioname].Data
 
-    def connect_outputs(self):
+    def connect_spice_outputs(self):
         """Automatically called function to connect iofiles (outputs) to top
         entity IOS Bundle items."""
         for name,val in self.iofile_bundle.Members.items():
             if val.dir == 'out':
                 self.IOS.Members[name].Data=self.iofile_bundle.Members[name].Data
 
-    def write_infile(self):
+    def write_spice_inputs(self):
         """Automatically called function to call write() functions of each
         iofile with direction 'input'."""
         for name, val in self.iofile_bundle.Members.items():
             if val.dir.lower()=='in' or val.dir.lower()=='input':
                 self.iofile_bundle.Members[name].write()
 
-    def read_outfile(self):
+    def read_spice_outputs(self):
         """Automatically called function to call read() functions of each
         iofile with direction 'output'."""
         # Handle spectre differently..
-        if self.model=='spectre':
+        if self.model=='spectre' or self.model=='eldo':
             first=True
             for name, val in self.iofile_bundle.Members.items():
                 if val.dir.lower()=='out' or val.dir.lower()=='output':
@@ -815,7 +814,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                             first=False
                         if len(val.ionames) == 1:
                             try:
-                                self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0]]
+                                self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()]
                             except KeyError:
                                 self.print_log(type='W', msg='Invalid ioname %s for iofile %s' % (val.ionames[0], name))
                         else: # Iofile is a bus?
@@ -823,10 +822,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                             for i, key in enumerate(val.ionames):
                                 try:
                                     if i == 0:
-                                        data=self.iofile_eventdict[key]
+                                        data=self.iofile_eventdict[key.upper()]
                                     else:
                                         try:
-                                            data=np.r_['1', data, self.iofile_eventdict[key]]
+                                            data=np.r_['1', data, self.iofile_eventdict[key.upper()]]
                                         except ValueError:
                                             self.print_log(type='W', msg='Invalid dimensions for concatenating arrays for IO %s!' % name)
                                 except KeyError:
@@ -834,7 +833,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                             self.iofile_bundle.Members[name].Data=data
                     else:
                         self.iofile_bundle.Members[name].read()
-
         else:
             for name, val in self.iofile_bundle.Members.items():
                 if val.dir.lower()=='out' or val.dir.lower()=='output':
@@ -908,52 +906,36 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         self.extracts.Members['currents'] = {}
         self.extracts.Members['curr_tran'] = {}
         try:
-            if self.model == 'eldo':
-                currentmatch = re.compile(r"\* CURRENT_")
-                powermatch = re.compile(r"\* POWER_")
-                with open(self.eldochisrc) as infile:
-                    chifile = infile.readlines()
-                    for line in chifile:
-                        if currentmatch.search(line):
-                            words = line.split()
-                            sourcename = words[1].replace('CURRENT_','')
-                            extval = float(words[3])
-                            self.extracts.Members['currents'][sourcename] = extval
-                        elif powermatch.search(line):
-                            words = line.split()
-                            sourcename = words[1].replace('POWER_','')
-                            extval = float(words[3])
-                            self.extracts.Members['powers'][sourcename] = extval
-            elif self.model == 'spectre':
-                for name, val in self.tb.dcsources.Members.items():
-                    # Read transient power consumption of the extracted source
-                    if val.extract and val.sourcetype.lower() == 'v':
-                        sourcename = '%s%s' % (val.sourcetype.upper(),val.name.lower())
-                        if sourcename in self.iofile_eventdict:
-                            arr = self.iofile_eventdict[sourcename]
-                            if val.ext_start is not None:
-                                arr = arr[np.where(arr[:,0] >= val.ext_start)[0],:]
-                            if val.ext_stop is not None:
-                                arr = arr[np.where(arr[:,0] <= val.ext_stop)[0],:]
-                            # The time points are non-uniform -> use deltas as weights
-                            dt = np.diff(arr[:,0])
-                            totaltime = arr[-1,0]-arr[0,0]
-                            meancurr = np.sum(np.abs(arr[1:,1])*dt)/totaltime
-                            meanpwr = meancurr*val.value
-                            self.extracts.Members['currents'][val.name] = meancurr
-                            self.extracts.Members['powers'][val.name] = meanpwr
-                            self.extracts.Members['curr_tran'][val.name] = arr
-            self.print_log(type='I',msg='Extracted power consumption from transient:')
-            # This is newer Python syntax
-            maxlen = len(max([*self.extracts.Members['powers'],'total'],key=len))
-            for name,val in self.extracts.Members['currents'].items():
-                self.print_log(type='I',msg='%s%s current = %.06f mA'%(name,' '*(maxlen-len(name)),1e3*val))
-            if len(self.extracts.Members['currents'].items()) > 0:
-                self.print_log(type='I',msg='Total%s current = %.06f mA'%(' '*(maxlen-5),1e3*sum(self.extracts.Members['currents'].values())))
-            for name,val in self.extracts.Members['powers'].items():
-                self.print_log(type='I',msg='%s%s power   = %.06f mW'%(name,' '*(maxlen-len(name)),1e3*val))
-            if len(self.extracts.Members['powers'].items()) > 0:
-                self.print_log(type='I',msg='Total%s power   = %.06f mW'%(' '*(maxlen-5),1e3*sum(self.extracts.Members['powers'].values())))
+            for name, val in self.tb.dcsources.Members.items():
+                # Read transient power consumption of the extracted source
+                if val.extract and val.sourcetype.lower() == 'v':
+                    sourcename = '%s%s' % (val.sourcetype.upper(),val.name.upper())
+                    if sourcename in self.iofile_eventdict:
+                        arr = self.iofile_eventdict[sourcename]
+                        if val.ext_start is not None:
+                            arr = arr[np.where(arr[:,0] >= val.ext_start)[0],:]
+                        if val.ext_stop is not None:
+                            arr = arr[np.where(arr[:,0] <= val.ext_stop)[0],:]
+                        # The time points are non-uniform -> use deltas as weights
+                        dt = np.diff(arr[:,0])
+                        totaltime = arr[-1,0]-arr[0,0]
+                        meancurr = np.sum(np.abs(arr[1:,1])*dt)/totaltime
+                        meanpwr = meancurr*val.value
+                        self.extracts.Members['currents'][val.name] = meancurr
+                        self.extracts.Members['powers'][val.name] = meanpwr
+                        self.extracts.Members['curr_tran'][val.name] = arr
+            if len(self.extracts.Members['powers'].keys()) > 0:
+                self.print_log(type='I',msg='Extracted power consumption from transient:')
+                # This is newer Python syntax
+                maxlen = len(max([*self.extracts.Members['powers'],'total'],key=len))
+                for name,val in self.extracts.Members['currents'].items():
+                    self.print_log(type='I',msg='%s%s current = %.06f mA'%(name,' '*(maxlen-len(name)),1e3*val))
+                if len(self.extracts.Members['currents'].items()) > 0:
+                    self.print_log(type='I',msg='Total%s current = %.06f mA'%(' '*(maxlen-5),1e3*sum(self.extracts.Members['currents'].values())))
+                for name,val in self.extracts.Members['powers'].items():
+                    self.print_log(type='I',msg='%s%s power   = %.06f mW'%(name,' '*(maxlen-len(name)),1e3*val))
+                if len(self.extracts.Members['powers'].items()) > 0:
+                    self.print_log(type='I',msg='Total%s power   = %.06f mW'%(' '*(maxlen-5),1e3*sum(self.extracts.Members['powers'].values())))
         except:
             self.print_log(type='W',msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting power consumptions.')
@@ -1098,17 +1080,17 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self.tb.iofiles = self.iofile_bundle
             self.tb.dcsources = self.dcsource_bundle
             self.tb.simcmds = self.simcmd_bundle
-            self.connect_inputs()
+            self.connect_spice_inputs()
             self.tb.generate_contents()
             self.tb.export_subckt(force=True)
             self.tb.export(force=True)
-            self.write_infile()
+            self.write_spice_inputs()
             if self.interactive_spice:
                 plotthread = threading.Thread(target=self.run_plotprogram,name='plotting')
                 plotthread.start()
             self.execute_spice_sim()
-            self.read_outfile()
-            self.connect_outputs()
+            self.read_spice_outputs()
+            self.connect_spice_outputs()
             self.extract_powers()
             self.read_oppts()
             # Clean simulation results
@@ -1134,9 +1116,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     self.tb.iofiles = self.iofile_bundle
                     self.tb.dcsources = self.dcsource_bundle
                     self.tb.simcmds = self.simcmd_bundle
-                    self.connect_inputs()
-                    self.read_outfile()
-                    self.connect_outputs()
+                    self.connect_spice_inputs()
+                    self.read_spice_outputs()
+                    self.connect_spice_outputs()
                     self.extract_powers()
                     self.read_oppts()
             except:

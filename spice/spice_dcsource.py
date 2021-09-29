@@ -8,7 +8,7 @@ testbench.
 
 Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
 
-Last modification by Okko Järvinen, 23.09.2021 14:41
+Last modification by Okko Järvinen, 29.09.2021 12:51
 
 """
 
@@ -221,3 +221,18 @@ class spice_dcsource(thesdk):
     @ramp.setter
     def ramp(self,value):
         self._ramp=value
+
+    @property
+    def ext_file(self):
+        """String
+
+        Optional filepath for extracted transient current when
+        self.extract=True.
+        """
+        if not hasattr(self,'_ext_file'):
+            self._ext_file = '%s/tb_%s.print' % (self.parent.spicesimpath,self.parent.name)
+        return self._ext_file
+    @ext_file.setter
+    def ext_file(self,val):
+        self._ext_file=val
+        return self._ext_file

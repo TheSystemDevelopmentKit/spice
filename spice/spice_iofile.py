@@ -6,9 +6,7 @@ Spice IO-file
 Provides spice file IO related attributes and methods 
 for TheSDK spice.
 
-Initially written by Okko Järvinen, okko.jarvinen@aalto.fi, 9.1.2020
-
-Last modification by Okko Järvinen, 24.09.2021 14:26
+Initially written by Okko Järvinen, 2020
 
 """
 import os
@@ -22,7 +20,6 @@ from thesdk.iofile import iofile
 import numpy as np
 import pandas as pd
 from numpy import genfromtxt
-#from spice.connector import intend
 import traceback
 from bitstring import BitArray
 
@@ -322,26 +319,20 @@ class spice_iofile(iofile):
         self._file = []
         for ioname in self.ionames:
             filepath = self.parent.spicesimpath+'/'
-            if self.iotype is not 'event': 
-                filename = ( '%s_%s_ioname_%s_bundlename_%s_%s_%s.txt' 
-                        % ( self.parent.runname,self.dir,ioname.replace('<','').replace('>','').replace('.','_'),
-                            self.name.replace('<','').replace('>','').replace('.','_'),self.iotype,self.edgetype))
+            # For now, all outputs are event type stored in a common file
+            if self.dir == 'out':
+                filename = 'tb_%s.print' % (self.parent.name)
             else:
-                # We cant control the filename. Location is defined with -odir option
-                if self.parent.model == 'spectre' and self.dir == 'out':
-                    filename = 'tb_%s.print' % (self.parent.name)
-                else:
-                    filename = ( '%s_%s_%s_%s.txt' 
-                        % ( self.parent.runname,self.dir,ioname.replace('<','').replace('>','').replace('.','_'),
-                            self.iotype))
-
+                filename = ( '%s_%s_%s_%s.txt' 
+                    % ( self.parent.runname,self.dir,ioname.replace('<','').replace('>','').replace('.','_'),
+                        self.iotype))
             if self.parent.model == 'ngspice' and self.dir == 'in':
                 # For some reason Ngspice requires lowercase names
                 filename = filename.lower()
             filename = filepath + filename    
             self._file.append(filename)
         # Keep unique filenames only for event-type outputs to keep load times at minimum
-        if self.parent.model=='spectre' and self.iotype=='event' and self.dir=='out':
+        if self.parent.model in ['spectre','eldo'] and self.iotype=='event' and self.dir=='out':
             self._file=list(set(self._file))
         return self._file
     @file.setter
@@ -451,53 +442,71 @@ class spice_iofile(iofile):
         """
         Function to read files associated with this spice_iofile.
         """
-
-        if self.iotype=='event' and self.parent.model=='spectre':
-            label_match=re.compile(r'\((.*)\)')
+        if self.iotype=='event':
             file=self.file[0] # File is the same for all event type outputs
-            lines=subprocess.check_output('grep -n \"time\|freq\" %s' % file, shell=True).decode('utf-8')
-            lines=lines.split('\n') 
-            linenumbers=[]
-            labels=[]
-            for line in lines:
-                parts=line.split(':')
-                if len(parts) > 1: # Line should now contain linenumber in first element, ioname in second
-                    line = 0
-                    try:
-                        line=int(parts[0])
-                        linenumbers.append(line)
-                    except ValueError:
-                        self.print_log(type='W', msg='Couldn\'t decode linenumber from file %s' %  file)
-                    label=label_match.search(parts[1])
+            label_match=re.compile(r'\((.*)\)')
+            if self.parent.model == 'spectre':
+                lines=subprocess.check_output('grep -n \"time\|freq\" %s' % file, shell=True).decode('utf-8')
+                lines=lines.split('\n') 
+                linenumbers=[]
+                labels=[]
+                for line in lines:
+                    parts=line.split(':')
+                    if len(parts) > 1: # Line should now contain linenumber in first element, ioname in second
+                        line = 0
+                        try:
+                            line=int(parts[0])
+                            linenumbers.append(line)
+                        except ValueError:
+                            self.print_log(type='W', msg='Couldn\'t decode linenumber from file %s' %  file)
+                        label=label_match.search(parts[1])
+                        if label:
+                            labels.append(label.group(1)) # Capture inner group (== ioname)
+                        else:
+                            self.print_log(type='W', msg='Couldn\'t find IO on line %d from file %s' %  (line,file))
+                if len(labels) == len(linenumbers):
+                    numlines = int(subprocess.check_output("wc -l %s | awk '{print $1}'" % file,shell=True).decode('utf-8'))
+                    procs = []
+                    queues = []
+                    for k in range(len(linenumbers)):
+                        start=linenumbers[k] # Indexing starts from zero
+                        if k == len(linenumbers)-1:
+                            stop=1
+                        else:
+                            stop=numlines-(linenumbers[k+1]-6) # Previous data column ends 5 rows before start of next one
+                        dtype=self.datatype if self.datatype=='complex' else 'float' # Default is int for thesdk_spicefile, let's infer from data
+                        queue = multiprocessing.Queue()
+                        queues.append(queue)
+                        proc = multiprocessing.Process(target=self.parse_io_from_file,args=(file,start,stop,dtype,labels[k],queue))
+                        procs.append(proc)
+                        proc.start() 
+                    for i,p in enumerate(procs):
+                        try:
+                            ret = queues[i].get()
+                            self.parent.iofile_eventdict[ret[0].upper()]=ret[1]
+                            p.join()
+                        except KeyError:
+                            self.print_log(type='W', msg='Failed reading %s' % (ret[0]))
+                else:
+                    self.print_log(type='W', msg='Couldn\'t read IOs from file %s. Missing ioname?' % file)
+            elif self.parent.model == 'eldo':
+                # Parse signal headers
+                with open(file,'r') as f:
+                    for line in f.readlines():
+                        if line.startswith('# TIME') or line.startswith('# FREQ'):
+                            header = line.replace('# ','').replace('\n','').split(' ')
+                            break
+                arr = np.genfromtxt(file)
+                if len(header) != len(arr[0,:]):
+                    self.print_log(type='E', msg='Signal name and array column mismatch while reading event outputs.')
+                for col_idx,sname in enumerate(header[1:]):
+                    label=label_match.search(sname)
                     if label:
-                        labels.append(label.group(1)) # Capture inner group (== ioname)
+                        label = label.group(1)
+                        # Add to the event dictionary
+                        self.parent.iofile_eventdict[label.upper()]=np.hstack((arr[:,0].reshape(-1,1),arr[:,col_idx+1].reshape(-1,1))).reshape(-1,2)
                     else:
-                        self.print_log(type='W', msg='Couldn\'t find IO on line %d from file %s' %  (line,file))
-            if len(labels) == len(linenumbers):
-                numlines = int(subprocess.check_output("wc -l %s | awk '{print $1}'" % file,shell=True).decode('utf-8'))
-                procs = []
-                queues = []
-                for k in range(len(linenumbers)):
-                    start=linenumbers[k] # Indexing starts from zero
-                    if k == len(linenumbers)-1:
-                        stop=1
-                    else:
-                        stop=numlines-(linenumbers[k+1]-6) # Previous data column ends 5 rows before start of next one
-                    dtype=self.datatype if self.datatype=='complex' else 'float' # Default is int for thesdk_spicefile, let's infer from data
-                    queue = multiprocessing.Queue()
-                    queues.append(queue)
-                    proc = multiprocessing.Process(target=self.parse_io_from_file,args=(file,start,stop,dtype,labels[k],queue))
-                    procs.append(proc)
-                    proc.start() 
-                for i,p in enumerate(procs):
-                    try:
-                        ret = queues[i].get()
-                        self.parent.iofile_eventdict[ret[0]]=ret[1]
-                        p.join()
-                    except KeyError:
-                        self.print_log(type='W', msg='Failed reading %s' % (ret[0]))
-            else:
-                self.print_log(type='W', msg='Couldn\'t read IOs from file %s. Missing ioname?' % file)
+                        self.print_log(type='W', msg='Label format mismatch with \'%s\'.' %  (label))
         else:
             for i in range(len(self.file)):
                 try:
@@ -521,14 +530,11 @@ class spice_iofile(iofile):
                         self.print_log(type='O',msg='IO type \'vsample\' is obsolete. Please use type \'sample\' and set ioformat=\'volt\'.')
                         self.print_log(type='F',msg='Please do it now :)')
                     elif self.iotype=='time':
-                        if self.parent.model=='eldo':
-                            arr = genfromtxt(self.file[i],delimiter=', ',skip_header=self.parent.syntaxdict["csvskip"])
+                        # TODO: Make sure all 'event' iofiles are parsed before 'time' iofiles
+                        if self.ionames[i].upper() in self.parent.iofile_eventdict:
+                            arr = self.parent.iofile_eventdict[self.ionames[i].upper()]
                         else:
-                            # TODO: Make sure all 'event' iofiles are parsed before 'time' iofiles
-                            if self.ionames[i] in self.parent.iofile_eventdict:
-                                arr = self.parent.iofile_eventdict[self.ionames[i]]
-                            else:
-                                self.print_log(type='E',msg='No event data found for %s while parsing time signal.' % self.ionames[i])
+                            self.print_log(type='E',msg='No event data found for %s while parsing time signal.' % self.ionames[i])
                         # This should work for both spectre and eldo now
                         if self.edgetype.lower() == 'both':
                             trise = self.interp_crossings(arr,self.vth,256,'rising')
@@ -554,135 +560,90 @@ class spice_iofile(iofile):
                                 self.Data = nans
                             self.Data = np.hstack((self.Data,nparr))
                     elif self.iotype=='sample':
-                        if self.parent.model == 'eldo':
-                            nodematch=re.compile(r"%s" % self.ionames[i].upper())
-                            with open(self.file[i]) as infile:
-                                wholefile=infile.readlines()
-                                maxsamp = -1
-                                outbus = {}
-                                for line in wholefile:
-                                    if nodematch.search(line) != None:
-                                        tokens = re.findall(r"[\w']+",line)
-                                        bitidx = tokens[2]
-                                        sampidx = tokens[3]
-                                        if int(sampidx) > maxsamp:
-                                            maxsamp = int(sampidx)
-                                        bitval = line.split()[-1]
-                                        # TODO: Rounding to bits is done here (might need to go elsewhere)
-                                        # Also, not all sampled signals need to be output as bits necessarily
-                                        if float(bitval) >= self.vth:
-                                            bitval = '1'
-                                        else:
-                                            bitval = '0'
-                                        if bitidx in outbus.keys():
-                                            outbus[bitidx].append(bitval)
-                                        else:
-                                            outbus.update({bitidx:[bitval]})
-                                maxbit = max(map(int,outbus.keys()))
-                                minbit = min(map(int,outbus.keys()))
-                                # TODO: REALLY check the endianness of these (together with RTL)
-                                if not self.big_endian:
-                                    bitrange = range(maxbit,minbit-1,-1)
-                                    self.print_log(type='I',msg='Reading %s<%d:%d> from file to %s.'%(self.ionames[i].upper(),maxbit,minbit,self.name))
-                                else:
-                                    bitrange = range(minbit,maxbit+1,1)
-                                    self.print_log(type='I',msg='Reading %s<%d:%d> from file to %s.'%(self.ionames[i].upper(),minbit,maxbit,self.name))
-                                arr = []
-                                for idx in range(maxsamp):
-                                    word = ''
-                                    for key in bitrange:
-                                        word += outbus[str(key)][idx]
-                                    arr.append(word)
-                                if self.Data is None: 
-                                    self.Data = np.array(arr).reshape(-1,1)
-                                else:
-                                    self.Data = np.hstack((self.Data,np.array(arr).reshape(-1,1)))
-                            infile.close()
-                        elif self.parent.model == 'spectre':
-                            # Extracting the bus width
-                            signame = self.ionames[i]
-                            busstart,busstop,buswidth,busrange = self.parent.get_buswidth(signame)
-                            signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
+                        # Extracting the bus width
+                        signame = self.ionames[i]
+                        busstart,busstop,buswidth,busrange = self.parent.get_buswidth(signame)
+                        signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
 
-                            # Find trigger signal threshold crossings
-                            if isinstance(self.trigger,list):
-                                if len(self.trigger) == len(self.ionames):
-                                    trig = self.trigger[i]
-                                else:
-                                    trig = self.trigger[0]
+                        # Find trigger signal threshold crossings
+                        if isinstance(self.trigger,list):
+                            if len(self.trigger) == len(self.ionames):
+                                trig = self.trigger[i]
                             else:
-                                trig = self.trigger
-                            if trig not in self.parent.iofile_eventdict:
-                                self.print_log(type='E',msg='Event data not found for trigger signal %s' % trig)
-                            else:
-                                trig_event = self.parent.iofile_eventdict[trig]
+                                trig = self.trigger[0]
+                        else:
+                            trig = self.trigger
+                        if trig.upper() not in self.parent.iofile_eventdict:
+                            self.print_log(type='E',msg='Event data not found for trigger signal %s' % trig)
+                        else:
+                            trig_event = self.parent.iofile_eventdict[trig]
                             tsamp = self.interp_crossings(trig_event,self.vth,256,self.edgetype)
 
-                            # Processing each bit in the bus
-                            self.print_log(type='I',msg='Sampling %s with %s (%s).'%(self.ionames[i],trig,self.edgetype))
-                            failed = False
-                            bitmat = None
-                            for j in busrange:
-                                # Get event data for the bit voltage
-                                if buswidth == 1 and '<' not in self.ionames[i]:
-                                    bitname = signame[0]
+                        # Processing each bit in the bus
+                        self.print_log(type='I',msg='Sampling %s with %s (%s).'%(self.ionames[i],trig,self.edgetype))
+                        failed = False
+                        bitmat = None
+                        for j in busrange:
+                            # Get event data for the bit voltage
+                            if buswidth == 1 and '<' not in self.ionames[i]:
+                                bitname = signame[0]
+                            else:
+                                bitname = '%s<%d>' % (signame[0],j)
+                            if bitname.upper() not in self.parent.iofile_eventdict:
+                                event = np.array(['0']).reshape(-1,1)
+                                failed = True
+                            else:
+                                event = self.parent.iofile_eventdict[bitname.upper()]
+                            # Sample the signal
+                            arr = self.sample_signal(event,tsamp)
+                            # Binary or decimal io format, rounding to bits
+                            if self.ioformat != 'volt':
+                                if len(arr.shape) > 1:
+                                    arr = (arr[:,1]>=self.vth).reshape(-1,1).astype(int).astype(str)
                                 else:
-                                    bitname = '%s<%d>' % (signame[0],j)
-                                if bitname not in self.parent.iofile_eventdict:
-                                    event = np.array(['0']).reshape(-1,1)
+                                    arr = np.array(['0']).reshape(-1,1)
                                     failed = True
-                                else:
-                                    event = self.parent.iofile_eventdict[bitname]
-                                # Sample the signal
-                                arr = self.sample_signal(event,tsamp)
-                                # Binary or decimal io format, rounding to bits
-                                if self.ioformat != 'volt':
-                                    if len(arr.shape) > 1:
-                                        arr = (arr[:,1]>=self.vth).reshape(-1,1).astype(int).astype(str)
-                                    else:
-                                        arr = np.array(['0']).reshape(-1,1)
-                                        failed = True
-                                if bitmat is None:
-                                    # First bit is read, it becomes the first column of the bit matrix
-                                    bitmat = arr
-                                else:
-                                    # Following bits get stacked as columns to the left of the previous one
-                                    bitmat = np.hstack((bitmat,arr))
-                            if failed:
-                                self.print_log(type='W',msg='Failed reading sample type output vector.')
+                            if bitmat is None:
+                                # First bit is read, it becomes the first column of the bit matrix
+                                bitmat = arr
+                            else:
+                                # Following bits get stacked as columns to the left of the previous one
+                                bitmat = np.hstack((bitmat,arr))
+                        if failed:
+                            self.print_log(type='W',msg='Failed reading sample type output vector.')
 
-                            if self.ioformat == 'volt':
-                                nparr = bitmat
-                            else:
-                                # Merging bits to buses
-                                arr = []
-                                for j in range(len(bitmat[:,0])):
-                                    arr.append(''.join(bitmat[j,:]))
-                                nparr = np.array(arr).reshape(-1,1)
-                                # Convert binary strings to decimals
-                                if self.ioformat == 'dec':
-                                    b2i = np.vectorize(self._bin2int)
-                                    # For now only little-endian unsigned
-                                    nparr = b2i(nparr)
-                            # TODO: also this should be a function
-                            if self.Data is None: 
-                                self.Data = nparr
-                            else:
-                                if len(self.Data[:,-1]) > len(nparr):
-                                    # Old max length is bigger -> padding new array
-                                    nans = np.empty(self.Data[:,-1].shape,dtype='S%s' % buswidth).reshape(-1,1)
-                                    nans.fill('U' * buswidth)
-                                    nans = nans.astype(str)
-                                    nans[:nparr.shape[0],:nparr.shape[1]] = nparr
-                                    nparr = nans
-                                elif len(self.Data[:,-1]) < len(nparr):
-                                    # Old max length is smaller -> padding old array
-                                    nans = np.empty(self.Data[:,-1].shape,dtype='S%s' % buswidth).reshape(-1,1)
-                                    nans.fill('U' * buswidth)
-                                    nans = nans.astype(str)
-                                    nans[:self.Data.shape[0],:self.Data.shape[1]] = self.Data
-                                    self.Data = nans
-                                self.Data = np.hstack((self.Data,nparr))
+                        if self.ioformat == 'volt':
+                            nparr = bitmat
+                        else:
+                            # Merging bits to buses
+                            arr = []
+                            for j in range(len(bitmat[:,0])):
+                                arr.append(''.join(bitmat[j,:]))
+                            nparr = np.array(arr).reshape(-1,1)
+                            # Convert binary strings to decimals
+                            if self.ioformat == 'dec':
+                                b2i = np.vectorize(self._bin2int)
+                                # For now only little-endian unsigned
+                                nparr = b2i(nparr)
+                        # TODO: also this should be a function
+                        if self.Data is None: 
+                            self.Data = nparr
+                        else:
+                            if len(self.Data[:,-1]) > len(nparr):
+                                # Old max length is bigger -> padding new array
+                                nans = np.empty(self.Data[:,-1].shape,dtype='S%s' % buswidth).reshape(-1,1)
+                                nans.fill('U' * buswidth)
+                                nans = nans.astype(str)
+                                nans[:nparr.shape[0],:nparr.shape[1]] = nparr
+                                nparr = nans
+                            elif len(self.Data[:,-1]) < len(nparr):
+                                # Old max length is smaller -> padding old array
+                                nans = np.empty(self.Data[:,-1].shape,dtype='S%s' % buswidth).reshape(-1,1)
+                                nans.fill('U' * buswidth)
+                                nans = nans.astype(str)
+                                nans[:self.Data.shape[0],:self.Data.shape[1]] = self.Data
+                                self.Data = nans
+                            self.Data = np.hstack((self.Data,nparr))
                     else:
                         self.print_log(type='F',msg='Couldn\'t read file for input type \'%s\'.'%self.iotype)
                 except:
