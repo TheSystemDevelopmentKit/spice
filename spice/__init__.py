@@ -671,7 +671,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @spicesimpath.deleter
     def spicesimpath(self):
         if os.path.exists(self.spicesimpath) and not self.preserve_result:
-            self.print_log(msg='Cleaning ./%s (set preserve_result=True to keep)' % os.path.relpath(self._spicesimpath,start='../'))
+            self.print_log(msg='Cleaning ./%s/ (set preserve_result=True to prevent cleaning).' % os.path.relpath(self._spicesimpath,start='../'))
             keepdb = False
             for target in os.listdir(self.spicesimpath):
                 targetpath = '%s/%s' % (self.spicesimpath,target)
@@ -689,10 +689,21 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     self.print_log(type='W',msg='Could not remove ./%s' % os.path.relpath(targetpath,start='../'))
             if not keepdb:
                 try:
+                    # Eldo needs some time to disconnect from the jwdb server
+                    # Another dirty hack to check that the process is dead before cleaning
+                    # TODO: figure out if this can be prevented
+                    if self.model == 'eldo':
+                        self.print_log(type='I',msg='Waiting for Eldo to exit...')
+                        waittime = 0
+                        while os.system('pgrep \"easynch_64.exe\" >/dev/null') == 0:
+                            time.sleep(1)
+                            waittime += 1
+                            if waittime > 60:
+                                break
                     shutil.rmtree(self.spicesimpath)
-                    self.print_log(type='D',msg='Removing ./%s' % os.path.relpath(self.spicesimpath,start='../'))
+                    self.print_log(type='D',msg='Removing ./%s/' % os.path.relpath(self.spicesimpath,start='../'))
                 except:
-                    self.print_log(type='W',msg='Could not remove ./%s' % os.path.relpath(self.spicesimpath,start='../'))
+                    self.print_log(type='W',msg='Could not remove ./%s/' % os.path.relpath(self.spicesimpath,start='../'))
 
     @property
     def spicecmd(self):
@@ -835,41 +846,33 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def execute_spice_sim(self):
         """Automatically called function to execute spice simulation."""
         self.print_log(type='I', msg="Running external command %s" %(self.spicecmd) )
-        if self.model == 'eldo':
-            # This is some experimental stuff
-            count = 0
-            while True:
-                status = int(os.system(self.spicecmd)/256)
-                # Status code 9 seems to result from failed licensing in LSF runs
-                # Let's not try to restart if in interactive mode
-                if status != 9 or count == 10 or self.interactive_spice:
-                    break
-                else:
-                    count += 1
-                    self.print_log(type='W',msg='License error, trying again... (%d/10)' % count)
-                    time.sleep(5)
-            if status > 0:
-                self.print_log(type='F',msg='Eldo encountered an error (%d).' % status)
-        else:
-            os.system(self.spicecmd)
+        if os.system(self.spicecmd) > 0:
+            self.print_log(type='F', msg="Simulator (%s) returned non-zero exit code." % (self.model))
 
     def run_plotprogram(self):
-        """ Run plotting program for interactive Spectre simulations
-            NOTE: This feature is for Spectre simulations ONLY!
-        """
+        ''' Starting a parallel process for waveform viewer program.
+
+        The plotting program command can be set with 'plotprogram'.
+        Tested for spectre and eldo.
+        '''
+        if self.model == 'ngspice':
+            self.print_log(type='W',msg='Interactive plotting not implemented for ngspice.')
+            return
         # This waiting method assumes spectre output.
-        # TODO: test for eldo (and ngspice?)
         tries = 0
         while tries < 100:
             if os.path.exists(self.spicedbpath):
-                # More than just the logfile exists
-                if len(os.listdir(self.spicedbpath)) > 1:
-                    # Database file has something written to it
-                    filesize = []
-                    for f in os.listdir(self.spicedbpath):
-                        filesize.append(os.stat('%s/%s' % (self.spicedbpath,f)).st_size)
-                    if all(filesize) > 0:
-                        break
+                if self.model == 'spectre':
+                    # More than just the logfile exists
+                    if len(os.listdir(self.spicedbpath)) > 1:
+                        # Database file has something written to it
+                        filesize = []
+                        for f in os.listdir(self.spicedbpath):
+                            filesize.append(os.stat('%s/%s' % (self.spicedbpath,f)).st_size)
+                        if all(filesize) > 0:
+                            break
+                else:
+                    break
             else:
                 time.sleep(2)
                 tries += 1
