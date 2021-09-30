@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>spice.spice_iofile &mdash; spice 1.7_RC documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> spice
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">spice</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+          <li><a href="../spice.html">spice</a> &raquo;</li>
+      <li>spice.spice_iofile</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for spice.spice_iofile</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">=============</span>
+<span class="sd">Spice IO-file</span>
+<span class="sd">=============</span>
+
+<span class="sd">Provides spice file IO related attributes and methods </span>
+<span class="sd">for TheSDK spice.</span>
+
+<span class="sd">Initially written by Okko Järvinen, 2020</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">multiprocessing</span>
+<span class="kn">import</span> <span class="nn">pdb</span>
+<span class="kn">from</span> <span class="nn">abc</span> <span class="k">import</span> <span class="o">*</span> 
+<span class="kn">from</span> <span class="nn">thesdk</span> <span class="k">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">thesdk.iofile</span> <span class="k">import</span> <span class="n">iofile</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">from</span> <span class="nn">numpy</span> <span class="k">import</span> <span class="n">genfromtxt</span>
+<span class="kn">import</span> <span class="nn">traceback</span>
+<span class="kn">from</span> <span class="nn">bitstring</span> <span class="k">import</span> <span class="n">BitArray</span>
+
+<div class="viewcode-block" id="spice_iofile"><a class="viewcode-back" href="../../index.html#spice.spice_iofile.spice_iofile">[docs]</a><span class="k">class</span> <span class="nc">spice_iofile</span><span class="p">(</span><span class="n">iofile</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Class to provide file IO for spice simulations. When created, </span>
+<span class="sd">    adds a spice_iofile object to the parents iofile_bundle property.</span>
+<span class="sd">    Accessible as iofile_bundle.Members[&#39;name&#39;].</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    parent : object </span>
+<span class="sd">        The parent object initializing the spice_iofile instance. Default None</span>
+<span class="sd">    name : str</span>
+<span class="sd">        Name of the IO.</span>
+<span class="sd">    dir : &#39;in&#39; or &#39;out&#39;</span>
+<span class="sd">        Direction of the IO.</span>
+<span class="sd">    iotype : &#39;event&#39;, &#39;sample&#39; or &#39;time&#39;</span>
+<span class="sd">        Type of the IO signal. Event type signals are time-value pairs (analog</span>
+<span class="sd">        signal), whereas sample type signals are sampled by a clock signal</span>
+<span class="sd">        (digital bus). Sample type signals can be used for discrete time &amp;</span>
+<span class="sd">        continuous amplitude outputs (sampled voltage for example), by setting</span>
+<span class="sd">        iotype=&#39;sample&#39; and ioformat=&#39;volt&#39;. Time type signals return a vector</span>
+<span class="sd">        of timestamps corresponding to threshold crossings.</span>
+<span class="sd">    ioformat : &#39;dec&#39;, &#39;bin&#39; or &#39;volt&#39;</span>
+<span class="sd">        Formatting of the sampled signals. Digital output buses are formatted</span>
+<span class="sd">        to unsigned integers when ioformat = &#39;dec&#39;. For &#39;bin&#39;, the digital</span>
+<span class="sd">        output bus is returned as a string containing ones and zeros. When</span>
+<span class="sd">        ioformat = &#39;volt&#39;, the output signal is sampled at the clock and the</span>
+<span class="sd">        floating point value is returned. Voltage sampling is only supported</span>
+<span class="sd">        for non-bus signals.</span>
+<span class="sd">    sourcetype : &#39;V&#39;, &#39;I&#39; or &#39;ISUB&#39;</span>
+<span class="sd">        Type of the source associated to a file. Default &#39;V&#39;.</span>
+<span class="sd">    datatype : str</span>
+<span class="sd">        Inherited from the parent. If complex, the ioname is handled as a</span>
+<span class="sd">        complex signal. Currently implemented only for writing the ouputs in</span>
+<span class="sd">        testbenches and reading them in. </span>
+<span class="sd">    trigger : str or list&lt;str&gt;</span>
+<span class="sd">        Name of the clock signal node in the Spice netlist. If a single string</span>
+<span class="sd">        is given, the same clock signal is used for all bits/buses. If a list</span>
+<span class="sd">        is given, and the length matches ionames list length, each ioname will</span>
+<span class="sd">        be assigned its own clock. Applies only to sample type outputs.</span>
+<span class="sd">    vth : float</span>
+<span class="sd">        Threshold voltage of the trigger signal and the bit rounding. Applies</span>
+<span class="sd">        only to sample type outputs.</span>
+<span class="sd">    edgetype : &#39;rising&#39;, &#39;falling&#39; or &#39;both&#39;</span>
+<span class="sd">        Type of triggering edge. When time type signal is used, the edgetype</span>
+<span class="sd">        values can define the extraction type as &#39;risetime&#39; or &#39;falltime&#39;</span>
+<span class="sd">        additionally. Default &#39;rising&#39;.</span>
+<span class="sd">    after : float</span>
+<span class="sd">        Initial delay added to the input signal (sample) or time extraction</span>
+<span class="sd">        (time). Useful for ignoring inital settling, for example. Applies only</span>
+<span class="sd">        to sample and time outputs. Default 0.</span>
+<span class="sd">    big_endian : bool</span>
+<span class="sd">        Flag to read the extracted bus as big-endian. Applies only to sample</span>
+<span class="sd">        type outputs. Default False.</span>
+<span class="sd">    rs : float</span>
+<span class="sd">        Sample rate of the sample type input. Default None.</span>
+<span class="sd">    vhi : float</span>
+<span class="sd">        High bit value of sample type input. Default 1.0.</span>
+<span class="sd">    vlo : float</span>
+<span class="sd">        Low bit value of sample type input. Default 0.</span>
+<span class="sd">    tfall : float</span>
+<span class="sd">        Falltime of sample type input. Default 5e-12.</span>
+<span class="sd">    trise : float</span>
+<span class="sd">        Risetime of sample type input. Default 5e-12.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    Initiated in parent as::</span>
+
+<span class="sd">        _=spice_iofile(self,name=&#39;foobar&#39;)</span>
+
+<span class="sd">    Defining analog input voltage signals from python to spice::</span>
+
+<span class="sd">        _=spice_iofile(self,name=&#39;inp&#39;,dir=&#39;in&#39;,iotype=&#39;event&#39;,sourcetype=&#39;V&#39;,ionames=&#39;INP&#39;)</span>
+<span class="sd">        _=spice_iofile(self,name=&#39;inn&#39;,dir=&#39;in&#39;,iotype=&#39;event&#39;,sourcetype=&#39;V&#39;,ionames=&#39;INN&#39;)</span>
+
+<span class="sd">    Defining time-domain output signal containing rising edge threshold</span>
+<span class="sd">    crossing timestamps of an analog clock signal::</span>
+
+<span class="sd">        _=spice_iofile(self,name=&#39;clk_rise&#39;,dir=&#39;out&#39;,iotype=&#39;time&#39;,sourcetype=&#39;V&#39;,</span>
+<span class="sd">                       ionames=&#39;CLK&#39;,edgetype=&#39;rising&#39;,vth=self.vdd/2)</span>
+
+<span class="sd">    Defining digital output signal triggered with a falling edge of the analog clock::</span>
+
+<span class="sd">        _=spice_iofile(self,name=&#39;dout&#39;,dir=&#39;out&#39;,iotype=&#39;sample&#39;,sourcetype=&#39;V&#39;,ioformat=&#39;bin&#39;,</span>
+<span class="sd">                       ionames=&#39;DOUT&lt;7:0&gt;&#39;,edgetype=&#39;falling&#39;,vth=self.vdd/2,trigger=&#39;CLK&#39;)</span>
+
+<span class="sd">    Defining a discrete time &amp; continuous amplitude output signal triggered</span>
+<span class="sd">    with a rising edge of the analog clock. The iofile returns a 2D-vector</span>
+<span class="sd">    similar to &#39;event&#39; type signals::</span>
+
+<span class="sd">        _=spice_iofile(self,name=&#39;sampled_input&#39;,dir=&#39;out&#39;,iotype=&#39;sample&#39;,sourcetype=&#39;V&#39;,ioformat=&#39;volt&#39;,</span>
+<span class="sd">                       ionames=&#39;INP&#39;,edgetype=&#39;rising&#39;,vth=self.vdd/2,trigger=&#39;CLK&#39;)</span>
+
+<span class="sd">    Defining digital input signal with decimal format. The input vector is a</span>
+<span class="sd">    list of integers, which get converted to binary bus of 4-bits (inferred</span>
+<span class="sd">    from &#39;CTRL&lt;3:0&gt;&#39;). The values are changed at 1 MHz interval in this</span>
+<span class="sd">    example.::</span>
+
+<span class="sd">        _=spice_iofile(self,name=&#39;ctrl&#39;,dir=&#39;in&#39;,iotype=&#39;sample&#39;,ionames=&#39;CTRL&lt;3:0&gt;&#39;,rs=1e6,</span>
+<span class="sd">                       vhi=self.vdd,trise=5e-12,tfall=5e-12,ioformat=&#39;dec&#39;)</span>
+<span class="sd">        </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">parent</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">parent</span><span class="o">==</span><span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">,</span> <span class="n">msg</span><span class="o">=</span><span class="s2">&quot;Parent of spice input file not given&quot;</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>  
+            <span class="nb">super</span><span class="p">(</span><span class="n">spice_iofile</span><span class="p">,</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">parent</span><span class="o">=</span><span class="n">parent</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">paramname</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;param&#39;</span><span class="p">,</span><span class="s1">&#39;-g g_file_&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ioformat</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ioformat&#39;</span><span class="p">,</span><span class="s1">&#39;dec&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">trigger</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;trigger&#39;</span><span class="p">,</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">vth</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;vth&#39;</span><span class="p">,</span><span class="mf">0.5</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">edgetype</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;edgetype&#39;</span><span class="p">,</span><span class="s1">&#39;rising&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">after</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;after&#39;</span><span class="p">,</span><span class="mi">0</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">big_endian</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;big_endian&#39;</span><span class="p">,</span><span class="kc">False</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rs</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;rs&#39;</span><span class="p">,</span><span class="kc">None</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">vhi</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;vhi&#39;</span><span class="p">,</span><span class="mf">1.0</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">vlo</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;vlo&#39;</span><span class="p">,</span><span class="mi">0</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tfall</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;tfall&#39;</span><span class="p">,</span><span class="mf">5e-12</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">trise</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;trise&#39;</span><span class="p">,</span><span class="mf">5e-12</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">sourcetype</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;sourcetype&#39;</span><span class="p">,</span><span class="s1">&#39;V&#39;</span><span class="p">)</span>
+        <span class="k">except</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">,</span> <span class="n">msg</span><span class="o">=</span><span class="s2">&quot;spice IO file definition failed.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Overloading file property to contain a list</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">file</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;List&lt;str&gt;</span>
+
+<span class="sd">        List containing filepaths to files associated with this spice_iofile.</span>
+<span class="sd">        For digital buses or arrays of signals, the list contains multiple</span>
+<span class="sd">        files which are automatically handled together. These filepaths are set</span>
+<span class="sd">        automatically.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_file</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">ioname</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ionames</span><span class="p">:</span>
+            <span class="n">filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">spicesimpath</span><span class="o">+</span><span class="s1">&#39;/&#39;</span>
+            <span class="c1"># For now, all outputs are event type stored in a common file</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">dir</span> <span class="o">==</span> <span class="s1">&#39;out&#39;</span><span class="p">:</span>
+                <span class="n">filename</span> <span class="o">=</span> <span class="s1">&#39;tb_</span><span class="si">%s</span><span class="s1">.print&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">filename</span> <span class="o">=</span> <span class="p">(</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1">_</span><span class="si">%s</span><span class="s1">_</span><span class="si">%s</span><span class="s1">_</span><span class="si">%s</span><span class="s1">.txt&#39;</span> 
+                    <span class="o">%</span> <span class="p">(</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">runname</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">dir</span><span class="p">,</span><span class="n">ioname</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&lt;&#39;</span><span class="p">,</span><span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&gt;&#39;</span><span class="p">,</span><span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span><span class="s1">&#39;_&#39;</span><span class="p">),</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">iotype</span><span class="p">))</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">model</span> <span class="o">==</span> <span class="s1">&#39;ngspice&#39;</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">dir</span> <span class="o">==</span> <span class="s1">&#39;in&#39;</span><span class="p">:</span>
+                <span class="c1"># For some reason Ngspice requires lowercase names</span>
+                <span class="n">filename</span> <span class="o">=</span> <span class="n">filename</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+            <span class="n">filename</span> <span class="o">=</span> <span class="n">filepath</span> <span class="o">+</span> <span class="n">filename</span>    
+            <span class="bp">self</span><span class="o">.</span><span class="n">_file</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+        <span class="c1"># Keep unique filenames only for event-type outputs to keep load times at minimum</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">iotype</span><span class="o">==</span><span class="s1">&#39;event&#39;</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">dir</span><span class="o">==</span><span class="s1">&#39;out&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_file</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_file</span><span class="p">))</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_file</span>
+    <span class="nd">@file</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span> <span class="nf">file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">val</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_file</span><span class="o">=</span><span class="n">val</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_file</span>
+
+    <span class="c1"># Overloading ionames property to contain a list</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">ionames</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;List&lt;str&gt;</span>
+
+<span class="sd">        Set by argument &#39;ionames&#39;. This property casts the given argument to a</span>
+<span class="sd">        list if needed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_ionames</span><span class="p">,</span><span class="nb">str</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_ionames</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_ionames</span><span class="p">]</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ionames</span>
+    <span class="nd">@ionames</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span> <span class="nf">ionames</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">val</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ionames</span><span class="o">=</span><span class="n">val</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ionames</span>
+
+    <span class="c1"># Overloaded write from thesdk.iofile</span>
+<div class="viewcode-block" id="spice_iofile.write"><a class="viewcode-back" href="../../index.html#spice.spice_iofile.spice_iofile.write">[docs]</a>    <span class="k">def</span> <span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Function to write files associated with this spice_iofile.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">iotype</span> <span class="o">==</span> <span class="s1">&#39;event&#39;</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Data</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">file</span><span class="p">)):</span>
+                    <span class="n">np</span><span class="o">.</span><span class="n">savetxt</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">file</span><span class="p">[</span><span class="n">i</span><span class="p">],</span><span class="n">data</span><span class="p">[:,[</span><span class="mi">2</span><span class="o">*</span><span class="n">i</span><span class="p">,</span><span class="mi">2</span><span class="o">*</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]],</span><span class="n">delimiter</span><span class="o">=</span><span class="s1">&#39;,&#39;</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;I&#39;</span><span class="p">,</span><span class="n">msg</span><span class="o">=</span><span class="s1">&#39;Writing event input </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">file</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+            <span class="k">except</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;E&#39;</span><span class="p">,</span><span class="n">msg</span><span class="o">=</span><span class="n">traceback</span><span class="o">.</span><span class="n">format_exc</span><span class="p">())</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;E&#39;</span><span class="p">,</span><span class="n">msg</span><span class="o">=</span><span class="s1">&#39;Failed writing </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">file</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">iotype</span> <span class="o">==</span> <span class="s1">&#39;sample&#39;</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">file</span><span class="p">)):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;I&#39;</span><span class="p">,</span><span class="n">msg</span><span class="o">=</span><span class="s1">&#39;Writing sample input </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">file</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Data</span><span class="p">,</span><span class="nb">int</span><span class="p">):</span>
+                        <span class="c1"># Input is a vector</span>
+                        <span class="n">vec</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Data</span><span class="p">[:,</span><span class="n">i</span><span class="p">]</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="c1"># Input is a scalar value</span>
+                        <span class="n">vec</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">Data</span><span class="p">]</span>
+                    <span class="c1"># Extracting the bus width</span>
+                    <span class="n">signame</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ionames</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+                    <span class="n">busstart</span><span class="p">,</span><span class="n">busstop</span><span class="p">,</span><span class="n">buswidth</span><span class="p">,</span><span class="n">busrange</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">get_buswidth</span><span class="p">(</span><span class="n">signame</span><span class="p">)</span>
+                    <span class="n">signame</span> <span class="o">=</span> <span class="n">signame</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&lt;&#39;</span><span class="p">,</span><span class="s1">&#39; &#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&gt;&#39;</span><span class="p">,</span><span class="s1">&#39; &#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;[&#39;</span><span class="p">,</span><span class="s1">&#39; &#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;]&#39;</span><span class="p">,</span><span class="s1">&#39; &#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">,</span><span class="s1">&#39; &#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">)</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">file</span><span class="p">[</span><span class="n">i</span><span class="p">],</span><span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">outfile</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">model</span> <span class="o">==</span> <span class="s1">&#39;spectre&#39;</span><span class="p">:</span>
+                        <span class="c1"># This is Spectre vector file syntax</span>
+                        <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;radix </span><span class="si">%s</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="s1">&#39;1 &#39;</span><span class="o">*</span><span class="n">buswidth</span><span class="p">))</span>
+                        <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;io i</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                        <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;vname </span><span class="si">%s</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">ionames</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&lt;&#39;</span><span class="p">,</span><span class="s1">&#39;&lt;[&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&gt;&#39;</span><span class="p">,</span><span class="s1">&#39;]&gt;&#39;</span><span class="p">))</span>
+                        <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;tunit ns</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                        <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;period </span><span class="si">%g</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="mf">1e9</span><span class="o">/</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rs</span><span class="p">)))</span>
+                        <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;trise </span><span class="si">%g</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">trise</span><span class="p">)</span><span class="o">*</span><span class="mf">1e9</span><span class="p">))</span>
+                        <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;tfall </span><span class="si">%g</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tfall</span><span class="p">)</span><span class="o">*</span><span class="mf">1e9</span><span class="p">))</span>
+                        <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;tdelay </span><span class="si">%g</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">after</span><span class="p">)</span><span class="o">*</span><span class="mf">1e9</span><span class="p">))</span>
+                        <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;vih </span><span class="si">%g</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">vhi</span><span class="p">)</span>
+                        <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;vil </span><span class="si">%g</span><span class="se">\n\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">vlo</span><span class="p">)</span>
+                        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">vec</span><span class="p">)):</span>
+                            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ioformat</span> <span class="o">==</span> <span class="s1">&#39;dec&#39;</span><span class="p">:</span>
+                                <span class="c1"># Input values are integer numbers (TODO: check if its unsigned)</span>
+                                <span class="n">binary</span> <span class="o">=</span> <span class="nb">format</span><span class="p">(</span><span class="n">vec</span><span class="p">[</span><span class="n">j</span><span class="p">],</span><span class="s1">&#39;0</span><span class="si">%d</span><span class="s1">b&#39;</span> <span class="o">%</span> <span class="n">buswidth</span><span class="p">)</span>
+                            <span class="k">else</span><span class="p">:</span>
+                                <span class="c1"># Input values  are bits (strings of &#39;1&#39; and &#39;0&#39;)</span>
+                                <span class="n">binary</span> <span class="o">=</span> <span class="n">vec</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
+                            <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%s</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">binary</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">model</span> <span class="o">==</span> <span class="s1">&#39;ngspice&#39;</span><span class="p">:</span>
+                        <span class="c1"># This is Ngsim vector file syntax</span>
+                        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">vec</span><span class="p">)):</span>
+                            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ioformat</span> <span class="o">==</span> <span class="s1">&#39;dec&#39;</span><span class="p">:</span>
+                                <span class="c1"># Input values are integer numbers (TODO: check if its unsigned)</span>
+                                <span class="n">binary</span> <span class="o">=</span> <span class="nb">format</span><span class="p">(</span><span class="n">vec</span><span class="p">[</span><span class="n">j</span><span class="p">],</span><span class="s1">&#39;0</span><span class="si">%d</span><span class="s1">b&#39;</span> <span class="o">%</span> <span class="n">buswidth</span><span class="p">)</span>
+                            <span class="k">else</span><span class="p">:</span>
+                                <span class="c1"># Input values  are bits (strings of &#39;1&#39; and &#39;0&#39;)</span>
+                                <span class="n">binary</span> <span class="o">=</span> <span class="n">vec</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
+                            <span class="n">line</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">j</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">rs</span><span class="p">)</span><span class="o">+</span><span class="s1">&#39; &#39;</span><span class="o">+</span><span class="s1">&#39;s &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">binary</span><span class="p">)</span><span class="o">+</span><span class="s1">&#39;s&#39;</span>
+                            <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%s</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">line</span><span class="p">)</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;E&#39;</span><span class="p">,</span><span class="n">msg</span><span class="o">=</span><span class="n">traceback</span><span class="o">.</span><span class="n">format_exc</span><span class="p">())</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;E&#39;</span><span class="p">,</span><span class="n">msg</span><span class="o">=</span><span class="s1">&#39;Failed while writing files for </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">file</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">pass</span></div>
+
+<div class="viewcode-block" id="spice_iofile.parse_io_from_file"><a class="viewcode-back" href="../../index.html#spice.spice_iofile.spice_iofile.parse_io_from_file">[docs]</a>    <span class="k">def</span> <span class="nf">parse_io_from_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">filepath</span><span class="p">,</span><span class="n">start</span><span class="p">,</span><span class="n">stop</span><span class="p">,</span><span class="n">dtype</span><span class="p">,</span><span class="n">label</span><span class="p">,</span><span class="n">queue</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Parse specific lines from a spectre print file.</span>
+
+<span class="sd">        This is wrapped to a function to allow parallelism.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">arr</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">genfromtxt</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span><span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span><span class="n">skip_header</span><span class="o">=</span><span class="n">start</span><span class="p">,</span><span class="n">skip_footer</span><span class="o">=</span><span class="n">stop</span><span class="p">,</span><span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+            <span class="c1"># TODO: This is not enabled by setting self.DEBUG = True for some</span>
+            <span class="c1"># reason.. Should this class inherit thesdk?</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;D&#39;</span><span class="p">,</span><span class="n">msg</span><span class="o">=</span><span class="s1">&#39;Reading event output </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">label</span><span class="p">)</span>
+            <span class="n">queue</span><span class="o">.</span><span class="n">put</span><span class="p">((</span><span class="n">label</span><span class="p">,</span><span class="n">arr</span><span class="p">))</span>
+        <span class="k">except</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;E&#39;</span><span class="p">,</span><span class="n">msg</span><span class="o">=</span><span class="s1">&#39;Failed reading event output </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">label</span><span class="p">)</span>
+            <span class="n">queue</span><span class="o">.</span><span class="n">put</span><span class="p">((</span><span class="n">label</span><span class="p">,</span><span class="kc">None</span><span class="p">))</span></div>
+
+    <span class="c1"># Overloaded read from thesdk.iofile</span>
+<div class="viewcode-block" id="spice_iofile.read"><a class="viewcode-back" href="../../index.html#spice.spice_iofile.spice_iofile.read">[docs]</a>    <span class="k">def</span> <span class="nf">read</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Function to read files associated with this spice_iofile.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">iotype</span><span class="o">==</span><span class="s1">&#39;event&#39;</span><span class="p">:</span>
+            <span class="n">file</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">file</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="c1"># File is the same for all event type outputs</span>
+            <span class="n">label_match</span><span class="o">=</span><span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;\((.*)\)&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">model</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;spectre&#39;</span><span class="p">,</span><span class="s1">&#39;ngspice&#39;</span><span class="p">]:</span>
+                <span class="n">lines</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">(</span><span class="s1">&#39;grep -n </span><span class="se">\&quot;</span><span class="s1">time\|freq</span><span class="se">\&quot;</span><span class="s1"> </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">file</span><span class="p">,</span> <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+                <span class="n">lines</span><span class="o">=</span><span class="n">lines</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span> 
+                <span class="n">linenumbers</span><span class="o">=</span><span class="p">[]</span>
+                <span class="n">labels</span><span class="o">=</span><span class="p">[]</span>
+                <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">:</span>
+                    <span class="n">parts</span><span class="o">=</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span> <span class="c1"># Line should now contain linenumber in first element, ioname in second</span>
+                        <span class="n">line</span> <span class="o">=</span> <span class="mi">0</span>
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="n">line</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                            <span class="n">linenumbers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+                        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;W&#39;</span><span class="p">,</span> <span class="n">msg</span><span class="o">=</span><span class="s1">&#39;Couldn</span><span class="se">\&#39;</span><span class="s1">t decode linenumber from file </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span>  <span class="n">file</span><span class="p">)</span>
+                        <span class="n">label</span><span class="o">=</span><span class="n">label_match</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">parts</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                        <span class="k">if</span> <span class="n">label</span><span class="p">:</span>
+                            <span class="n">labels</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">label</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span> <span class="c1"># Capture inner group (== ioname)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;W&#39;</span><span class="p">,</span> <span class="n">msg</span><span class="o">=</span><span class="s1">&#39;Couldn</span><span class="se">\&#39;</span><span class="s1">t find IO on line </span><span class="si">%d</span><span class="s1"> from file </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span>  <span class="p">(</span><span class="n">line</span><span class="p">,</span><span class="n">file</span><span class="p">))</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">labels</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">linenumbers</span><span class="p">):</span>
+                    <span class="n">numlines</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">(</span><span class="s2">&quot;wc -l </span><span class="si">%s</span><span class="s2"> | awk &#39;{print $1}&#39;&quot;</span> <span class="o">%</span> <span class="n">file</span><span class="p">,</span><span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))</span>
+                    <span class="n">procs</span> <span class="o">=</span> <span class="p">[]</span>
+                    <span class="n">queues</span> <span class="o">=</span> <span class="p">[]</span>
+                    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">linenumbers</span><span class="p">)):</span>
+                        <span class="n">start</span><span class="o">=</span><span class="n">linenumbers</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="c1"># Indexing starts from zero</span>
+                        <span class="k">if</span> <span class="n">k</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">linenumbers</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+                            <span class="n">stop</span><span class="o">=</span><span class="mi">1</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">stop</span><span class="o">=</span><span class="n">numlines</span><span class="o">-</span><span class="p">(</span><span class="n">linenumbers</span><span class="p">[</span><span class="n">k</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="mi">6</span><span class="p">)</span> <span class="c1"># Previous data column ends 5 rows before start of next one</span>
+                        <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">datatype</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">datatype</span><span class="o">==</span><span class="s1">&#39;complex&#39;</span> <span class="k">else</span> <span class="s1">&#39;float&#39;</span> <span class="c1"># Default is int for thesdk_spicefile, let&#39;s infer from data</span>
+                        <span class="n">queue</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Queue</span><span class="p">()</span>
+                        <span class="n">queues</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">queue</span><span class="p">)</span>
+                        <span class="n">proc</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Process</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">parse_io_from_file</span><span class="p">,</span><span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">file</span><span class="p">,</span><span class="n">start</span><span class="p">,</span><span class="n">stop</span><span class="p">,</span><span class="n">dtype</span><span class="p">,</span><span class="n">labels</span><span class="p">[</span><span class="n">k</span><span class="p">],</span><span class="n">queue</span><span class="p">))</span>
+                        <span class="n">procs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">proc</span><span class="p">)</span>
+                        <span class="n">proc</span><span class="o">.</span><span class="n">start</span><span class="p">()</span> 
+                    <span class="k">for</span> <span class="n">i</span><span class="p">,</span><span class="n">p</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">procs</span><span class="p">):</span>
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="n">ret</span> <span class="o">=</span> <span class="n">queues</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">iofile_eventdict</span><span class="p">[</span><span class="n">ret</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()]</span><span class="o">=</span><span class="n">ret</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                            <span class="n">p</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+                        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;W&#39;</span><span class="p">,</span> <span class="n">msg</span><span class="o">=</span><span class="s1">&#39;Failed reading </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">ret</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;W&#39;</span><span class="p">,</span> <span class="n">msg</span><span class="o">=</span><span class="s1">&#39;Couldn</span><span class="se">\&#39;</span><span class="s1">t read IOs from file </span><span class="si">%s</span><span class="s1">. Missing ioname?&#39;</span> <span class="o">%</span> <span class="n">file</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">model</span> <span class="o">==</span> <span class="s1">&#39;eldo&#39;</span><span class="p">:</span>
+                <span class="c1"># Parse signal headers</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">file</span><span class="p">,</span><span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="o">.</span><span class="n">readlines</span><span class="p">():</span>
+                        <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;# TIME&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;# FREQ&#39;</span><span class="p">):</span>
+                            <span class="n">header</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;# &#39;</span><span class="p">,</span><span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">,</span><span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">)</span>
+                            <span class="k">break</span>
+                <span class="n">arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">genfromtxt</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">header</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">arr</span><span class="p">[</span><span class="mi">0</span><span class="p">,:]):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;E&#39;</span><span class="p">,</span> <span class="n">msg</span><span class="o">=</span><span class="s1">&#39;Signal name and array column mismatch while reading event outputs.&#39;</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">col_idx</span><span class="p">,</span><span class="n">sname</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">header</span><span class="p">[</span><span class="mi">1</span><span class="p">:]):</span>
+                    <span class="n">label</span><span class="o">=</span><span class="n">label_match</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">sname</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">label</span><span class="p">:</span>
+                        <span class="n">label</span> <span class="o">=</span> <span class="n">label</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+                        <span class="c1"># Add to the event dictionary</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">iofile_eventdict</span><span class="p">[</span><span class="n">label</span><span class="o">.</span><span class="n">upper</span><span class="p">()]</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="n">arr</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span><span class="n">arr</span><span class="p">[:,</span><span class="n">col_idx</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)))</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;W&#39;</span><span class="p">,</span> <span class="n">msg</span><span class="o">=</span><span class="s1">&#39;Label format mismatch with </span><span class="se">\&#39;</span><span class="si">%s</span><span class="se">\&#39;</span><span class="s1">.&#39;</span> <span class="o">%</span>  <span class="p">(</span><span class="n">label</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">file</span><span class="p">)):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">iotype</span><span class="o">==</span><span class="s1">&#39;vsample&#39;</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;O&#39;</span><span class="p">,</span><span class="n">msg</span><span class="o">=</span><span class="s1">&#39;IO type </span><span class="se">\&#39;</span><span class="s1">vsample</span><span class="se">\&#39;</span><span class="s1"> is obsolete. Please use type </span><span class="se">\&#39;</span><span class="s1">sample</span><span class="se">\&#39;</span><span class="s1"> and set ioformat=</span><span class="se">\&#39;</span><span class="s1">volt</span><span class="se">\&#39;</span><span class="s1">.&#39;</span><span class="p">)</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">,</span><span class="n">msg</span><span class="o">=</span><span class="s1">&#39;Please do it now :)&#39;</span><span class="p">)</span>
+                    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">iotype</span><span class="o">==</span><span class="s1">&#39;time&#39;</span><span class="p">:</span>
+                        <span class="c1"># TODO: Make sure all &#39;event&#39; iofiles are parsed before &#39;time&#39; iofiles</span>
+                        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ionames</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">iofile_eventdict</span><span class="p">:</span>
+                            <span class="n">arr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">iofile_eventdict</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">ionames</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()]</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;E&#39;</span><span class="p">,</span><span class="n">msg</span><span class="o">=</span><span class="s1">&#39;No event data found for </span><span class="si">%s</span><span class="s1"> while parsing time signal.&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">ionames</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+                        <span class="c1"># This should work for both spectre and eldo now</span>
+                        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">edgetype</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;both&#39;</span><span class="p">:</span>
+                            <span class="n">trise</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_crossings</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">vth</span><span class="p">,</span><span class="mi">256</span><span class="p">,</span><span class="s1">&#39;rising&#39;</span><span class="p">)</span>
+                            <span class="n">tfall</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_crossings</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">vth</span><span class="p">,</span><span class="mi">256</span><span class="p">,</span><span class="s1">&#39;falling&#39;</span><span class="p">)</span>
+                            <span class="n">tcross</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">((</span><span class="n">trise</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span><span class="n">tfall</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">))),</span><span class="mi">0</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">tcross</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_crossings</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">vth</span><span class="p">,</span><span class="mi">256</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">edgetype</span><span class="p">)</span>
+                        <span class="n">nparr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">tcross</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+                        <span class="c1"># Adding nparr to self.Data</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">append_to_data</span><span class="p">(</span><span class="n">arr</span><span class="o">=</span><span class="n">nparr</span><span class="p">,</span><span class="n">bits</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">iotype</span><span class="o">==</span><span class="s1">&#39;sample&#39;</span><span class="p">:</span>
+                        <span class="c1"># Extracting the bus width</span>
+                        <span class="n">signame</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ionames</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+                        <span class="n">busstart</span><span class="p">,</span><span class="n">busstop</span><span class="p">,</span><span class="n">buswidth</span><span class="p">,</span><span class="n">busrange</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">get_buswidth</span><span class="p">(</span><span class="n">signame</span><span class="p">)</span>
+                        <span class="n">signame</span> <span class="o">=</span> <span class="n">signame</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&lt;&#39;</span><span class="p">,</span><span class="s1">&#39; &#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&gt;&#39;</span><span class="p">,</span><span class="s1">&#39; &#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;[&#39;</span><span class="p">,</span><span class="s1">&#39; &#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;]&#39;</span><span class="p">,</span><span class="s1">&#39; &#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">,</span><span class="s1">&#39; &#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">)</span>
+
+                        <span class="c1"># Find trigger signal threshold crossings</span>
+                        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">trigger</span><span class="p">,</span><span class="nb">list</span><span class="p">):</span>
+                            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">trigger</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ionames</span><span class="p">):</span>
+                                <span class="n">trig</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">trigger</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+                            <span class="k">else</span><span class="p">:</span>
+                                <span class="n">trig</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">trigger</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">trig</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">trigger</span>
+                        <span class="k">if</span> <span class="n">trig</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">iofile_eventdict</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;E&#39;</span><span class="p">,</span><span class="n">msg</span><span class="o">=</span><span class="s1">&#39;Event data not found for trigger signal </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">trig</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">trig_event</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">iofile_eventdict</span><span class="p">[</span><span class="n">trig</span><span class="p">]</span>
+                            <span class="n">tsamp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_crossings</span><span class="p">(</span><span class="n">trig_event</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">vth</span><span class="p">,</span><span class="mi">256</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">edgetype</span><span class="p">)</span>
+
+                        <span class="c1"># Processing each bit in the bus</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;I&#39;</span><span class="p">,</span><span class="n">msg</span><span class="o">=</span><span class="s1">&#39;Sampling </span><span class="si">%s</span><span class="s1"> with </span><span class="si">%s</span><span class="s1"> (</span><span class="si">%s</span><span class="s1">).&#39;</span><span class="o">%</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ionames</span><span class="p">[</span><span class="n">i</span><span class="p">],</span><span class="n">trig</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">edgetype</span><span class="p">))</span>
+                        <span class="n">failed</span> <span class="o">=</span> <span class="kc">False</span>
+                        <span class="n">bitmat</span> <span class="o">=</span> <span class="kc">None</span>
+                        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">busrange</span><span class="p">:</span>
+                            <span class="c1"># Get event data for the bit voltage</span>
+                            <span class="k">if</span> <span class="n">buswidth</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="s1">&#39;&lt;&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ionames</span><span class="p">[</span><span class="n">i</span><span class="p">]:</span>
+                                <span class="n">bitname</span> <span class="o">=</span> <span class="n">signame</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                            <span class="k">else</span><span class="p">:</span>
+                                <span class="n">bitname</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1">&lt;</span><span class="si">%d</span><span class="s1">&gt;&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">signame</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="n">j</span><span class="p">)</span>
+                            <span class="k">if</span> <span class="n">bitname</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">iofile_eventdict</span><span class="p">:</span>
+                                <span class="n">event</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="s1">&#39;0&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+                                <span class="n">failed</span> <span class="o">=</span> <span class="kc">True</span>
+                            <span class="k">else</span><span class="p">:</span>
+                                <span class="n">event</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">iofile_eventdict</span><span class="p">[</span><span class="n">bitname</span><span class="o">.</span><span class="n">upper</span><span class="p">()]</span>
+                            <span class="c1"># Sample the signal</span>
+                            <span class="n">arr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_signal</span><span class="p">(</span><span class="n">event</span><span class="p">,</span><span class="n">tsamp</span><span class="p">)</span>
+                            <span class="c1"># Binary or decimal io format, rounding to bits</span>
+                            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ioformat</span> <span class="o">!=</span> <span class="s1">&#39;volt&#39;</span><span class="p">:</span>
+                                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">arr</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                                    <span class="n">arr</span> <span class="o">=</span> <span class="p">(</span><span class="n">arr</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span><span class="o">&gt;=</span><span class="bp">self</span><span class="o">.</span><span class="n">vth</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+                                <span class="k">else</span><span class="p">:</span>
+                                    <span class="n">arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="s1">&#39;0&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+                                    <span class="n">failed</span> <span class="o">=</span> <span class="kc">True</span>
+                            <span class="k">if</span> <span class="n">bitmat</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                                <span class="c1"># First bit is read, it becomes the first column of the bit matrix</span>
+                                <span class="n">bitmat</span> <span class="o">=</span> <span class="n">arr</span>
+                            <span class="k">else</span><span class="p">:</span>
+                                <span class="c1"># Following bits get stacked as columns to the left of the previous one</span>
+                                <span class="n">bitmat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="n">bitmat</span><span class="p">,</span><span class="n">arr</span><span class="p">))</span>
+                        <span class="k">if</span> <span class="n">failed</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;W&#39;</span><span class="p">,</span><span class="n">msg</span><span class="o">=</span><span class="s1">&#39;Failed reading sample type output vector.&#39;</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ioformat</span> <span class="o">==</span> <span class="s1">&#39;volt&#39;</span><span class="p">:</span>
+                            <span class="n">nparr</span> <span class="o">=</span> <span class="n">bitmat</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="c1"># Merging bits to buses</span>
+                            <span class="n">arr</span> <span class="o">=</span> <span class="p">[]</span>
+                            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">bitmat</span><span class="p">[:,</span><span class="mi">0</span><span class="p">])):</span>
+                                <span class="n">arr</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">bitmat</span><span class="p">[</span><span class="n">j</span><span class="p">,:]))</span>
+                            <span class="n">nparr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">arr</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+                            <span class="c1"># Convert binary strings to decimals</span>
+                            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ioformat</span> <span class="o">==</span> <span class="s1">&#39;dec&#39;</span><span class="p">:</span>
+                                <span class="n">b2i</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vectorize</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_bin2int</span><span class="p">)</span>
+                                <span class="c1"># For now only little-endian unsigned</span>
+                                <span class="n">nparr</span> <span class="o">=</span> <span class="n">b2i</span><span class="p">(</span><span class="n">nparr</span><span class="p">)</span>
+                        <span class="c1"># Adding nparr to self.Data</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">append_to_data</span><span class="p">(</span><span class="n">arr</span><span class="o">=</span><span class="n">nparr</span><span class="p">,</span><span class="n">bits</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span><span class="n">buswidth</span><span class="o">=</span><span class="n">buswidth</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">,</span><span class="n">msg</span><span class="o">=</span><span class="s1">&#39;Couldn</span><span class="se">\&#39;</span><span class="s1">t read file for input type </span><span class="se">\&#39;</span><span class="si">%s</span><span class="se">\&#39;</span><span class="s1">.&#39;</span><span class="o">%</span><span class="bp">self</span><span class="o">.</span><span class="n">iotype</span><span class="p">)</span>
+                <span class="k">except</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;E&#39;</span><span class="p">,</span><span class="n">msg</span><span class="o">=</span><span class="n">traceback</span><span class="o">.</span><span class="n">format_exc</span><span class="p">())</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">print_log</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">,</span><span class="n">msg</span><span class="o">=</span><span class="s1">&#39;Failed while reading files for </span><span class="si">%s</span><span class="s1">.&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="spice_iofile.interp_crossings"><a class="viewcode-back" href="../../index.html#spice.spice_iofile.spice_iofile.interp_crossings">[docs]</a>    <span class="k">def</span> <span class="nf">interp_crossings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">data</span><span class="p">,</span><span class="n">vth</span><span class="p">,</span><span class="n">nint</span><span class="p">,</span><span class="n">edgetype</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Helper method called for &#39;time&#39; and &#39;sample&#39; type outputs.</span>
+
+<span class="sd">        Interpolates the requested threshold crossings (rising or falling) from</span>
+<span class="sd">        the &#39;event&#39; type input signal. Returns the time-stamps of the crossing</span>
+<span class="sd">        instants in a 1D-vector.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        data : ndarray</span>
+<span class="sd">            Input data array. Expected an &#39;event&#39; type 2D-vector where first</span>
+<span class="sd">            column is time and second is voltage.</span>
+<span class="sd">        vth : float</span>
+<span class="sd">            Threshold voltage.</span>
+<span class="sd">        nint : int</span>
+<span class="sd">            Interpolation factor. The two closest points on each side of a</span>
+<span class="sd">            threshold crossing are used for linear interpolation endpoints,</span>
+<span class="sd">            where nint points are added to find as close x-value of the</span>
+<span class="sd">            threshold crossing as possible. </span>
+<span class="sd">        edgetype : str</span>
+<span class="sd">            Direction of the crossing: &#39;rising&#39;, &#39;falling&#39; or &#39;both&#39;.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        ndarray</span>
+<span class="sd">            1D-vector with time-stamps of interpolated threshold crossings.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">edgetype</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;rising&#39;</span><span class="p">:</span>
+            <span class="n">edges</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">((</span><span class="n">data</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">]</span><span class="o">&lt;</span><span class="n">vth</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">:,</span><span class="mi">1</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">vth</span><span class="p">))</span><span class="o">+</span><span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">edges</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">((</span><span class="n">data</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">]</span><span class="o">&gt;=</span><span class="n">vth</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">:,</span><span class="mi">1</span><span class="p">]</span><span class="o">&lt;</span><span class="n">vth</span><span class="p">))</span><span class="o">+</span><span class="mi">1</span>
+        <span class="n">tcross</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">edges</span><span class="p">)))</span>
+        <span class="c1"># Potentially slow (TODO?)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">edges</span><span class="p">)):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">prev</span> <span class="o">=</span> <span class="n">edges</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span>
+                <span class="k">if</span> <span class="n">prev</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">prev</span> <span class="o">==</span> <span class="mi">0</span>
+                <span class="n">xstart</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">prev</span><span class="p">,</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">ystart</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">prev</span><span class="p">,</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">xstop</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">edges</span><span class="p">[</span><span class="n">i</span><span class="p">],</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">ystop</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">edges</span><span class="p">[</span><span class="n">i</span><span class="p">],</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">xinterp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">xstart</span><span class="p">,</span><span class="n">xstop</span><span class="p">,</span><span class="n">nint</span><span class="p">)</span>
+                <span class="n">lerp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">xinterp</span><span class="p">,[</span><span class="n">xstart</span><span class="p">,</span><span class="n">xstop</span><span class="p">],[</span><span class="n">ystart</span><span class="p">,</span><span class="n">ystop</span><span class="p">])</span>
+                <span class="k">if</span> <span class="n">edgetype</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;rising&#39;</span><span class="p">:</span>
+                    <span class="n">tcross</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">xinterp</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">lerp</span><span class="o">&gt;=</span><span class="n">vth</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">tcross</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">xinterp</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">lerp</span><span class="o">&lt;=</span><span class="n">vth</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]]</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="n">pdb</span><span class="o">.</span><span class="n">set_trace</span><span class="p">()</span>
+        <span class="c1"># Removing edges happening before self.after</span>
+        <span class="k">return</span> <span class="n">tcross</span><span class="p">[</span><span class="n">tcross</span><span class="o">&gt;=</span><span class="bp">self</span><span class="o">.</span><span class="n">after</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="spice_iofile.sample_signal"><a class="viewcode-back" href="../../index.html#spice.spice_iofile.spice_iofile.sample_signal">[docs]</a>    <span class="k">def</span> <span class="nf">sample_signal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">signal</span><span class="p">,</span><span class="n">trigger</span><span class="p">,</span><span class="n">nint</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Helper method called for &#39;sample&#39; type outputs.</span>
+
+<span class="sd">        Finds the signal y-values at time instants defined by the clock signal</span>
+<span class="sd">        (trigger).</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        data : ndarray</span>
+<span class="sd">            Input data array. Expected an &#39;event&#39; type 2D-vector where first</span>
+<span class="sd">            column is time and second is voltage.</span>
+<span class="sd">        vth : float</span>
+<span class="sd">            Threshold voltage.</span>
+<span class="sd">        nint : int</span>
+<span class="sd">            Interpolation factor. The two closest points on each side of a</span>
+<span class="sd">            threshold crossing are used for linear interpolation endpoints,</span>
+<span class="sd">            where nint points are added to find as close x-value of the</span>
+<span class="sd">            threshold crossing as possible. </span>
+<span class="sd">        edgetype : str</span>
+<span class="sd">            Direction of the crossing: &#39;rising&#39;, &#39;falling&#39; or &#39;both&#39;.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        ndarray</span>
+<span class="sd">            1D-vector with time-stamps of interpolated threshold crossings.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">sampled</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">trigger</span><span class="p">),</span><span class="mi">2</span><span class="p">))</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">trigger</span><span class="p">)):</span>
+            <span class="n">tsamp</span> <span class="o">=</span> <span class="n">trigger</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+            <span class="n">closest_idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">signal</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span><span class="o">-</span><span class="n">tsamp</span><span class="p">))</span>
+            <span class="n">sampled</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">signal</span><span class="p">[</span><span class="n">closest_idx</span><span class="p">,</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">sampled</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">signal</span><span class="p">[</span><span class="n">closest_idx</span><span class="p">,</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">sampled</span></div>
+
+    <span class="k">def</span> <span class="nf">_bin2int</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">binary</span><span class="p">,</span><span class="n">big_endian</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">signed</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Helper method to convert binary string to integer.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">big_endian</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">signed</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">BitArray</span><span class="p">(</span><span class="nb">bin</span><span class="o">=</span><span class="n">binary</span><span class="p">)</span><span class="o">.</span><span class="n">int</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">binary</span><span class="p">,</span><span class="mi">2</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">signed</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">BitArray</span><span class="p">(</span><span class="nb">bin</span><span class="o">=</span><span class="n">binary</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span><span class="o">.</span><span class="n">int</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">binary</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span><span class="mi">2</span><span class="p">)</span>
+
+<div class="viewcode-block" id="spice_iofile.append_to_data"><a class="viewcode-back" href="../../index.html#spice.spice_iofile.spice_iofile.append_to_data">[docs]</a>    <span class="k">def</span> <span class="nf">append_to_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">arr</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="n">bits</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">buswidth</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Helper method to append array to self.Data.</span>
+<span class="sd">        </span>
+<span class="sd">        The array(s) are padded with np.nan when bits=False, and &#39;UUUU&#39; when</span>
+<span class="sd">        bits=True. This is called automatically for time and sample type IOs.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="n">filler</span> <span class="o">=</span> <span class="s1">&#39;U&#39;</span><span class="o">*</span><span class="n">buswidth</span> <span class="k">if</span> <span class="n">bits</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+        <span class="n">dtype</span> <span class="o">=</span> <span class="s1">&#39;S</span><span class="si">%s</span><span class="s1">&#39;</span><span class="o">%</span><span class="n">buswidth</span> <span class="k">if</span> <span class="n">bits</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">double</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">Data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> 
+            <span class="bp">self</span><span class="o">.</span><span class="n">Data</span> <span class="o">=</span> <span class="n">arr</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Data</span><span class="p">[:,</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">&gt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">arr</span><span class="p">):</span>
+                <span class="c1"># Old max length is bigger -&gt; padding new array</span>
+                <span class="n">padded</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Data</span><span class="p">[:,</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span><span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+                <span class="n">padded</span><span class="o">.</span><span class="n">fill</span><span class="p">(</span><span class="n">filler</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">bits</span><span class="p">:</span> 
+                    <span class="n">padded</span> <span class="o">=</span> <span class="n">padded</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+                <span class="n">padded</span><span class="p">[:</span><span class="n">arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],:</span><span class="n">arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span> <span class="o">=</span> <span class="n">arr</span>
+                <span class="n">arr</span> <span class="o">=</span> <span class="n">padded</span>
+            <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Data</span><span class="p">[:,</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">arr</span><span class="p">):</span>
+                <span class="c1"># Old max length is smaller -&gt; padding old array</span>
+                <span class="n">padded</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="bp">self</span><span class="o">.</span><span class="n">Data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span><span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+                <span class="n">padded</span><span class="o">.</span><span class="n">fill</span><span class="p">(</span><span class="n">filler</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">bits</span><span class="p">:</span> 
+                    <span class="n">padded</span> <span class="o">=</span> <span class="n">padded</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+                <span class="n">padded</span><span class="p">[:</span><span class="bp">self</span><span class="o">.</span><span class="n">Data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],:</span><span class="bp">self</span><span class="o">.</span><span class="n">Data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Data</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">Data</span> <span class="o">=</span> <span class="n">padded</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">Data</span><span class="p">,</span><span class="n">arr</span><span class="p">))</span></div></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2019 TheSyDeKick Community.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
