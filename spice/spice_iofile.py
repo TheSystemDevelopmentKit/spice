@@ -26,8 +26,66 @@ from bitstring import BitArray
 class spice_iofile(iofile):
     """
     Class to provide file IO for spice simulations. When created, 
-    adds a spice_iofile object to the parents iofile_bundle attribute.
+    adds a spice_iofile object to the parents iofile_bundle property.
     Accessible as iofile_bundle.Members['name'].
+
+    Parameters
+    ----------
+    parent : object 
+        The parent object initializing the spice_iofile instance. Default None
+    name : str
+        Name of the IO.
+    dir : 'in' or 'out'
+        Direction of the IO.
+    iotype : 'event', 'sample' or 'time'
+        Type of the IO signal. Event type signals are time-value pairs (analog
+        signal), whereas sample type signals are sampled by a clock signal
+        (digital bus). Sample type signals can be used for discrete time &
+        continuous amplitude outputs (sampled voltage for example), by setting
+        iotype='sample' and ioformat='volt'. Time type signals return a vector
+        of timestamps corresponding to threshold crossings.
+    ioformat : 'dec', 'bin' or 'volt'
+        Formatting of the sampled signals. Digital output buses are formatted
+        to unsigned integers when ioformat = 'dec'. For 'bin', the digital
+        output bus is returned as a string containing ones and zeros. When
+        ioformat = 'volt', the output signal is sampled at the clock and the
+        floating point value is returned. Voltage sampling is only supported
+        for non-bus signals.
+    sourcetype : 'V', 'I' or 'ISUB'
+        Type of the source associated to a file. Default 'V'.
+    datatype : str
+        Inherited from the parent. If complex, the ioname is handled as a
+        complex signal. Currently implemented only for writing the ouputs in
+        testbenches and reading them in. 
+    trigger : str or list<str>
+        Name of the clock signal node in the Spice netlist. If a single string
+        is given, the same clock signal is used for all bits/buses. If a list
+        is given, and the length matches ionames list length, each ioname will
+        be assigned its own clock. Applies only to sample type outputs.
+    vth : float
+        Threshold voltage of the trigger signal and the bit rounding. Applies
+        only to sample type outputs.
+    edgetype : 'rising', 'falling' or 'both'
+        Type of triggering edge. When time type signal is used, the edgetype
+        values can define the extraction type as 'risetime' or 'falltime'
+        additionally. Default 'rising'.
+    after : float
+        Initial delay added to the input signal (sample) or time extraction
+        (time). Useful for ignoring inital settling, for example. Applies only
+        to sample and time outputs. Default 0.
+    big_endian : bool
+        Flag to read the extracted bus as big-endian. Applies only to sample
+        type outputs. Default False.
+    rs : float
+        Sample rate of the sample type input. Default None.
+    vhi : float
+        High bit value of sample type input. Default 1.0.
+    vlo : float
+        Low bit value of sample type input. Default 0.
+    tfall : float
+        Falltime of sample type input. Default 5e-12.
+    trise : float
+        Risetime of sample type input. Default 5e-12.
 
     Examples
     --------
@@ -66,79 +124,6 @@ class spice_iofile(iofile):
         _=spice_iofile(self,name='ctrl',dir='in',iotype='sample',ionames='CTRL<3:0>',rs=1e6,
                        vhi=self.vdd,trise=5e-12,tfall=5e-12,ioformat='dec')
         
-    Parameters
-    -----------
-    parent : object 
-        The parent object initializing the 
-        spice_iofile instance. Default None
-    
-    **kwargs :  
-            name (str)
-                Name of the IO.
-            dir (str)
-                Direction of the IO: 'in'/'out'.
-            iotype (str)
-                Type of the IO signal: 'event'/'sample'/'time'.  Event type
-                signals are time-value pairs (analog signal), while sample type
-                signals are sampled by a clock signal (digital bus).  Sample
-                type signals can be used for discrete time & continuous
-                amplitude outputs (sampled voltage for example), by setting
-                iotype='sample' and ioformat='volt'. Time type signals return
-                a vector of timestamps corresponding to threshold crossings.
-            ioformat {'dec','bin','volt'}
-                Formatting of the sampled signals. Digital output buses are
-                formatted to unsigned integers when ioformat = 'dec'. For
-                'bin', the digital output bus is returned as a string
-                containing ones and zeros. When ioformat = 'volt', the output
-                signal is sampled at the clock and the floating point value is
-                returned. Voltage sampling is only supported for non-bus
-                signals.
-                Default 'dec'.
-            datatype (str)
-                Inherited from the parent.
-                If complex, the ioname is handled as a complex signal.
-                Currently implemented only for writing the ouputs in testbenched and reading them in. 
-            trigger (str or list<str>)
-                Name of the clock signal node in the Spice netlist.
-                If a single string is given, the same clock signal is used for all bits/buses.
-                If a list is given, and the length matches ionames list length, each ioname will
-                be assigned its own clock.
-                Applies only to sample type outputs.
-            vth (float)
-                Threshold voltage of the trigger signal and the bit rounding.
-                Applies only to sample type outputs.
-            edgetype (str)
-                Type of triggering edge: 'rising'/'falling'/'both'.
-                When time type signal is used, the edgetype values can define the
-                extraction type as: 'rising'/'falling'/'both'/'risetime'/'falltime'.
-                Default 'rising'.
-            after (float)
-                Time to wait before starting the extraction (useful for ignoring inital settling).
-                Applies only to sample type outputs.
-                Default 0.
-            big_endian (bool)
-                Flag to read the extracted bus as big-endian.
-                Applies only to sample type outputs.
-                Default False.
-            rs (float)
-                Sample rate of the sample type input.
-                Default None.
-            vhi (float)
-                High bit value of sample type input.
-                Default 1.0.
-            vlo (float)
-                Low bit value of sample type input.
-                Default 0.
-            tfall (float)
-                Falltime of sample type input.
-                Default 5e-12.
-            trise (float)
-                Risetime of sample type input.
-                Default 5e-12.
-            sourcetype (str)
-                Type of the source associated to a file.
-                V | I | ISUB (for spectre, event type)
-                Default 'V'
     """
     def __init__(self,parent=None,**kwargs):
         if parent==None:
@@ -146,165 +131,20 @@ class spice_iofile(iofile):
         try:  
             super(spice_iofile,self).__init__(parent=parent,**kwargs)
             self.paramname=kwargs.get('param','-g g_file_')
-            self._ioformat=kwargs.get('ioformat','dec')
-            self._trigger=kwargs.get('trigger','')
-            self._vth=kwargs.get('vth',0.5)
-            self._edgetype=kwargs.get('edgetype','rising')
-            self._after=kwargs.get('after',0)
-            self._big_endian=kwargs.get('big_endian',False)
-            self._rs=kwargs.get('rs',None)
-            self._vhi=kwargs.get('vhi',1.0)
-            self._vlo=kwargs.get('vlo',0)
-            self._tfall=kwargs.get('tfall',5e-12)
-            self._trise=kwargs.get('trise',5e-12)
-            self._sourcetype=kwargs.get('sourcetype','V')
+            self.ioformat=kwargs.get('ioformat','dec')
+            self.trigger=kwargs.get('trigger','')
+            self.vth=kwargs.get('vth',0.5)
+            self.edgetype=kwargs.get('edgetype','rising')
+            self.after=kwargs.get('after',0)
+            self.big_endian=kwargs.get('big_endian',False)
+            self.rs=kwargs.get('rs',None)
+            self.vhi=kwargs.get('vhi',1.0)
+            self.vlo=kwargs.get('vlo',0)
+            self.tfall=kwargs.get('tfall',5e-12)
+            self.trise=kwargs.get('trise',5e-12)
+            self.sourcetype=kwargs.get('sourcetype','V')
         except:
             self.print_log(type='F', msg="spice IO file definition failed.")
-
-    @property
-    def ioformat(self):
-        """Set by argument 'ioformat'."""
-        if hasattr(self,'_ioformat'):
-            return self._ioformat
-        else:
-            self._ioformat='dec'
-        return self._ioformat
-    @ioformat.setter
-    def ioformat(self,value):
-        self._ioformat=value
-
-    @property
-    def trigger(self):
-        """Set by argument 'trigger'."""
-        if hasattr(self,'_trigger'):
-            return self._trigger
-        else:
-            self._trigger=""
-            self.print_log(type='F',msg='Trigger node not given.')
-        return self._trigger
-    @trigger.setter
-    def trigger(self,value):
-        self._trigger=value
-
-    @property
-    def vth(self):
-        """Set by argument 'vth'."""
-        if hasattr(self,'_vth'):
-            return self._vth
-        else:
-            self._vth=0.5
-        return self._vth
-    @vth.setter
-    def vth(self,value):
-        self._vth=value
-
-    @property
-    def edgetype(self):
-        """Set by argument 'edgetype'."""
-        if hasattr(self,'_edgetype'):
-            return self._edgetype
-        else:
-            self._edgetype='rising'
-        return self._edgetype
-    @edgetype.setter
-    def edgetype(self,value):
-        self._edgetype=value
-
-    @property
-    def after(self):
-        """Set by argument 'after'."""
-        if hasattr(self,'_after'):
-            return self._after
-        else:
-            self._after=0
-        return self._after
-    @after.setter
-    def after(self,value):
-        self._after=value
-
-    @property
-    def big_endian(self):
-        """Set by argument 'big_endian'."""
-        if hasattr(self,'_big_endian'):
-            return self._big_endian
-        else:
-            self._big_endian=False
-        return self._big_endian
-    @big_endian.setter
-    def big_endian(self,value):
-        self._big_endian=value
-
-    @property
-    def rs(self):
-        """Set by argument 'rs'."""
-        if hasattr(self,'_rs'):
-            return self._rs
-        else:
-            self._rs=None
-        return self._rs
-    @rs.setter
-    def rs(self,value):
-        self._rs=value
-
-    @property
-    def vhi(self):
-        """Set by argument 'vhi'."""
-        if hasattr(self,'_vhi'):
-            return self._vhi
-        else:
-            self._vhi=1.0
-        return self._vhi
-    @vhi.setter
-    def vhi(self,value):
-        self._vhi=value
-
-    @property
-    def vlo(self):
-        """Set by argument 'vlo'."""
-        if hasattr(self,'_vlo'):
-            return self._vlo
-        else:
-            self._vlo=0
-        return self._vlo
-    @vlo.setter
-    def vlo(self,value):
-        self._vlo=value
-
-    @property
-    def tfall(self):
-        """Set by argument 'tfall'."""
-        if hasattr(self,'_tfall'):
-            return self._tfall
-        else:
-            self._tfall=5e-12
-        return self._tfall
-    @tfall.setter
-    def tfall(self,value):
-        self._tfall=value
-
-    @property
-    def trise(self):
-        """Set by argument 'trise'."""
-        if hasattr(self,'_trise'):
-            return self._trise
-        else:
-            self._trise=5e-12
-        return self._trise
-    @trise.setter
-    def trise(self,value):
-        self._trise=value
-
-    @property
-    def sourcetype(self):
-        """Set by argument 'sourcetype'."""
-        if hasattr(self,'_sourcetype'):
-            return self._sourcetype
-        else:
-            self._sourcetype='V'
-        return self._sourcetype
-    @sourcetype.setter
-    def sourcetype(self,value):
-        self._sourcetype=value
 
     # Overloading file property to contain a list
     @property
