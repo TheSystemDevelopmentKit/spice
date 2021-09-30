@@ -10,7 +10,7 @@
    :members:
    :undoc-members:
 
-.. automodule:: spice.module
+.. automodule:: spice.spice_module
    :members:
    :undoc-members:
 
