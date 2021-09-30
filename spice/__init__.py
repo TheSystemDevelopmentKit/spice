@@ -32,7 +32,7 @@ from spice.testbench import testbench as stb
 from spice.spice_iofile import spice_iofile as spice_iofile
 from spice.spice_dcsource import spice_dcsource as spice_dcsource
 from spice.spice_simcmd import spice_simcmd as spice_simcmd
-from spice.module import spice_module
+from spice.spice_module import spice_module as spice_module
 
 class spice(thesdk,metaclass=abc.ABCMeta):
     """Adding this class as a superclass enforces the definitions 

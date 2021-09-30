@@ -14,7 +14,7 @@ import fileinput
 from abc import * 
 from thesdk import *
 from spice import *
-from spice.module import spice_module
+from spice.spice_module import spice_module
 import pdb
 
 import numpy as np
@@ -23,7 +23,6 @@ from functools import reduce
 import textwrap
 from datetime import datetime
 
-# Utilizes logging method from thesdk
 class testbench(spice_module):
     """
     This class generates all testbench contents.

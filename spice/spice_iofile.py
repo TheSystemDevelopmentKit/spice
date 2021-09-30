@@ -527,22 +527,8 @@ class spice_iofile(iofile):
                         else:
                             tcross = self.interp_crossings(arr,self.vth,256,self.edgetype)
                         nparr = np.array(tcross).reshape(-1,1)
-                        if self.Data is None: 
-                            self.Data = nparr
-                        else:
-                            if len(self.Data[:,-1]) > len(nparr):
-                                # Old max length is bigger -> padding new array
-                                nans = np.empty(self.Data[:,-1].shape).reshape(-1,1)
-                                nans.fill(np.nan)
-                                nans[:nparr.shape[0],:nparr.shape[1]] = nparr
-                                nparr = nans
-                            elif len(self.Data[:,-1]) < len(nparr):
-                                # Old max length is smaller -> padding old array
-                                nans = np.empty((nparr.shape[0],self.Data.shape[1]))
-                                nans.fill(np.nan)
-                                nans[:self.Data.shape[0],:self.Data.shape[1]] = self.Data
-                                self.Data = nans
-                            self.Data = np.hstack((self.Data,nparr))
+                        # Adding nparr to self.Data
+                        self.append_to_data(arr=nparr,bits=False)
                     elif self.iotype=='sample':
                         # Extracting the bus width
                         signame = self.ionames[i]
@@ -595,7 +581,6 @@ class spice_iofile(iofile):
                                 bitmat = np.hstack((bitmat,arr))
                         if failed:
                             self.print_log(type='W',msg='Failed reading sample type output vector.')
-
                         if self.ioformat == 'volt':
                             nparr = bitmat
                         else:
@@ -609,25 +594,8 @@ class spice_iofile(iofile):
                                 b2i = np.vectorize(self._bin2int)
                                 # For now only little-endian unsigned
                                 nparr = b2i(nparr)
-                        # TODO: also this should be a function
-                        if self.Data is None: 
-                            self.Data = nparr
-                        else:
-                            if len(self.Data[:,-1]) > len(nparr):
-                                # Old max length is bigger -> padding new array
-                                nans = np.empty(self.Data[:,-1].shape,dtype='S%s' % buswidth).reshape(-1,1)
-                                nans.fill('U' * buswidth)
-                                nans = nans.astype(str)
-                                nans[:nparr.shape[0],:nparr.shape[1]] = nparr
-                                nparr = nans
-                            elif len(self.Data[:,-1]) < len(nparr):
-                                # Old max length is smaller -> padding old array
-                                nans = np.empty(self.Data[:,-1].shape,dtype='S%s' % buswidth).reshape(-1,1)
-                                nans.fill('U' * buswidth)
-                                nans = nans.astype(str)
-                                nans[:self.Data.shape[0],:self.Data.shape[1]] = self.Data
-                                self.Data = nans
-                            self.Data = np.hstack((self.Data,nparr))
+                        # Adding nparr to self.Data
+                        self.append_to_data(arr=nparr,bits=True,buswidth=buswidth)
                     else:
                         self.print_log(type='F',msg='Couldn\'t read file for input type \'%s\'.'%self.iotype)
                 except:
@@ -635,7 +603,7 @@ class spice_iofile(iofile):
                     self.print_log(type='F',msg='Failed while reading files for %s.' % self.name)
 
     def interp_crossings(self,data,vth,nint,edgetype):
-        """ Helper function called for 'time' and 'sample' type outputs.
+        """ Helper method called for 'time' and 'sample' type outputs.
 
         Interpolates the requested threshold crossings (rising or falling) from
         the 'event' type input signal. Returns the time-stamps of the crossing
@@ -689,7 +657,7 @@ class spice_iofile(iofile):
         return tcross[tcross>=self.after]
 
     def sample_signal(self,signal,trigger,nint=1):
-        """ Helper function called for 'sample' type outputs.
+        """ Helper method called for 'sample' type outputs.
 
         Finds the signal y-values at time instants defined by the clock signal
         (trigger).
@@ -724,7 +692,7 @@ class spice_iofile(iofile):
         return sampled
 
     def _bin2int(self,binary,big_endian=False,signed=False):
-        ''' Function to convert binary string to integer.
+        ''' Helper method to convert binary string to integer.
         '''
         if big_endian:
             if signed:
@@ -736,3 +704,32 @@ class spice_iofile(iofile):
                 return BitArray(bin=binary[::-1]).int
             else:
                 return int(binary[::-1],2)
+
+    def append_to_data(self,arr=None,bits=False,buswidth=None):
+        ''' Helper method to append array to self.Data.
+        
+        The array(s) are padded with np.nan when bits=False, and 'UUUU' when
+        bits=True. This is called automatically for time and sample type IOs.
+        '''
+        filler = 'U'*buswidth if bits else np.nan
+        dtype = 'S%s'%buswidth if bits else np.double
+        if self.Data is None: 
+            self.Data = arr
+        else:
+            if len(self.Data[:,-1]) > len(arr):
+                # Old max length is bigger -> padding new array
+                padded = np.empty(self.Data[:,-1].shape,dtype=dtype).reshape(-1,1)
+                padded.fill(filler)
+                if bits: 
+                    padded = padded.astype(str)
+                padded[:arr.shape[0],:arr.shape[1]] = arr
+                arr = padded
+            elif len(self.Data[:,-1]) < len(arr):
+                # Old max length is smaller -> padding old array
+                padded = np.empty((arr.shape[0],self.Data.shape[1]),dtype=dtype)
+                padded.fill(filler)
+                if bits: 
+                    padded = padded.astype(str)
+                padded[:self.Data.shape[0],:self.Data.shape[1]] = self.Data
+                self.Data = padded
+            self.Data = np.hstack((self.Data,arr))
