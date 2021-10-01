@@ -272,6 +272,8 @@ class spice_iofile(iofile):
             # TODO: This is not enabled by setting self.DEBUG = True for some
             # reason.. Should this class inherit thesdk?
             self.print_log(type='D',msg='Reading event output %s' % label)
+            if dtype=='complex': # Complex data has separate columns in file for real and imag parts
+                arr=np.vstack((arr[:,0], arr[:,1]+1j*arr[:,2])).T
             queue.put((label,arr))
         except:
             self.print_log(type='E',msg='Failed reading event output %s' % label)
@@ -284,7 +286,7 @@ class spice_iofile(iofile):
         """
         if self.iotype=='event':
             file=self.file[0] # File is the same for all event type outputs
-            label_match=re.compile(r'\((.*)\)')
+            label_match=re.compile(r'\(([^)]+)\)') # Match one or more characters that are not ) and capture.
             if self.parent.model in ['spectre','ngspice']:
                 lines=subprocess.check_output('grep -n \"time\|freq\" %s | sed \'s/^\([0-9]\+\):/\\1|/\'' % file, shell=True).decode('utf-8')
                 lines=lines.split('\n') 
