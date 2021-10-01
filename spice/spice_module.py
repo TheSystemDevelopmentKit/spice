@@ -5,8 +5,6 @@ Spice Module
 
 Class for Spice netlist parsing.
 
-Last modification by Okko Järvinen, 07.10.2020 13:10
-
 """
 import os
 import pdb

@@ -4,10 +4,6 @@ Spice Testbench
 ===============
 
 Testbench generation class for spice simulations.
-Generates testbenches for eldo and spectre.
-
-=======
-Last modification by Okko Järvinen, 22.09.2021 18:36
 
 """
 import os
@@ -18,7 +14,7 @@ import fileinput
 from abc import * 
 from thesdk import *
 from spice import *
-from spice.module import spice_module
+from spice.spice_module import spice_module
 import pdb
 
 import numpy as np
@@ -27,7 +23,6 @@ from functools import reduce
 import textwrap
 from datetime import datetime
 
-# Utilizes logging method from thesdk
 class testbench(spice_module):
     """
     This class generates all testbench contents.
@@ -276,33 +271,6 @@ class testbench(spice_module):
     def misccmd(self,value):
         self._misccmd=None
 
-    @property
-    def ahdlincludecmd(self):
-        """String
-        
-        Verilog-A inclusion string pointing to file-IO utility blocks, as well
-        as manually added Verilog-A files defined in self.ahdlpath in the
-        parent entity.
-        """
-        if not hasattr(self,'_ahdlincludecmd'):
-            if self.parent.model == 'spectre':
-                self._ahdlincludecmd="%s VerilogA block includes\n" % (self.parent.syntaxdict["commentchar"])
-                self._ahdlincludecmd += 'ahdl_include "' + self.parent.entitypath + '/../spice/spice/veriloga_csv_write_edge.va"\n'
-                self._ahdlincludecmd += 'ahdl_include "' + self.parent.entitypath + '/../spice/spice/veriloga_csv_write_allpoints.va"\n'
-                self._ahdlincludecmd += 'ahdl_include "' + self.parent.entitypath + '/../spice/spice/veriloga_csv_write_allpoints_current.va"\n'
-                ahldincludes = self.parent.ahdlpath
-                for ahdlfile in ahldincludes:
-                    self._ahdlincludecmd += 'ahdl_include' + ahdlfile + "\n"
-            else:
-                self._ahdlincludecmd = ''
-        return self._ahdlincludecmd
-    @ahdlincludecmd.setter
-    def ahdlincludecmd(self,value):
-        self._ahdlincludecmd=value
-    @ahdlincludecmd.deleter
-    def ahdlincludecmd(self,value):
-        self._ahdlincludecmd=None
-
     # Generating spice dcsources string
     @property
     def dcsourcestr(self):
@@ -314,27 +282,18 @@ class testbench(spice_module):
         if not hasattr(self,'_dcsourcestr'):
             self._dcsourcestr = "%s DC sources\n" % self.parent.syntaxdict["commentchar"]
             for name, val in self.dcsources.Members.items():
+                supply = '%s%s' % (val.sourcetype.upper(),val.name.upper())
                 if self.parent.model == 'eldo':
                     if val.ramp == 0:
-                        self._dcsourcestr += "%s%s %s %s %g %s\n" % \
-                                (val.sourcetype.upper(),val.name.lower(),val.pos,val.neg,val.value, \
+                        self._dcsourcestr += "%s %s %s %g %s\n" % \
+                                (supply,val.pos,val.neg,val.value, \
                                 'NONOISE' if not val.noise else '')
                     else:
-                        self._dcsourcestr += "%s%s %s %s %s %s\n" % \
-                                (val.sourcetype.upper(),val.name.lower(),val.pos,val.neg, \
+                        self._dcsourcestr += "%s %s %s %s %s\n" % \
+                                (supply,val.pos,val.neg, \
                                 'pulse(0 %g 0 %g)' % (val.value,abs(val.ramp)), \
                                 'NONOISE' if not val.noise else '')
-                    # If the DC source is a supply, the power consumption is extracted for it automatically
-                    if val.extract:
-                        supply = "%s%s"%(val.sourcetype.upper(),val.name.lower())
-                        self._dcsourcestr += ".defwave p_%s=v(%s)*i(%s)\n" % \
-                                (supply.lower(),supply,supply)
-                        self._dcsourcestr += ".extract label=current_%s abs(average(i(%s),%s,%s))\n" % \
-                                (supply.lower(),supply,val.ext_start,val.ext_stop)
-                        self._dcsourcestr += ".extract label=power_%s abs(average(w(p_%s),%s,%s))\n" % \
-                                (supply.lower(),supply.lower(),val.ext_start,val.ext_stop)
                 elif self.parent.model == 'spectre':
-                    supply = '%s%s' % (val.sourcetype.upper(),val.name.lower())
                     if val.ramp == 0:
                         self._dcsourcestr += "%s %s %s %s%g\n" % \
                                 (supply,self.esc_bus(val.pos),self.esc_bus(val.neg),\
@@ -343,27 +302,14 @@ class testbench(spice_module):
                         self._dcsourcestr += "%s %s %s %s type=pulse val0=0 val1=%g rise=%g\n" % \
                                 (supply,self.esc_bus(val.pos),self.esc_bus(val.neg),\
                                 ('%ssource' % val.sourcetype.lower()),val.value,val.ramp)
-                    if val.extract:
-                        if supply not in self.parent.iofile_eventdict:
-                            self.parent.iofile_eventdict[supply] = None
-                        # Plotting power and current waveforms for this supply
-                        self._dcsourcestr += 'save %s:pwr\n' % supply
-                        self._dcsourcestr += 'save %s:p\n' % supply
-                        # Writing source current consumption to a file
-                        self._dcsourcestr += 'simulator lang=spice\n'
-                        self._dcsourcestr += '.option ingold 2\n'
-                        self._dcsourcestr += ".print I(%s)\n" % supply
-                        self._dcsourcestr += 'simulator lang=spectre\n'
-                        #self._dcsourcestr += "pwrout_%s%s (%s_p %s) veriloga_csv_write_allpoints_current filename=\"%s\"\n" % \
-                        #    (val.sourcetype.lower(),val.name.lower().replace('.','_'),self.esc_bus(val.pos),self.esc_bus(val.pos),val._extfile)
                 elif self.parent.model == 'ngspice':
                     if val.ramp == 0:
-                        self._dcsourcestr += "%s%s %s %s %g %s\n" % \
-                                (val.sourcetype.upper(),val.name.lower(),val.pos,val.neg,val.value, \
+                        self._dcsourcestr += "%s %s %s %g %s\n" % \
+                                (supply,val.pos,val.neg,val.value, \
                                 'NONOISE' if not val.noise else '')
                     else:
-                        self._dcsourcestr += "%s%s %s %s %s %s\n" % \
-                                (val.sourcetype.upper(),val.name.lower(),val.pos,val.neg, \
+                        self._dcsourcestr += "%s %s %s %s %s\n" % \
+                                (supply,val.pos,val.neg, \
                                 'pulse(0 %g 0 %g)' % (val.value,abs(val.ramp)), \
                                 'NONOISE' if not val.noise else '')
         return self._dcsourcestr
@@ -469,7 +415,7 @@ class testbench(spice_module):
                                                 val.ionames[i], val.ionames[i], val.ionames[i])
                                                 )
                                     self._inputsignals += (
-                                        '.model dac_%s dac_bridge(out_low = %s out_high = %s out_undef = %s input_load = 5.0e-16 t_rise = %s t_fall = %s' %
+                                        '.model dac_%s dac_bridge(out_low = %s out_high = %s out_undef = %s input_load = 5.0e-16 t_rise = %s t_fall = %s\n' %
                                         (val.ionames[i], val.vlo, val.vhi, (val.vhi+val.vlo)/2,
                                             val.trise, val.tfall )
                                         )
@@ -658,8 +604,10 @@ class testbench(spice_module):
     
     def esc_bus(self,name, esc_colon=True):
         """
-        Helper function to escape bus characters for Spectre simulations
-        bus<3:0> --> bus\<3\:0\>.
+        Helper function to escape bus characters for Spectre simulations::
+
+            self.esc_bus('bus<3:0>') 
+            # Returns 'bus\<3\:0\>'
         """
         if self.parent.model == 'spectre':
             if esc_colon:
@@ -674,13 +622,9 @@ class testbench(spice_module):
     def plotcmd(self):
         """String
         
-        Manual plot commands corresponding to self.plotlist defined in the
-        parent entity.
+        All output IOs are mapped to plot or print statements in the testbench.
+        Also manual plot commands through `spice_simcmd.plotlist` are handled here.
 
-        
-        Apparently, the there is no good way to save individual plots for individual analyses
-        in Spectre. Thus all 'save' statements can be grouped into one. For Eldo, the situation
-        is different and we need to figure out a way for this to work with Eldo also.
         """
         if not hasattr(self,'_plotcmd'):
             self._plotcmd = "" 
@@ -716,36 +660,36 @@ class testbench(spice_module):
                 if name.lower() == 'tran' or name.lower() == 'ac' :
                     self._plotcmd += "%s Output signals\n" % self.parent.syntaxdict["commentchar"]
                     if self.parent.model=='ngspice':
-                        self._plotcmd += ".control\nset wr_singlescale\nset wr_vecnames\n"
+                        self._plotcmd += ".control\nset wr_singlescale\nset wr_vecnames\nset appendwrite\n"
                         if self.parent.nproc: 
                             self._plotcmd +="%s%d\n" % (self.parent.syntaxdict["nprocflag"],self.parent.nproc)
                         self._plotcmd += "run\n"
 
+                    # Parsing output iofiles
                     for name, val in self.iofiles.Members.items():
-                        # Output iofile becomes an extract command
+                        # Output iofile becomes a plot/print command
                         if val.dir.lower()=='out' or val.dir.lower()=='output':
                             if val.iotype=='event':
                                 for i in range(len(val.ionames)):
+                                    signame = self.esc_bus(val.ionames[i])
                                     if self.parent.model=='eldo':
-                                        self._plotcmd += ".printfile %s(%s) file=\"%s\"\n" % \
-                                                (val.sourcetype,val.ionames[i],val.file[i])
+                                        self._plotcmd += '.printfile %s(%s) file=%s\n' % (val.sourcetype,signame,val.file[i])
                                     elif self.parent.model=='spectre':
-                                        signame = self.esc_bus(val.ionames[i])
                                         self._plotcmd += 'save %s\n' % signame
                                         self._plotcmd += 'simulator lang=spice\n'
                                         self._plotcmd += '.option ingold 2\n'
                                         # Implement complex value probing
                                         if val.datatype.lower() == 'complex':
-                                            self._plotcmd += ".print %sr(%s) %si(%s) \n" % \
-                                                    (val.sourcetype,val.ionames[i],
-                                                            val.sourcetype,val.ionames[i])
+                                            self._plotcmd += '.print %sr(%s) %si(%s) \n' % \
+                                                    (val.sourcetype,val.ionames[i],val.sourcetype,val.ionames[i])
                                         else:
-                                            self._plotcmd += ".print %s(%s)\n" % \
-                                                (val.sourcetype,val.ionames[i])
+                                            self._plotcmd += '.print %s(%s)\n' % (val.sourcetype,val.ionames[i])
                                         self._plotcmd += 'simulator lang=spectre\n'
                                     elif self.parent.model=='ngspice':
-                                        self._plotcmd += "plot %s(%s)\n" % \
-                                                (val.sourcetype,val.ionames[i].upper())
+                                        # Plots in tb only for interactive. Does not work in batch
+                                        if self.parent.interactive_spice:
+                                            self._plotcmd += "plot %s(%s)\n" % \
+                                                    (val.sourcetype,val.ionames[i].upper())
                                         self._plotcmd += "wrdata %s %s(%s)\n" % \
                                                 (val.file[i], val.sourcetype,val.ionames[i].upper())
                             elif val.iotype=='sample':
@@ -761,88 +705,108 @@ class testbench(spice_module):
                                                     % (len(val.trigger),len(val.ionames)))
                                     else:
                                         trig = val.trigger
-                                    # Checking the polarity of the triggers (for now every trigger has to have same polarity)
-                                    vthstr = ',%s' % str(val.vth)
-                                    afterstr = ',%g' % float(val.after)
-                                    beforestr = ',end'
-                                    if val.edgetype.lower()=='falling':
-                                        polarity = 'xdown'
-                                    elif val.edgetype.lower()=='both':
-                                        # Syntax for tcross is a bit different
-                                        polarity = 'tcross'
-                                        vthstr = ',vth=%s' % str(val.vth)
-                                        afterstr = ',after=%g' % float(val.after)
-                                        beforestr = ',before=end'
-                                    else:
-                                        polarity = 'xup'
-                                    if self.parent.model=='eldo':
-                                        self._plotcmd += ".extract file=\"%s\" vect label=%s yval(v(%s<*>),%s(v(%s)%s%s%s))\n" % (val.file[i],val.ionames[i],val.ionames[i].upper(),polarity,trig,vthstr,afterstr,beforestr)
-                                    elif self.parent.model=='spectre':
-                                        # Extracting the bus width from the ioname
-                                        signame = val.ionames[i].upper()
-                                        signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
-                                        if len(signame) == 1:
-                                            busstart = 0
-                                            busstop = 0
+                                    # Extracting the bus width
+                                    signame = val.ionames[i]
+                                    busstart,busstop,buswidth,busrange = self.parent.get_buswidth(signame)
+                                    signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
+                                    # If not already, add the respective trigger signal voltage to iofile_eventdict
+                                    if trig not in self.parent.iofile_eventdict:
+                                        self.parent.iofile_eventdict[trig] = None
+                                        if self.parent.model=='spectre':
+                                            self._plotcmd += 'save %s\n' % self.esc_bus(trig)
+                                            self._plotcmd += 'simulator lang=spice\n'
+                                            self._plotcmd += '.option ingold 2\n'
+                                            self._plotcmd += '.print v(%s)\n' % trig
+                                            self._plotcmd += 'simulator lang=spectre\n'
+                                        elif self.parent.model=='eldo':
+                                            self._plotcmd += '.printfile %s(%s) file=%s\n' % (val.sourcetype,self.esc_bus(trig),val.file[i])
+                                        elif self.parent.model=='ngspice':
+                                            # Plots in tb only for interactive. Does not work in batch
+                                            if self.parent.interactive_spice:
+                                                self._plotcmd += "plot %s(%s)\n" % \
+                                                    (val.sourcetype,trig.upper())
+                                            self._plotcmd += "wrdata %s %s(%s)\n" % \
+                                                    (val.file[i],val.sourcetype,trig.upper())
+                                    for j in busrange:
+                                        if buswidth == 1 and '<' not in val.ionames[i]:
+                                            bitname = signame[0]
                                         else:
-                                            busstart = int(signame[1])
-                                            busstop = int(signame[2])
-                                        if busstart > busstop:
-                                            buswidth = busstart-busstop+1
-                                        else:
-                                            buswidth = busstop-busstart+1
-                                        # Writing every individual bit of a bus to its own file (TODO: maybe to one file?)
-                                        for j in range(buswidth):
-                                            if buswidth == 1:
-                                                bitname = self.esc_bus('%s' % signame[0])
-                                            else:
-                                                bitname = self.esc_bus('%s<%d>' % (signame[0],j))
-                                            #self._plotcmd += 'save %s\n' % bitname
-                                            self._plotcmd += "sampleout_%s_%d (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" % \
-                                                    (signame[0],j,self.esc_bus(trig),bitname,val.file[i].replace('.txt','_%d.txt'%j),\
-                                                     val.vth,-1 if val.edgetype.lower() == 'falling' else 1)
-
+                                            bitname = '%s<%d>' % (signame[0],j)
+                                        # If not already, add the bit voltage to iofile_eventdict
+                                        if bitname not in self.parent.iofile_eventdict:
+                                            self.parent.iofile_eventdict[bitname] = None
+                                            if self.parent.model=='spectre':
+                                                self._plotcmd += 'save %s\n' % self.esc_bus(bitname)
+                                                self._plotcmd += 'simulator lang=spice\n'
+                                                self._plotcmd += '.option ingold 2\n'
+                                                self._plotcmd += '.print %s(%s)\n' % (val.sourcetype,bitname)
+                                                self._plotcmd += 'simulator lang=spectre\n'
+                                            elif self.parent.model=='eldo':
+                                                self._plotcmd += '.printfile %s(%s) file=%s\n' % (val.sourcetype,self.esc_bus(bitname),val.file[i])
+                                            elif self.parent.model=='ngspice':
+                                                self._plotcmd += "plot %s(%s)\n" % \
+                                                        (val.sourcetype,bitname.upper())
+                                                self._plotcmd += "wrdata %s %s(%s)\n" % \
+                                                        (val.file[i],val.sourcetype,bitname.upper())
                             elif val.iotype=='time':
+                                # For time IOs, the node voltage is saved as
+                                # event and the time information is later
+                                # parsed in Python
                                 for i in range(len(val.ionames)):
-                                    if self.parent.model == 'eldo':
-                                        self._plotcmd += ".printfile %s(%s) file=\"%s\"\n" % \
-                                                (val.sourcetype,val.ionames[i].upper(),val.file[i])
-                                    elif self.parent.model == 'spectre':
-                                        signame = self.esc_bus(val.ionames[i])
-                                        # Check if this same node was already saved as event type
-                                        if val.ionames[i] not in self.parent.iofile_eventdict:
-                                            # Requested node was not saved as event
-                                            # -> add to eventdict + save to output database
-                                            self.parent.iofile_eventdict[val.ionames[i]] = None
+                                    signame = self.esc_bus(val.ionames[i])
+                                    # Check if this same node was already saved as event type
+                                    if val.ionames[i] not in self.parent.iofile_eventdict:
+                                        # Requested node was not saved as event
+                                        # -> add to eventdict + save to output database
+                                        self.parent.iofile_eventdict[val.ionames[i]] = None
+                                        if self.parent.model == 'spectre':
                                             self._plotcmd += 'save %s\n' % signame
                                             self._plotcmd += 'simulator lang=spice\n'
                                             self._plotcmd += '.option ingold 2\n'
-                                            self._plotcmd += ".print %s(%s)\n" % (val.sourcetype,val.ionames[i])
+                                            self._plotcmd += '.print %s(%s)\n' % (val.sourcetype,val.ionames[i])
                                             self._plotcmd += 'simulator lang=spectre\n'
+                                        elif self.parent.model == 'eldo':
+                                            self._plotcmd += '.printfile %s(%s) file=%s\n' % (val.sourcetype,signame,val.file[i])
+                                        elif self.parent.model == 'ngspice':
+                                            # Plots in tb only for interactive. Does not work in batch
+                                            if self.parent.interactive_spice:
+                                                self._plotcmd += "plot %s(%s)\n" % \
+                                                        (val.sourcetype,signame.upper())
+                                            self._plotcmd += "wrdata %s %s(%s)\n" % \
+                                                    (val.file[i],val.sourcetype,signame.upper())
                             elif val.iotype=='vsample':
-                                for i in range(len(val.ionames)):
-                                    # Checking the given trigger(s)
-                                    if isinstance(val.trigger,list):
-                                        if len(val.trigger) == len(val.ionames):
-                                            trig = val.trigger[i]
-                                        else:
-                                            trig = val.trigger[0]
-                                            self.print_log(type='W',msg='%d triggers given for %d ionames. Using the first trigger for all ionames.' % (len(val.trigger),len(val.ionames)))
-                                    else:
-                                        trig = val.trigger
-                                    if self.parent.model=='eldo':
-                                        self.print_log(type='F',msg='not yet done') #TODO
-                                    elif self.parent.model=='spectre':
-                                        #self._plotcmd += 'save %s\n' % val.ionames[i].upper()
-                                        self._plotcmd += ("vsampleout_%s (%s %s) veriloga_csv_write_edge filename=\"%s\" vth=%g edgetype=%d\n" 
-                                                %(val.ionames[i].upper().replace('.','_'),trig,val.ionames[i].upper(),
-                                                    val.file[i],val.vth,-1 if val.edgetype.lower() == 'falling' else 1))
-                                    elif self.parent.model=='ngspice':
-                                        self.print_log(type='F',msg='Iotype vsample not implemented for Ngspice') #TODO
+                                self.print_log(type='O',msg='IO type \'vsample\' is obsolete. Please use type \'sample\' and set ioformat=\'volt\'.')
+                                self.print_log(type='F',msg='Please do it now :)')
                             else:
                                 self.print_log(type='W',msg='Output filetype incorrectly defined.')
+
+                    # Parsing supply currents here as well (I think ngspice
+                    # plots need to be grouped like this)
+                    for name, val in self.dcsources.Members.items():
+                        if val.extract:
+                            supply = '%s%s' % (val.sourcetype.upper(),val.name.upper())
+                            if supply not in self.parent.iofile_eventdict:
+                                self.parent.iofile_eventdict[supply] = None
+                            if self.parent.model == 'eldo':
+                                # Plotting power and current waveforms for this supply
+                                self._plotcmd += '.plot POW(%s)\n' % supply
+                                self._plotcmd += '.plot I(%s)\n' % supply
+                                # Writing source current consumption to a file
+                                self._plotcmd += '.printfile I(%s) file=%s\n' % (supply,val.ext_file)
+                            elif self.parent.model == 'spectre':
+                                self._plotcmd += 'save %s:pwr\n' % supply
+                                self._plotcmd += 'save %s:p\n' % supply
+                                self._plotcmd += 'simulator lang=spice\n'
+                                self._plotcmd += '.option ingold 2\n'
+                                self._plotcmd += '.print I(%s)\n' % supply
+                                self._plotcmd += 'simulator lang=spectre\n'
+                            elif self.parent.model == 'ngspice':
+                                # Plots in tb only for interactive. Does not work in batch
+                                if self.parent.interactive_spice:
+                                    self._plotcmd += "plot I(%s)\n" % supply
+                                self._plotcmd += "wrdata %s I(%s)\n" % (val.ext_file,supply)
             if self.parent.model=='ngspice':
-                    self._plotcmd += ".endc\n"
+                self._plotcmd += ".endc\n"
         return self._plotcmd
     @plotcmd.setter
     def plotcmd(self,value):
@@ -850,7 +814,6 @@ class testbench(spice_module):
     @plotcmd.deleter
     def plotcmd(self,value):
         self._plotcmd=None
-
 
     def export(self,**kwargs):
         """
@@ -902,7 +865,6 @@ class testbench(spice_module):
         includecmd = self.includecmd
         subinst = self.subinst
         dspfincludecmd = self.dspfincludecmd
-        ahdlincludecmd = self.ahdlincludecmd
         options = self.options
         params = self.parameters
         dcsourcestr = self.dcsourcestr
@@ -914,15 +876,14 @@ class testbench(spice_module):
                         libcmd + "\n" +\
                         includecmd + "\n" +
                         dspfincludecmd + "\n" +
-                        ahdlincludecmd + "\n" +
                         options + "\n" +\
                         params + "\n" +
                         subinst + "\n\n" +\
                         misccmd + "\n" +
                         dcsourcestr + "\n" +\
                         inputsignals + "\n" +\
-                        plotcmd + "\n" +\
                         simcmd + "\n" +\
+                        plotcmd + "\n" +\
                         self.parent.syntaxdict["lastline"])
 if __name__=="__main__":
     pass

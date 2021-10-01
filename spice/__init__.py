@@ -3,14 +3,12 @@
 Spice
 =====
 
-Analog simulation interface package for The System Development Kit 
+Analog simulation interface package for TheSyDeKick.
 
-Provides utilities to import spice-like modules to python environment and
-automatically generate testbenches for the most common simulation cases.
+Provides utilities to import spice-like modules to Python environment and
+generate testbenches for the various simulation cases.
 
 Initially written by Okko Järvinen, 2019
-
-Last modification by Okko Järvinen, 23.09.2021 18:48
 
 Release 1.6, Jun 2020 supports Eldo and Spectre
 """
@@ -34,7 +32,7 @@ from spice.testbench import testbench as stb
 from spice.spice_iofile import spice_iofile as spice_iofile
 from spice.spice_dcsource import spice_dcsource as spice_dcsource
 from spice.spice_simcmd import spice_simcmd as spice_simcmd
-from spice.module import spice_module
+from spice.spice_module import spice_module as spice_module
 
 class spice(thesdk,metaclass=abc.ABCMeta):
     """Adding this class as a superclass enforces the definitions 
@@ -53,7 +51,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def si_prefix_mult(self):
-        """ Dictionary mapping SI-prefixes to multipliers """
+        """ Dictionary
+        
+        Dictionary mapping SI-prefixes to multipliers.
+        """
         if hasattr(self, '_si_prefix_mult'):
             return self._si_prefix_mult
         else:
@@ -75,8 +76,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def syntaxdict(self):
-        """Internally used dictionary for common syntax conversions between
-        Spectre, Eldo, and Ngspice."""
+        """ Dictionary
+        
+        Internally used dictionary for common syntax conversions between
+        Spectre, Eldo, and Ngspice.
+        """
         if self.model=='eldo':
             self._syntaxdict = {
                     "cmdfile_ext" : '.cir',
@@ -155,7 +159,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """True | False (default)
 
         If True, do not delete file IO files after simulations. Useful for
-        debugging the file IO"""
+        debugging the file IO.
+        
+        .. note::
+            Replaced by `preserve_result` in v1.7
+        """
         if not hasattr(self,'_preserve_iofiles'):
             self._preserve_iofiles=False
         return self._preserve_iofiles
@@ -171,7 +179,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """True | False (default)
 
         If True, do not delete generated Spice files (testbench, subcircuit,
-        etc.) after simulations.  Useful for debugging."""
+        etc.) after simulations.  Useful for debugging.
+        
+        .. note::
+            Replaced by `preserve_result` in v1.7
+        """
         if not hasattr(self,'_preserve_spicefiles'):
             self._preserve_spicefiles=False
         return self._preserve_spicefiles
@@ -184,10 +196,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def distributed_run(self):
-        """ Boolean (default False)
-            If True, distributes applicable simulations (currently DC sweep supported)
-            into the LSF cluster. The number of subprocesses launched is
-            set by self.num_processes.
+        """ True | False (default)
+
+        If True, distributes applicable simulations (currently DC sweep
+        supported) into the LSF cluster. The number of subprocesses launched is
+        set by self.num_processes.
         """
         if hasattr(self, '_distributed_run'):
             return self._distributed_run
@@ -200,8 +213,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def num_processes(self):
-        """ integer
-            Maximum number of spawned child processes for distributed runs.
+        """ Integer
+
+        Maximum number of spawned child processes for distributed runs.
         """
         if hasattr(self, '_num_processes'):
             return self._num_processes
@@ -214,22 +228,28 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def load_state(self):  
-        """String (Default '')
+        """ String (default '')
 
-        Feature for loading results of previous simulation.  The Spice
+        Feature for loading results of previous simulation. The Spice
         simulation is not re-executed, but the outputs will be read from
-        existing files.
+        existing files. The string value should be the `runname` of the desired
+        simulation.
         
-        Example inputs::
+        Loading the most recent result automatically::
 
-            self.load_state = 'last' # load latest
-            self.load_state = 'latest' # load latest
-            self.load_state = '20201002103638_tmpdbw11nr4' # load results matching this name
-            self.load_state = 'zzzz' (non-existent directory) # list available directories to load
+            self.load_state = 'last'
+            # or
+            self.load_state = 'latest'
+
+        Loading a specific past result using the `runname`::
+
+            self.load_state = '20201002103638_tmpdbw11nr4'
+
+        List available results by providing any non-existent `runname`::
+
+            self.load_state = 'this_does_not_exist'
         """
-        if hasattr(self,'_load_state'):
-            return self._load_state
-        else:
+        if not hasattr(self,'_load_state'):
             self._load_state=''
         return self._load_state
     @load_state.setter
@@ -242,7 +262,8 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
         Feature for specifying the 'section' of the model library file and
         simulation temperature. The path to model libraries should be set in
-        TheSDK.config as either ELDOLIBFILE, SPECTRELIBFILE or NGSPICELIBFILE variable.
+        TheSDK.config as either ELDOLIBFILE, SPECTRELIBFILE or NGSPICELIBFILE
+        variable.
 
         Example::
 
@@ -346,7 +367,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def interactive_spice(self):
         """ True | False (default)
         
-        Launch simulator in interactive mode. For Eldo, opens also ezwave."""
+        Launch simulator in interactive mode. A waveform viewer (ezwave by
+        default) is opened during the simulation for debugging. See
+        `plotprogram` for selecting waveform viewer program.
+        """
 
         if hasattr(self,'_interactive_spice'):
             return self._interactive_spice
@@ -359,11 +383,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def nproc(self):
-        """Integer
+        """ Integer
         
         Requested maximum number of threads for multithreaded simulations. For
         Eldo, maps to command line parameter '-nproc'. For Spectre, maps to
-        command line parameter '+mt'."""
+        command line parameter '+mt'.
+        """
         if hasattr(self,'_nproc'):
             return self._nproc
         else:
@@ -375,11 +400,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def errpreset(self):
-        """String
+        """ String
         
         Global accuracy parameter for Spectre simulations. Options include
-        'liberal', 'moderate' and 'conservative', in order of rising
-        accuracy."""
+        'liberal', 'moderate' and 'conservative', in order of rising accuracy.
+        """
         if hasattr(self,'_errpreset'):
             return self._errpreset
         else:
@@ -392,7 +417,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     # DSPF filenames
     @property
     def dspf(self):
-        """List<String>
+        """ List of str
         
         List containing filenames for DSPF-files to be included for post-layout
         simulations. The names given in this list are matched to dspf-files in
@@ -418,15 +443,19 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def iofile_eventdict(self):
-        """
-        Dictionary to store event type output from spectre simulations. This should speed up reading the results.
+        """ Dictionary
+
+        Dictionary to store event type output from the simulations. This should
+        speed up reading the results.
         """
         if not hasattr(self, '_iofile_eventdict'):
             self._iofile_eventdict=dict()
             for name, val in self.iofile_bundle.Members.items():
                 if (val.dir.lower()=='out' or val.dir.lower()=='output') and val.iotype=='event':
                     for key in val.ionames:
-                        self._iofile_eventdict[key] = None
+                        # Eldo seems to force output names to uppercase, let's
+                        # uppercase everything here to avoid key mismatches
+                        self._iofile_eventdict[key.upper()] = None
         return self._iofile_eventdict
     @iofile_eventdict.setter
     def iofile_eventdict(self,val):
@@ -434,10 +463,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def iofile_bundle(self):
-        """ 
-        A thesdk.Bundle containing spice_iofile objects. The iofile objects
-        are automatically added to this Bundle, nothing should be manually
-        added.
+        """ Bundle
+
+        A thesdk.Bundle containing `spice_iofile` objects. The `spice_iofile`
+        objects are automatically added to this Bundle, nothing should be
+        manually added.
         """
         if not hasattr(self,'_iofile_bundle'):
             self._iofile_bundle=Bundle()
@@ -448,10 +478,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def dcsource_bundle(self):
-        """ 
-        A thesdk.Bundle containing spice_dcsource objects. The dcsource objects
-        are automatically added to this Bundle, nothing should be manually
-        added.
+        """ Bundle
+
+        A thesdk.Bundle containing `spice_dcsource` objects. The `spice_dcsource`
+        objects are automatically added to this Bundle, nothing should be
+        manually added.
         """
         if not hasattr(self,'_dcsource_bundle'):
             self._dcsource_bundle=Bundle()
@@ -462,10 +493,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def simcmd_bundle(self):
-        """ 
-        A thesdk.Bundle containing spice_simcmd objects. The simcmd objects
-        are automatically added to this Bundle, nothing should be manually
-        added.
+        """ Bundle
+
+        A thesdk.Bundle containing `spice_simcmd` objects. The `spice_simcmd`
+        objects are automatically added to this Bundle, nothing should be
+        manually added.
         """
         if not hasattr(self,'_simcmd_bundle'):
             self._simcmd_bundle=Bundle()
@@ -476,7 +508,8 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def extracts(self):
-        """ 
+        """ Bundle
+
         A thesdk.Bundle containing extracted quantities.
         """
         if not hasattr(self,'_extracts'):
@@ -488,8 +521,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property 
     def has_lsf(self):
-        """
-        Returs True if LSF submissions are properly defined. Default False
+        """ True | False (default)
+
+        True if LSF submissions are properly defined.
         """
         if ( not thesdk.GLOBALS['LSFINTERACTIVE'] == '' ) and (not thesdk.GLOBALS['LSFSUBMISSION'] == ''):
             self._has_lsf = True
@@ -499,11 +533,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property 
     def spice_submission(self):
-        """
+        """ String
+
         Defines spice submission prefix from thesdk.GLOBALS['LSFSUBMISSION']
         and thesdk.GLOBALS['LSFINTERACTIVE'] for LSF submissions.
 
-        Usually something like 'bsub -K' and 'bsub -I'.
+        Usually something like 'bsub -K' or 'bsub -I'.
         """
         if not hasattr(self, '_spice_submission'):
             try:
@@ -530,8 +565,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def plotlist(self): 
-        """
-            OBSOLETE! RE-LOCATED TO SPICE_SIMCMD.PY
+        """ List of str
+
+        List of net names to be saved in the waveform database.
+
+        .. note:: 
+            Obsolete! Moved to `spice_simcmd` as a keyword argument.
         """
         self.print_log(type='O', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
         if not hasattr(self,'_plotlist'):
@@ -544,17 +583,23 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def spicemisc(self): 
-        """List<String>
+        """ List of str
 
         List of manual commands to be pasted to the testbench. The strings are
         pasted to their own lines (no linebreaks needed), and the syntax is
         unchanged.
 
-        Example: setting initial voltages from testbench (Eldo)::
+        For example, setting initial voltages from testbench (Eldo)::
 
-            self.spicemisc = []
             for i in range(nodes):
                 self.spicemisc.append('.ic NODE<%d> 0' % i)
+
+        The same example can be done in Spectre with::
+
+            self.spicemisc.append('simulator lang=spice')
+            for i in range(nodes):
+                self.spicemisc.append('.ic NODE<%d> 0' % i)
+            self.spicemisc.append('simulator lang=spectre')
         """
         if not hasattr(self, '_spicemisc'):
             self._spicemisc = []
@@ -562,20 +607,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @spicemisc.setter
     def spicemisc(self,value): 
             self._spicemisc = value
-
-    @property
-    def ahdlpath(self): 
-        """List<String>
-
-        List of strings containing file paths to Verilog-A files to be included
-        into a Spectre simulation.
-        """
-        if not hasattr(self, '_ahdlpath'):
-            self._ahdlpath = []
-        return self._ahdlpath
-    @ahdlpath.setter
-    def ahdlpath(self,value): 
-            self._ahdlpath = value
 
     @property
     def name(self):
@@ -646,18 +677,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         return self._spicetbsrc
 
     @property
-    def eldochisrc(self):
-        """String
-
-        Path to the Eldo chi-file. ('./Simulations/spicesim/<runname>/tb_entityname.chi').
-        Only applies to Eldo simulations.
-        This shouldn't be set manually.
-        """
-        if not hasattr(self, '_eldochisrc'):
-            self._eldochisrc=self.spicesimpath + '/tb_' + self.name + '.chi'
-        return self._eldochisrc
-
-    @property
     def spicesubcktsrc(self):
         """String
 
@@ -687,6 +706,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @spicesimpath.deleter
     def spicesimpath(self):
         if os.path.exists(self.spicesimpath) and not self.preserve_result:
+            self.print_log(msg='Cleaning ./%s/ (set preserve_result=True to prevent cleaning).' % os.path.relpath(self._spicesimpath,start='../'))
             keepdb = False
             for target in os.listdir(self.spicesimpath):
                 targetpath = '%s/%s' % (self.spicesimpath,target)
@@ -704,10 +724,21 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     self.print_log(type='W',msg='Could not remove ./%s' % os.path.relpath(targetpath,start='../'))
             if not keepdb:
                 try:
+                    # Eldo needs some time to disconnect from the jwdb server
+                    # Another dirty hack to check that the process is dead before cleaning
+                    # TODO: figure out if this can be prevented
+                    if self.model == 'eldo':
+                        self.print_log(type='I',msg='Waiting for Eldo to exit...')
+                        waittime = 0
+                        while os.system('pgrep \"easynch_64.exe\" >/dev/null') == 0:
+                            time.sleep(1)
+                            waittime += 1
+                            if waittime > 60:
+                                break
                     shutil.rmtree(self.spicesimpath)
-                    self.print_log(type='D',msg='Removing ./%s' % os.path.relpath(self.spicesimpath,start='../'))
+                    self.print_log(type='D',msg='Removing ./%s/' % os.path.relpath(self.spicesimpath,start='../'))
                 except:
-                    self.print_log(type='W',msg='Could not remove ./%s' % os.path.relpath(spicesimpath,start='../'))
+                    self.print_log(type='W',msg='Could not remove ./%s/' % os.path.relpath(self.spicesimpath,start='../'))
 
     @property
     def spicecmd(self):
@@ -758,7 +789,8 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def plotprogram(self):
-        """
+        """ String
+
         Sets the program to be used for visualizing waveform databases.
         Options are ezwave (default) or viva.
         """
@@ -771,7 +803,8 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def plotprogcmd(self):
-        """
+        """ String
+
         Sets the command to be run for interactive simulations.
         """
         if not hasattr(self, '_plotprogcmd'):
@@ -789,7 +822,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def plotprogcmd(self, value):
         self._plotprogcmd=value
 
-    def connect_inputs(self):
+    def connect_spice_inputs(self):
         """Automatically called function to connect iofiles (inputs) to top
         entity IOS Bundle items."""
         for ioname,io in self.IOS.Members.items():
@@ -801,97 +834,82 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     # Data must be properly shaped
                     self.iofile_bundle.Members[ioname].Data=self.IOS.Members[ioname].Data
 
-    def connect_outputs(self):
+    def connect_spice_outputs(self):
         """Automatically called function to connect iofiles (outputs) to top
         entity IOS Bundle items."""
         for name,val in self.iofile_bundle.Members.items():
             if val.dir == 'out':
                 self.IOS.Members[name].Data=self.iofile_bundle.Members[name].Data
 
-    def write_infile(self):
+    def write_spice_inputs(self):
         """Automatically called function to call write() functions of each
         iofile with direction 'input'."""
         for name, val in self.iofile_bundle.Members.items():
             if val.dir.lower()=='in' or val.dir.lower()=='input':
                 self.iofile_bundle.Members[name].write()
 
-    def read_outfile(self):
+    def read_spice_outputs(self):
         """Automatically called function to call read() functions of each
         iofile with direction 'output'."""
-        # Handle spectre differently..
-        if self.model=='spectre':
-            first=True
-            for name, val in self.iofile_bundle.Members.items():
-                if val.dir.lower()=='out' or val.dir.lower()=='output':
-                    if val.iotype=='event': # Event type outs are in same file, read only once to speed up things
-                        if first:
-                            self.iofile_bundle.Members[name].read()
-                            first=False
-                        if len(val.ionames) == 1:
-                            try:
-                                self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0]]
-                            except KeyError:
-                                self.print_log(type='W', msg='Invalid ioname %s for iofile %s' % (val.ionames[0], name))
-                        else: # Iofile is a bus?
-                            data=[]
-                            for i, key in enumerate(val.ionames):
-                                try:
-                                    if i == 0:
-                                        data=self.iofile_eventdict[key]
-                                    else:
-                                        try:
-                                            data=np.r_['1', data, self.iofile_eventdict[key]]
-                                        except ValueError:
-                                            self.print_log(type='W', msg='Invalid dimensions for concatenating arrays for IO %s!' % name)
-                                except KeyError:
-                                    self.print_log(type='W', msg='Invalid ioname %s for iofile %s' % (key, name))
-                            self.iofile_bundle.Members[name].Data=data
-                    else:
+        first=True
+        for name, val in self.iofile_bundle.Members.items():
+            if val.dir.lower()=='out' or val.dir.lower()=='output':
+                if val.iotype=='event': # Event type outs are in same file, read only once to speed up things
+                    if first:
                         self.iofile_bundle.Members[name].read()
-
-        else:
-            for name, val in self.iofile_bundle.Members.items():
-                if val.dir.lower()=='out' or val.dir.lower()=='output':
+                        first=False
+                    if len(val.ionames) == 1:
+                        try:
+                            self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()]
+                        except KeyError:
+                            self.print_log(type='W', msg='Invalid ioname %s for iofile %s' % (val.ionames[0], name))
+                    else: # Iofile is a bus?
+                        data=[]
+                        for i, key in enumerate(val.ionames):
+                            try:
+                                if i == 0:
+                                    data=self.iofile_eventdict[key.upper()]
+                                else:
+                                    try:
+                                        data=np.r_['1', data, self.iofile_eventdict[key.upper()]]
+                                    except ValueError:
+                                        self.print_log(type='W', msg='Invalid dimensions for concatenating arrays for IO %s!' % name)
+                            except KeyError:
+                                self.print_log(type='W', msg='Invalid ioname %s for iofile %s' % (key, name))
+                        self.iofile_bundle.Members[name].Data=data
+                else:
                     self.iofile_bundle.Members[name].read()
     
     def execute_spice_sim(self):
         """Automatically called function to execute spice simulation."""
         self.print_log(type='I', msg="Running external command %s" %(self.spicecmd) )
-        if self.model == 'eldo':
-            # This is some experimental stuff
-            count = 0
-            while True:
-                status = int(os.system(self.spicecmd)/256)
-                # Status code 9 seems to result from failed licensing in LSF runs
-                # Let's not try to restart if in interactive mode
-                if status != 9 or count == 10 or self.interactive_spice:
-                    break
-                else:
-                    count += 1
-                    self.print_log(type='W',msg='License error, trying again... (%d/10)' % count)
-                    time.sleep(5)
-            if status > 0:
-                self.print_log(type='F',msg='Eldo encountered an error (%d).' % status)
-        else:
-            os.system(self.spicecmd)
+        if os.system(self.spicecmd) > 0:
+            self.print_log(type='E', msg="Simulator (%s) returned non-zero exit code." % (self.model))
 
     def run_plotprogram(self):
-        """ Run plotting program for interactive Spectre simulations
-            NOTE: This feature is for Spectre simulations ONLY!
-        """
+        ''' Starting a parallel process for waveform viewer program.
+
+        The plotting program command can be set with 'plotprogram'.
+        Tested for spectre and eldo.
+        '''
+        if self.model == 'ngspice':
+            self.print_log(type='W',msg='Interactive plotting not implemented for ngspice.')
+            return
         # This waiting method assumes spectre output.
-        # TODO: test for eldo (and ngspice?)
         tries = 0
         while tries < 100:
             if os.path.exists(self.spicedbpath):
-                # More than just the logfile exists
-                if len(os.listdir(self.spicedbpath)) > 1:
-                    # Database file has something written to it
-                    filesize = []
-                    for f in os.listdir(self.spicedbpath):
-                        filesize.append(os.stat('%s/%s' % (self.spicedbpath,f)).st_size)
-                    if all(filesize) > 0:
-                        break
+                if self.model == 'spectre':
+                    # More than just the logfile exists
+                    if len(os.listdir(self.spicedbpath)) > 1:
+                        # Database file has something written to it
+                        filesize = []
+                        for f in os.listdir(self.spicedbpath):
+                            filesize.append(os.stat('%s/%s' % (self.spicedbpath,f)).st_size)
+                        if all(filesize) > 0:
+                            break
+                else:
+                    break
             else:
                 time.sleep(2)
                 tries += 1
@@ -911,71 +929,102 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         consumptions. The consumptions are extracted for spice_dcsource objects
         with the attribute extract=True.
         
-        The extracted consumptions are accessible on the top-level after simulation as::
+        The extracted consumptions are accessible on the top-level after
+        simulation as::
             
-            self.extracts.Members['powers'] # Dictionary with averaged power consumptions of each supply + total
-            self.extracts.Members['currents'] # Dictionary with averaged current consumptions of each supply + total
-            self.extracts.Members['curr_tran'] # Dictionary with transient current consumptions of each supply
+            # Dictionary with averaged power of each supply + total
+            self.extracts.Members['powers']
+            # Dictionary with averaged current of each supply + total
+            self.extracts.Members['currents']
+            # Dictionary with transient current of each supply
+            self.extracts.Members['curr_tran']
+
+        The keys in the aforementioned dictionaries match the `name`-fields of
+        the respective `spice_dcsource` objects.
 
         """
         self.extracts.Members['powers'] = {}
         self.extracts.Members['currents'] = {}
         self.extracts.Members['curr_tran'] = {}
         try:
-            if self.model == 'eldo':
-                currentmatch = re.compile(r"\* CURRENT_")
-                powermatch = re.compile(r"\* POWER_")
-                with open(self.eldochisrc) as infile:
-                    chifile = infile.readlines()
-                    for line in chifile:
-                        if currentmatch.search(line):
-                            words = line.split()
-                            sourcename = words[1].replace('CURRENT_','')
-                            extval = float(words[3])
-                            self.extracts.Members['currents'][sourcename] = extval
-                        elif powermatch.search(line):
-                            words = line.split()
-                            sourcename = words[1].replace('POWER_','')
-                            extval = float(words[3])
-                            self.extracts.Members['powers'][sourcename] = extval
-            elif self.model == 'spectre':
-                for name, val in self.tb.dcsources.Members.items():
-                    # Read transient power consumption of the extracted source
-                    if val.extract and val.sourcetype.lower() == 'v':
-                        sourcename = '%s%s' % (val.sourcetype.upper(),val.name.lower())
-                        if sourcename in self.iofile_eventdict:
-                            arr = self.iofile_eventdict[sourcename]
-                            if val.ext_start is not None:
-                                arr = arr[np.where(arr[:,0] >= val.ext_start)[0],:]
-                            if val.ext_stop is not None:
-                                arr = arr[np.where(arr[:,0] <= val.ext_stop)[0],:]
-                            # The time points are non-uniform -> use deltas as weights
-                            dt = np.diff(arr[:,0])
-                            totaltime = arr[-1,0]-arr[0,0]
-                            meancurr = np.sum(np.abs(arr[1:,1])*dt)/totaltime
-                            meanpwr = meancurr*val.value
-                            self.extracts.Members['currents'][val.name] = meancurr
-                            self.extracts.Members['powers'][val.name] = meanpwr
-                            self.extracts.Members['curr_tran'][val.name] = arr
-            self.print_log(type='I',msg='Extracted power consumption from transient:')
-            # This is newer Python syntax
-            maxlen = len(max([*self.extracts.Members['powers'],'total'],key=len))
-            for name,val in self.extracts.Members['currents'].items():
-                self.print_log(type='I',msg='%s%s current = %.06f mA'%(name,' '*(maxlen-len(name)),1e3*val))
-            if len(self.extracts.Members['currents'].items()) > 0:
-                self.print_log(type='I',msg='Total%s current = %.06f mA'%(' '*(maxlen-5),1e3*sum(self.extracts.Members['currents'].values())))
-            for name,val in self.extracts.Members['powers'].items():
-                self.print_log(type='I',msg='%s%s power   = %.06f mW'%(name,' '*(maxlen-len(name)),1e3*val))
-            if len(self.extracts.Members['powers'].items()) > 0:
-                self.print_log(type='I',msg='Total%s power   = %.06f mW'%(' '*(maxlen-5),1e3*sum(self.extracts.Members['powers'].values())))
+            for name, val in self.tb.dcsources.Members.items():
+                # Read transient power consumption of the extracted source
+                if val.extract and val.sourcetype.lower() == 'v':
+                    sourcename = '%s%s' % (val.sourcetype.upper(),val.name.upper())
+                    if sourcename in self.iofile_eventdict:
+                        arr = self.iofile_eventdict[sourcename]
+                        if val.ext_start is not None:
+                            arr = arr[np.where(arr[:,0] >= val.ext_start)[0],:]
+                        if val.ext_stop is not None:
+                            arr = arr[np.where(arr[:,0] <= val.ext_stop)[0],:]
+                        # The time points are non-uniform -> use deltas as weights
+                        dt = np.diff(arr[:,0])
+                        totaltime = arr[-1,0]-arr[0,0]
+                        meancurr = np.sum(np.abs(arr[1:,1])*dt)/totaltime
+                        meanpwr = meancurr*val.value
+                        self.extracts.Members['currents'][val.name] = meancurr
+                        self.extracts.Members['powers'][val.name] = meanpwr
+                        self.extracts.Members['curr_tran'][val.name] = arr
+            if len(self.extracts.Members['powers'].keys()) > 0:
+                self.print_log(type='I',msg='Extracted power consumption from transient:')
+                # This is newer Python syntax
+                maxlen = len(max([*self.extracts.Members['powers'],'total'],key=len))
+                for name,val in self.extracts.Members['currents'].items():
+                    self.print_log(type='I',msg='%s%s current = %.06f mA'%(name,' '*(maxlen-len(name)),1e3*val))
+                if len(self.extracts.Members['currents'].items()) > 0:
+                    self.print_log(type='I',msg='Total%s current = %.06f mA'%(' '*(maxlen-5),1e3*sum(self.extracts.Members['currents'].values())))
+                for name,val in self.extracts.Members['powers'].items():
+                    self.print_log(type='I',msg='%s%s power   = %.06f mW'%(name,' '*(maxlen-len(name)),1e3*val))
+                if len(self.extracts.Members['powers'].items()) > 0:
+                    self.print_log(type='I',msg='Total%s power   = %.06f mW'%(' '*(maxlen-5),1e3*sum(self.extracts.Members['powers'].values())))
         except:
             self.print_log(type='W',msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting power consumptions.')
+
+    def get_buswidth(self,signame):
+        """ Extract buswidth from signal name.
+        
+        Little-endian example::
+                
+            start,stop,width,busrange = get_buswidth('BUS<10:0>')
+            # start = 10
+            # stop = 0
+            # width = 11
+            # busrange = range(10,-1,-1)
+
+        Big-endian example::
+                
+            start,stop,width,busrange = get_buswidth('BUS<0:8>')
+            # start = 0
+            # stop = 8
+            # width = 9
+            # busrange = range(0,9)
+            
+        """
+        signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
+        if '' in signame:
+            signame.remove('')
+        if len(signame) == 1:
+            busstart = 0
+            busstop = 0
+        elif len(signame) == 2:
+            busstart = int(signame[1])
+            busstop = int(signame[1])
+        else:
+            busstart = int(signame[1])
+            busstop = int(signame[2])
+        if busstart > busstop:
+            buswidth = busstart-busstop+1
+            busrange = range(busstart,busstop-1,-1)
+        else:
+            buswidth = busstop-busstart+1
+            busrange = range(busstart,busstop+1)
+        return busstart,busstop,buswidth,busrange
     
     def si_string_to_float(self, strval):
         """ Convert SI-formatted string to float
             
-            E.g. self.si_string_to_float('3 mV') returns 3e-3.
+        E.g. self.si_string_to_float('3 mV') returns 3e-3.
         """
         parts = strval.split()
         if len(parts) == 2:
@@ -1072,17 +1121,17 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self.tb.iofiles = self.iofile_bundle
             self.tb.dcsources = self.dcsource_bundle
             self.tb.simcmds = self.simcmd_bundle
-            self.connect_inputs()
+            self.connect_spice_inputs()
             self.tb.generate_contents()
             self.tb.export_subckt(force=True)
             self.tb.export(force=True)
-            self.write_infile()
+            self.write_spice_inputs()
             if self.interactive_spice:
                 plotthread = threading.Thread(target=self.run_plotprogram,name='plotting')
                 plotthread.start()
             self.execute_spice_sim()
-            self.read_outfile()
-            self.connect_outputs()
+            self.read_spice_outputs()
+            self.connect_spice_outputs()
             self.extract_powers()
             self.read_oppts()
             # Clean simulation results
@@ -1108,9 +1157,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     self.tb.iofiles = self.iofile_bundle
                     self.tb.dcsources = self.dcsource_bundle
                     self.tb.simcmds = self.simcmd_bundle
-                    self.connect_inputs()
-                    self.read_outfile()
-                    self.connect_outputs()
+                    self.connect_spice_inputs()
+                    self.read_spice_outputs()
+                    self.connect_spice_outputs()
                     self.extract_powers()
                     self.read_oppts()
             except:

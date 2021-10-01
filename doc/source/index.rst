@@ -10,10 +10,6 @@
    :members:
    :undoc-members:
 
-.. automodule:: spice.module
-   :members:
-   :undoc-members:
-
 .. automodule:: spice.spice_iofile
    :members:
    :undoc-members:
@@ -27,6 +23,10 @@
    :undoc-members:
 
 .. automodule:: spice.testbench
+   :members:
+   :undoc-members:
+
+.. automodule:: spice.spice_module
    :members:
    :undoc-members:
 
