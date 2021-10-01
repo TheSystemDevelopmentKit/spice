@@ -138,7 +138,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
     (master_doc, 'spice.tex', 'Spice Documentation',
-     'Your Name', 'manual'),
+     '', 'howto'),
 ]
 
 

@@ -29,7 +29,7 @@ class spice_iofile(iofile):
     adds a spice_iofile object to the parents iofile_bundle property.
     Accessible as iofile_bundle.Members['name'].
 
-    Parameters
+    Attributes
     ----------
     parent : object 
         The parent object initializing the spice_iofile instance. Default None
@@ -57,7 +57,7 @@ class spice_iofile(iofile):
         Inherited from the parent. If complex, the ioname is handled as a
         complex signal. Currently implemented only for writing the ouputs in
         testbenches and reading them in. 
-    trigger : str or list<str>
+    trigger : str or list(str)
         Name of the clock signal node in the Spice netlist. If a single string
         is given, the same clock signal is used for all bits/buses. If a list
         is given, and the length matches ionames list length, each ioname will
@@ -106,15 +106,17 @@ class spice_iofile(iofile):
 
     Defining digital output signal triggered with a falling edge of the analog clock::
 
-        _=spice_iofile(self,name='dout',dir='out',iotype='sample',sourcetype='V',ioformat='bin',
-                       ionames='DOUT<7:0>',edgetype='falling',vth=self.vdd/2,trigger='CLK')
+        _=spice_iofile(self,name='dout',dir='out',iotype='sample',sourcetype='V',
+                       ioformat='bin',ionames='DOUT<7:0>',edgetype='falling',
+                       vth=self.vdd/2,trigger='CLK')
 
     Defining a discrete time & continuous amplitude output signal triggered
     with a rising edge of the analog clock. The iofile returns a 2D-vector
     similar to 'event' type signals::
 
-        _=spice_iofile(self,name='sampled_input',dir='out',iotype='sample',sourcetype='V',ioformat='volt',
-                       ionames='INP',edgetype='rising',vth=self.vdd/2,trigger='CLK')
+        _=spice_iofile(self,name='sampled_input',dir='out',iotype='sample',sourcetype='V',
+                       ioformat='volt',ionames='INP',edgetype='rising',
+                       vth=self.vdd/2,trigger='CLK')
 
     Defining digital input signal with decimal format. The input vector is a
     list of integers, which get converted to binary bus of 4-bits (inferred

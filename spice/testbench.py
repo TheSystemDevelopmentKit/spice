@@ -604,8 +604,10 @@ class testbench(spice_module):
     
     def esc_bus(self,name, esc_colon=True):
         """
-        Helper function to escape bus characters for Spectre simulations
-        bus<3:0> --> bus\<3\:0\>.
+        Helper function to escape bus characters for Spectre simulations::
+
+            self.esc_bus('bus<3:0>') 
+            # Returns 'bus\<3\:0\>'
         """
         if self.parent.model == 'spectre':
             if esc_colon:
@@ -621,7 +623,7 @@ class testbench(spice_module):
         """String
         
         All output IOs are mapped to plot or print statements in the testbench.
-        Also manual plot commands through spice_simcmd.plotlist are handled here.
+        Also manual plot commands through `spice_simcmd.plotlist` are handled here.
 
         """
         if not hasattr(self,'_plotcmd'):
@@ -684,8 +686,10 @@ class testbench(spice_module):
                                             self._plotcmd += '.print %s(%s)\n' % (val.sourcetype,val.ionames[i])
                                         self._plotcmd += 'simulator lang=spectre\n'
                                     elif self.parent.model=='ngspice':
-                                        self._plotcmd += "plot %s(%s)\n" % \
-                                                (val.sourcetype,val.ionames[i].upper())
+                                        # Plots in tb only for interactive. Does not work in batch
+                                        if self.parent.interactive_spice:
+                                            self._plotcmd += "plot %s(%s)\n" % \
+                                                    (val.sourcetype,val.ionames[i].upper())
                                         self._plotcmd += "wrdata %s %s(%s)\n" % \
                                                 (val.file[i], val.sourcetype,val.ionames[i].upper())
                             elif val.iotype=='sample':
@@ -717,7 +721,9 @@ class testbench(spice_module):
                                         elif self.parent.model=='eldo':
                                             self._plotcmd += '.printfile %s(%s) file=%s\n' % (val.sourcetype,self.esc_bus(trig),val.file[i])
                                         elif self.parent.model=='ngspice':
-                                            self._plotcmd += "plot %s(%s)\n" % \
+                                            # Plots in tb only for interactive. Does not work in batch
+                                            if self.parent.interactive_spice:
+                                                self._plotcmd += "plot %s(%s)\n" % \
                                                     (val.sourcetype,trig.upper())
                                             self._plotcmd += "wrdata %s %s(%s)\n" % \
                                                     (val.file[i],val.sourcetype,trig.upper())
@@ -762,8 +768,10 @@ class testbench(spice_module):
                                         elif self.parent.model == 'eldo':
                                             self._plotcmd += '.printfile %s(%s) file=%s\n' % (val.sourcetype,signame,val.file[i])
                                         elif self.parent.model == 'ngspice':
-                                            self._plotcmd += "plot %s(%s)\n" % \
-                                                    (val.sourcetype,signame.upper())
+                                            # Plots in tb only for interactive. Does not work in batch
+                                            if self.parent.interactive_spice:
+                                                self._plotcmd += "plot %s(%s)\n" % \
+                                                        (val.sourcetype,signame.upper())
                                             self._plotcmd += "wrdata %s %s(%s)\n" % \
                                                     (val.file[i],val.sourcetype,signame.upper())
                             elif val.iotype=='vsample':
@@ -793,7 +801,9 @@ class testbench(spice_module):
                                 self._plotcmd += '.print I(%s)\n' % supply
                                 self._plotcmd += 'simulator lang=spectre\n'
                             elif self.parent.model == 'ngspice':
-                                self._plotcmd += "plot I(%s)\n" % supply
+                                # Plots in tb only for interactive. Does not work in batch
+                                if self.parent.interactive_spice:
+                                    self._plotcmd += "plot I(%s)\n" % supply
                                 self._plotcmd += "wrdata %s I(%s)\n" % (val.ext_file,supply)
             if self.parent.model=='ngspice':
                 self._plotcmd += ".endc\n"
