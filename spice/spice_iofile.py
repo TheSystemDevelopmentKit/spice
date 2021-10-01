@@ -288,12 +288,12 @@ class spice_iofile(iofile):
             file=self.file[0] # File is the same for all event type outputs
             label_match=re.compile(r'\((.*)\)')
             if self.parent.model in ['spectre','ngspice']:
-                lines=subprocess.check_output('grep -n \"time\|freq\" %s' % file, shell=True).decode('utf-8')
+                lines=subprocess.check_output('grep -n \"time\|freq\" %s | sed \'s/^\([0-9]\+\):/\\1|/\'' % file, shell=True).decode('utf-8')
                 lines=lines.split('\n') 
                 linenumbers=[]
                 labels=[]
                 for line in lines:
-                    parts=line.split(':')
+                    parts=line.split('|')
                     if len(parts) > 1: # Line should now contain linenumber in first element, ioname in second
                         line = 0
                         try:
@@ -311,7 +311,7 @@ class spice_iofile(iofile):
                     procs = []
                     queues = []
                     for k in range(len(linenumbers)):
-                        start=linenumbers[k] # Indexing starts from zero
+                        start=linenumbers[k] # Indexing of line numbers starts from one
                         if k == len(linenumbers)-1:
                             stop=1
                         else:
