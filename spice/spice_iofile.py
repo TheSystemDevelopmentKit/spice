@@ -106,15 +106,17 @@ class spice_iofile(iofile):
 
     Defining digital output signal triggered with a falling edge of the analog clock::
 
-        _=spice_iofile(self,name='dout',dir='out',iotype='sample',sourcetype='V',ioformat='bin',
-                       ionames='DOUT<7:0>',edgetype='falling',vth=self.vdd/2,trigger='CLK')
+        _=spice_iofile(self,name='dout',dir='out',iotype='sample',sourcetype='V',
+                       ioformat='bin',ionames='DOUT<7:0>',edgetype='falling',
+                       vth=self.vdd/2,trigger='CLK')
 
     Defining a discrete time & continuous amplitude output signal triggered
     with a rising edge of the analog clock. The iofile returns a 2D-vector
     similar to 'event' type signals::
 
-        _=spice_iofile(self,name='sampled_input',dir='out',iotype='sample',sourcetype='V',ioformat='volt',
-                       ionames='INP',edgetype='rising',vth=self.vdd/2,trigger='CLK')
+        _=spice_iofile(self,name='sampled_input',dir='out',iotype='sample',sourcetype='V',
+                       ioformat='volt',ionames='INP',edgetype='rising',
+                       vth=self.vdd/2,trigger='CLK')
 
     Defining digital input signal with decimal format. The input vector is a
     list of integers, which get converted to binary bus of 4-bits (inferred
