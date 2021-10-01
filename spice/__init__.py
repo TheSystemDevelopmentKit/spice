@@ -896,7 +896,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """Automatically called function to execute spice simulation."""
         self.print_log(type='I', msg="Running external command %s" %(self.spicecmd) )
         if os.system(self.spicecmd) > 0:
-            self.print_log(type='F', msg="Simulator (%s) returned non-zero exit code." % (self.model))
+            self.print_log(type='E', msg="Simulator (%s) returned non-zero exit code." % (self.model))
 
     def run_plotprogram(self):
         ''' Starting a parallel process for waveform viewer program.
