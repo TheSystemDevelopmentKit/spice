@@ -59,8 +59,8 @@ class spice_simcmd(thesdk):
 
         It is highly recommended to exclude the devices that are not needed
         from the output to reduce file size. Examples of such devices are
-        RC-parasitics (include option 'savefilter=rc' in self.spiceoptions to
-        exclude them) and dummy transistors. See exclude_list below. 
+        RC-parasitics (include option savefilter='rc' in self.spiceoptions to
+        exclude them) and dummy transistors. See excludelist below. 
     excludelist : list(str)
         Applies for Spectre only! List of device names NOT to be included in
         the output report. Wildcards are supported. Exclude list is especially
@@ -94,7 +94,7 @@ class spice_simcmd(thesdk):
         device given by this property. For example::
         
             _=spice_simcmd(sim='dc', sweep='w', deviceswp='XSUBCKT.XNMOS',
-                           swpstart=10u, swpstop=14u, step=0.1u)
+                           swpstart='10u', swpstop='14u', step='0.1u')
         
         sweeps the width of transistor XNMOS of subckt XSUBCKT from 10u to 14u
         in 0.1u increments.
@@ -105,7 +105,7 @@ class spice_simcmd(thesdk):
     swpstep : int, float or str
         Step size of the sweep simulation. Default 10.
     tprint : float or str
-        Print interval. Default '1p' or 1e-12.
+        Print interval. Default 1e-12 (same as '1p').
     tstop : float or str
         Transient simulation duration. When not defined, the simulation time is
         the duration of the longest input signal.
@@ -162,29 +162,29 @@ class spice_simcmd(thesdk):
     def __init__(self,parent,**kwargs):
         try:
             self.parent = parent
-            self.sim=kwargs.get('sim','tran')
-            self.plotlist=kwargs.get('plotlist', [])
-            self.excludelist=kwargs.get('excludelist', [])
-            self.sweep=kwargs.get('sweep', '')
-            self.subcktname=kwargs.get('subcktname', '')
-            self.devname=kwargs.get('devname', '')
-            self.swpstart=kwargs.get('swpstart', 0)
-            self.swpstop=kwargs.get('swpstop', 0)
-            self.swpstep=kwargs.get('swpstep', 10)
-            self.tprint=kwargs.get('tprint','1p')
-            self.tstop=kwargs.get('tstop',None)
-            self.uic=kwargs.get('uic',False)
-            self.noise=kwargs.get('noise',False)
-            self.fmin=kwargs.get('fmin',1)
-            self.fmax=kwargs.get('fmax',5e9)
-            self.fscale=kwargs.get('fscale','log')
-            self.fpoints=kwargs.get('fpoints',0)
-            self.fstepsize=kwargs.get('fstepsize',0)
-            self.seed=kwargs.get('seed',None)
-            self.method=kwargs.get('method',None)
-            self.cmin=kwargs.get('cmin',None)
-            self.mc=kwargs.get('mc',False)
-            self.mc_seed=kwargs.get('mc_seed',None)
+            self.sim = kwargs.get('sim','tran')
+            self.plotlist = kwargs.get('plotlist',[])
+            self.excludelist = kwargs.get('excludelist',[])
+            self.sweep = kwargs.get('sweep','')
+            self.subcktname = kwargs.get('subcktname','')
+            self.devname = kwargs.get('devname','')
+            self.swpstart = kwargs.get('swpstart',0)
+            self.swpstop = kwargs.get('swpstop',0)
+            self.swpstep = kwargs.get('swpstep',10)
+            self.tprint = kwargs.get('tprint',1e-12)
+            self.tstop = kwargs.get('tstop',None)
+            self.uic = kwargs.get('uic',False)
+            self.noise = kwargs.get('noise',False)
+            self.fmin = kwargs.get('fmin',1)
+            self.fmax = kwargs.get('fmax',5e9)
+            self.fscale = kwargs.get('fscale','log')
+            self.fpoints = kwargs.get('fpoints',0)
+            self.fstepsize = kwargs.get('fstepsize',0)
+            self.seed = kwargs.get('seed',None)
+            self.method = kwargs.get('method',None)
+            self.cmin = kwargs.get('cmin',None)
+            self.mc = kwargs.get('mc',False)
+            self.mc_seed = kwargs.get('mc_seed',None)
         except:
             self.print_log(type='F', msg="Simulation command definition failed.")
         if hasattr(self.parent,'simcmd_bundle'):

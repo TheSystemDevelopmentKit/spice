@@ -677,18 +677,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         return self._spicetbsrc
 
     @property
-    def eldochisrc(self):
-        """String
-
-        Path to the Eldo chi-file. ('./Simulations/spicesim/<runname>/tb_entityname.chi').
-        Only applies to Eldo simulations.
-        This shouldn't be set manually.
-        """
-        if not hasattr(self, '_eldochisrc'):
-            self._eldochisrc=self.spicesimpath + '/tb_' + self.name + '.chi'
-        return self._eldochisrc
-
-    @property
     def spicesubcktsrc(self):
         """String
 
