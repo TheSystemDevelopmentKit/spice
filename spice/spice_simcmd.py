@@ -24,7 +24,7 @@ class spice_simcmd(thesdk):
     When instantiated in the parent class, this class automatically
     attaches spice_simcmd objects to simcmd_bundle -bundle in testbench.
     
-    Parameters
+    Attributes
     ----------
     parent : object 
         The parent object initializing the spice_simcmd instance. Default None.
@@ -136,9 +136,9 @@ class spice_simcmd(thesdk):
         Enable Monte Carlo simulation. This flag will enable Monte Carlo
         modeling for a single simulation. It will NOT execute multiple runs
         or do any statistical analysis. Intended use case is to generate a
-        group of entities in TheSyDeKick with each having mc=True,
+        group of entities in the testbench with each having mc=True,
         simulating them in parallel (see run_parallel() of thesdk-class),
-        post-processing results in TheSyDeKick.
+        post-processing results in Python.
     mc_seed : int
         Random seed for the Monte Carlo instance. Default None (random seed).
 

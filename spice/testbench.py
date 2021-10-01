@@ -604,8 +604,10 @@ class testbench(spice_module):
     
     def esc_bus(self,name, esc_colon=True):
         """
-        Helper function to escape bus characters for Spectre simulations
-        bus<3:0> --> bus\<3\:0\>.
+        Helper function to escape bus characters for Spectre simulations::
+
+            self.esc_bus('bus<3:0>') 
+            # Returns 'bus\<3\:0\>'
         """
         if self.parent.model == 'spectre':
             if esc_colon:
@@ -621,7 +623,7 @@ class testbench(spice_module):
         """String
         
         All output IOs are mapped to plot or print statements in the testbench.
-        Also manual plot commands through spice_simcmd.plotlist are handled here.
+        Also manual plot commands through `spice_simcmd.plotlist` are handled here.
 
         """
         if not hasattr(self,'_plotcmd'):

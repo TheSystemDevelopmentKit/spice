@@ -3,10 +3,10 @@
 Spice
 =====
 
-Analog simulation interface package for The System Development Kit 
+Analog simulation interface package for TheSyDeKick.
 
-Provides utilities to import spice-like modules to python environment and
-automatically generate testbenches for the most common simulation cases.
+Provides utilities to import spice-like modules to Python environment and
+generate testbenches for the various simulation cases.
 
 Initially written by Okko Järvinen, 2019
 
@@ -51,7 +51,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def si_prefix_mult(self):
-        """ Dictionary mapping SI-prefixes to multipliers """
+        """ Dictionary
+        
+        Dictionary mapping SI-prefixes to multipliers.
+        """
         if hasattr(self, '_si_prefix_mult'):
             return self._si_prefix_mult
         else:
@@ -73,8 +76,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def syntaxdict(self):
-        """Internally used dictionary for common syntax conversions between
-        Spectre, Eldo, and Ngspice."""
+        """ Dictionary
+        
+        Internally used dictionary for common syntax conversions between
+        Spectre, Eldo, and Ngspice.
+        """
         if self.model=='eldo':
             self._syntaxdict = {
                     "cmdfile_ext" : '.cir',
@@ -153,7 +159,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """True | False (default)
 
         If True, do not delete file IO files after simulations. Useful for
-        debugging the file IO"""
+        debugging the file IO.
+        
+        .. note::
+            Replaced by `preserve_result` in v1.7
+        """
         if not hasattr(self,'_preserve_iofiles'):
             self._preserve_iofiles=False
         return self._preserve_iofiles
@@ -169,7 +179,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """True | False (default)
 
         If True, do not delete generated Spice files (testbench, subcircuit,
-        etc.) after simulations.  Useful for debugging."""
+        etc.) after simulations.  Useful for debugging.
+        
+        .. note::
+            Replaced by `preserve_result` in v1.7
+        """
         if not hasattr(self,'_preserve_spicefiles'):
             self._preserve_spicefiles=False
         return self._preserve_spicefiles
@@ -182,10 +196,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def distributed_run(self):
-        """ Boolean (default False)
-            If True, distributes applicable simulations (currently DC sweep supported)
-            into the LSF cluster. The number of subprocesses launched is
-            set by self.num_processes.
+        """ True | False (default)
+
+        If True, distributes applicable simulations (currently DC sweep
+        supported) into the LSF cluster. The number of subprocesses launched is
+        set by self.num_processes.
         """
         if hasattr(self, '_distributed_run'):
             return self._distributed_run
@@ -198,8 +213,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def num_processes(self):
-        """ integer
-            Maximum number of spawned child processes for distributed runs.
+        """ Integer
+
+        Maximum number of spawned child processes for distributed runs.
         """
         if hasattr(self, '_num_processes'):
             return self._num_processes
@@ -212,18 +228,26 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def load_state(self):  
-        """String (Default '')
+        """ String (default '')
 
-        Feature for loading results of previous simulation.  The Spice
+        Feature for loading results of previous simulation. The Spice
         simulation is not re-executed, but the outputs will be read from
-        existing files.
+        existing files. The string value should be the `runname` of the desired
+        simulation.
         
-        Example inputs::
+        Loading the most recent result automatically::
 
-            self.load_state = 'last' # load latest
-            self.load_state = 'latest' # load latest
-            self.load_state = '20201002103638_tmpdbw11nr4' # load results matching this name
-            self.load_state = 'zzzz' (non-existent directory) # list available directories to load
+            self.load_state = 'last'
+            # or
+            self.load_state = 'latest'
+
+        Loading a specific past result using the `runname`::
+
+            self.load_state = '20201002103638_tmpdbw11nr4'
+
+        List available results by providing any non-existent `runname`::
+
+            self.load_state = 'this_does_not_exist'
         """
         if not hasattr(self,'_load_state'):
             self._load_state=''
@@ -238,7 +262,8 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
         Feature for specifying the 'section' of the model library file and
         simulation temperature. The path to model libraries should be set in
-        TheSDK.config as either ELDOLIBFILE, SPECTRELIBFILE or NGSPICELIBFILE variable.
+        TheSDK.config as either ELDOLIBFILE, SPECTRELIBFILE or NGSPICELIBFILE
+        variable.
 
         Example::
 
@@ -342,7 +367,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def interactive_spice(self):
         """ True | False (default)
         
-        Launch simulator in interactive mode. For Eldo, opens also ezwave."""
+        Launch simulator in interactive mode. A waveform viewer (ezwave by
+        default) is opened during the simulation for debugging. See
+        `plotprogram` for selecting waveform viewer program.
+        """
 
         if hasattr(self,'_interactive_spice'):
             return self._interactive_spice
@@ -355,11 +383,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def nproc(self):
-        """Integer
+        """ Integer
         
         Requested maximum number of threads for multithreaded simulations. For
         Eldo, maps to command line parameter '-nproc'. For Spectre, maps to
-        command line parameter '+mt'."""
+        command line parameter '+mt'.
+        """
         if hasattr(self,'_nproc'):
             return self._nproc
         else:
@@ -371,11 +400,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def errpreset(self):
-        """String
+        """ String
         
         Global accuracy parameter for Spectre simulations. Options include
-        'liberal', 'moderate' and 'conservative', in order of rising
-        accuracy."""
+        'liberal', 'moderate' and 'conservative', in order of rising accuracy.
+        """
         if hasattr(self,'_errpreset'):
             return self._errpreset
         else:
@@ -388,7 +417,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     # DSPF filenames
     @property
     def dspf(self):
-        """List<String>
+        """ List of str
         
         List containing filenames for DSPF-files to be included for post-layout
         simulations. The names given in this list are matched to dspf-files in
@@ -414,8 +443,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def iofile_eventdict(self):
-        """
-        Dictionary to store event type output from spectre simulations. This should speed up reading the results.
+        """ Dictionary
+
+        Dictionary to store event type output from the simulations. This should
+        speed up reading the results.
         """
         if not hasattr(self, '_iofile_eventdict'):
             self._iofile_eventdict=dict()
@@ -432,10 +463,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def iofile_bundle(self):
-        """ 
-        A thesdk.Bundle containing spice_iofile objects. The iofile objects
-        are automatically added to this Bundle, nothing should be manually
-        added.
+        """ Bundle
+
+        A thesdk.Bundle containing `spice_iofile` objects. The `spice_iofile`
+        objects are automatically added to this Bundle, nothing should be
+        manually added.
         """
         if not hasattr(self,'_iofile_bundle'):
             self._iofile_bundle=Bundle()
@@ -446,10 +478,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def dcsource_bundle(self):
-        """ 
-        A thesdk.Bundle containing spice_dcsource objects. The dcsource objects
-        are automatically added to this Bundle, nothing should be manually
-        added.
+        """ Bundle
+
+        A thesdk.Bundle containing `spice_dcsource` objects. The `spice_dcsource`
+        objects are automatically added to this Bundle, nothing should be
+        manually added.
         """
         if not hasattr(self,'_dcsource_bundle'):
             self._dcsource_bundle=Bundle()
@@ -460,10 +493,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def simcmd_bundle(self):
-        """ 
-        A thesdk.Bundle containing spice_simcmd objects. The simcmd objects
-        are automatically added to this Bundle, nothing should be manually
-        added.
+        """ Bundle
+
+        A thesdk.Bundle containing `spice_simcmd` objects. The `spice_simcmd`
+        objects are automatically added to this Bundle, nothing should be
+        manually added.
         """
         if not hasattr(self,'_simcmd_bundle'):
             self._simcmd_bundle=Bundle()
@@ -474,7 +508,8 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def extracts(self):
-        """ 
+        """ Bundle
+
         A thesdk.Bundle containing extracted quantities.
         """
         if not hasattr(self,'_extracts'):
@@ -486,8 +521,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property 
     def has_lsf(self):
-        """
-        Returs True if LSF submissions are properly defined. Default False
+        """ True | False (default)
+
+        True if LSF submissions are properly defined.
         """
         if ( not thesdk.GLOBALS['LSFINTERACTIVE'] == '' ) and (not thesdk.GLOBALS['LSFSUBMISSION'] == ''):
             self._has_lsf = True
@@ -497,11 +533,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property 
     def spice_submission(self):
-        """
+        """ String
+
         Defines spice submission prefix from thesdk.GLOBALS['LSFSUBMISSION']
         and thesdk.GLOBALS['LSFINTERACTIVE'] for LSF submissions.
 
-        Usually something like 'bsub -K' and 'bsub -I'.
+        Usually something like 'bsub -K' or 'bsub -I'.
         """
         if not hasattr(self, '_spice_submission'):
             try:
@@ -528,8 +565,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def plotlist(self): 
-        """
-            OBSOLETE! RE-LOCATED TO SPICE_SIMCMD.PY
+        """ List of str
+
+        List of net names to be saved in the waveform database.
+
+        .. note:: 
+            Obsolete! Moved to `spice_simcmd` as a keyword argument.
         """
         self.print_log(type='O', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
         if not hasattr(self,'_plotlist'):
@@ -542,17 +583,23 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def spicemisc(self): 
-        """List<String>
+        """ List of str
 
         List of manual commands to be pasted to the testbench. The strings are
         pasted to their own lines (no linebreaks needed), and the syntax is
         unchanged.
 
-        Example: setting initial voltages from testbench (Eldo)::
+        For example, setting initial voltages from testbench (Eldo)::
 
-            self.spicemisc = []
             for i in range(nodes):
                 self.spicemisc.append('.ic NODE<%d> 0' % i)
+
+        The same example can be done in Spectre with::
+
+            self.spicemisc.append('simulator lang=spice')
+            for i in range(nodes):
+                self.spicemisc.append('.ic NODE<%d> 0' % i)
+            self.spicemisc.append('simulator lang=spectre')
         """
         if not hasattr(self, '_spicemisc'):
             self._spicemisc = []
@@ -754,7 +801,8 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def plotprogram(self):
-        """
+        """ String
+
         Sets the program to be used for visualizing waveform databases.
         Options are ezwave (default) or viva.
         """
@@ -767,7 +815,8 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def plotprogcmd(self):
-        """
+        """ String
+
         Sets the command to be run for interactive simulations.
         """
         if not hasattr(self, '_plotprogcmd'):
@@ -892,11 +941,18 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         consumptions. The consumptions are extracted for spice_dcsource objects
         with the attribute extract=True.
         
-        The extracted consumptions are accessible on the top-level after simulation as::
+        The extracted consumptions are accessible on the top-level after
+        simulation as::
             
-            self.extracts.Members['powers'] # Dictionary with averaged power consumptions of each supply + total
-            self.extracts.Members['currents'] # Dictionary with averaged current consumptions of each supply + total
-            self.extracts.Members['curr_tran'] # Dictionary with transient current consumptions of each supply
+            # Dictionary with averaged power of each supply + total
+            self.extracts.Members['powers']
+            # Dictionary with averaged current of each supply + total
+            self.extracts.Members['currents']
+            # Dictionary with transient current of each supply
+            self.extracts.Members['curr_tran']
+
+        The keys in the aforementioned dictionaries match the `name`-fields of
+        the respective `spice_dcsource` objects.
 
         """
         self.extracts.Members['powers'] = {}
@@ -942,19 +998,19 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         
         Little-endian example::
                 
-            start,stop,width,range = get_buswidth('BUS<10:0>')
+            start,stop,width,busrange = get_buswidth('BUS<10:0>')
             # start = 10
             # stop = 0
             # width = 11
-            # range = range(10,-1,-1)
+            # busrange = range(10,-1,-1)
 
         Big-endian example::
                 
-            start,stop,width,range = get_buswidth('BUS<0:8>')
+            start,stop,width,busrange = get_buswidth('BUS<0:8>')
             # start = 0
             # stop = 8
             # width = 9
-            # range = range(0,9)
+            # busrange = range(0,9)
             
         """
         signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
@@ -980,7 +1036,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def si_string_to_float(self, strval):
         """ Convert SI-formatted string to float
             
-            E.g. self.si_string_to_float('3 mV') returns 3e-3.
+        E.g. self.si_string_to_float('3 mV') returns 3e-3.
         """
         parts = strval.split()
         if len(parts) == 2:

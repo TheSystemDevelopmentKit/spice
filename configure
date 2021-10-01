@@ -16,7 +16,8 @@ all: doc
 
 doc:
 	cd $THISDIR/doc && \\
-	make html
+	make html latexpdf && \\
+    git add -f $THISDIR/doc/build/latex/$MODULE.pdf
 
 clean:
 	cd ${THISDIR}/doc && \\
