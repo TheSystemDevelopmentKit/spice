@@ -1,3 +1,1 @@
-# Documentation
-
-[Spice Documentation](doc/build/latex/spice.pdf)
+# [Documentation](doc/build/latex/spice.pdf)
