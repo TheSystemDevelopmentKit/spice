@@ -24,7 +24,7 @@ class spice_dcsource(thesdk):
     instantiated in the parent class, this class automatically attaches
     spice_dcsource objects to dcsource_bundle -bundle in testbench.
 
-    Parameters
+    Attributes
     ----------
     parent : object 
         The parent object initializing the spice_dcsource instance. Default
