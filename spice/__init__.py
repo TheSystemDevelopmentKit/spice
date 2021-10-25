@@ -142,37 +142,19 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     #Name derived from the file
 
     @property
-    def preserve_result(self):  
-        """True | False (default)
-
-        If True, do not delete result files after simulations.
-        """
-        if not hasattr(self,'_preserve_result'):
-            self._preserve_result=False
-        return self._preserve_result
-    @preserve_result.setter
-    def preserve_result(self,value):
-        self._preserve_result=value
-
-    @property
     def preserve_iofiles(self):  
         """True | False (default)
 
         If True, do not delete file IO files after simulations. Useful for
         debugging the file IO.
         
-        .. note::
-            Replaced by `preserve_result` in v1.7
         """
         if not hasattr(self,'_preserve_iofiles'):
             self._preserve_iofiles=False
         return self._preserve_iofiles
     @preserve_iofiles.setter
     def preserve_iofiles(self,value):
-        self.print_log(type='O',msg='preserve_iofiles is replaced with preserve_result since v1.7')
         self._preserve_iofiles=value
-        self.print_log(msg='Setting preserve_result to %s' % str(value))
-        self._preserve_result=value
         
     @property
     def preserve_spicefiles(self):  
@@ -181,18 +163,13 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         If True, do not delete generated Spice files (testbench, subcircuit,
         etc.) after simulations.  Useful for debugging.
         
-        .. note::
-            Replaced by `preserve_result` in v1.7
         """
         if not hasattr(self,'_preserve_spicefiles'):
             self._preserve_spicefiles=False
         return self._preserve_spicefiles
     @preserve_spicefiles.setter
     def preserve_spicefiles(self,value):
-        self.print_log(type='O',msg='preserve_spicefiles is replaced with preserve_result since v1.7')
         self._preserve_spicefiles=value
-        self.print_log(msg='Setting preserve_result to %s' % str(value))
-        self._preserve_result=value
 
     @property
     def distributed_run(self):
@@ -618,15 +595,15 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self._name=os.path.splitext(os.path.basename(self._classfile))[0]
         return self._name
 
-    @property
-    def entitypath(self):
-        """String
+    #@property
+    #def entitypath(self):
+    #    """String
 
-        Path to the entity root.
-        """
-        if not hasattr(self, '_entitypath'):
-            self._entitypath= os.path.dirname(os.path.dirname(self._classfile))
-        return self._entitypath
+    #    Path to the entity root.
+    #    """
+    #    if not hasattr(self, '_entitypath'):
+    #        self._entitypath= os.path.dirname(os.path.dirname(self._classfile))
+    #    return self._entitypath
 
     @property
     def spicesrcpath(self):
@@ -705,24 +682,42 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         return self._spicesimpath
     @spicesimpath.deleter
     def spicesimpath(self):
-        if os.path.exists(self.spicesimpath) and not self.preserve_result:
-            self.print_log(msg='Cleaning ./%s/ (set preserve_result=True to prevent cleaning).' % os.path.relpath(self._spicesimpath,start='../'))
+        if os.path.exists(self.spicesimpath):
+            # This is used to check if the waveform database would prevent the deletion of the directory
             keepdb = False
+            # Collect iofile filepaths to preserve them if requested
+            iofilepaths = []
+            for name,val in self.iofile_bundle.Members.items():
+                for fpath in val.file:
+                    iofilepaths.append(fpath)
+            # Delete everything (conditionally skip iofiles or spicefiles)
             for target in os.listdir(self.spicesimpath):
                 targetpath = '%s/%s' % (self.spicesimpath,target)
                 try:
-                    if targetpath == self.spicedbpath and self.interactive_spice:
-                        keepdb = True
-                        self.print_log(msg='Preserving ./%s due to interactive_spice' % os.path.relpath(targetpath,start='../'))
-                        continue
-                    if os.path.isdir(targetpath):
-                        shutil.rmtree(targetpath)
+                    if targetpath in iofilepaths:
+                        # Target is an iofile
+                        if self.preserve_iofiles:
+                            self.print_log(type='D',msg='Preserving ./%s' % os.path.relpath(targetpath,start='../'))
+                        else:
+                            os.remove(targetpath)
+                            self.print_log(type='D',msg='Removing ./%s' % os.path.relpath(targetpath,start='../'))
                     else:
-                        os.remove(targetpath)
-                    self.print_log(type='D',msg='Removing ./%s' % os.path.relpath(targetpath,start='../'))
+                        # Target is a spicefile (anything that isn't an iofile)
+                        if self.preserve_spicefiles:
+                            self.print_log(type='D',msg='Preserving ./%s' % os.path.relpath(targetpath,start='../'))
+                        else:
+                            if targetpath == self.spicedbpath and self.interactive_spice:
+                                keepdb = True
+                                self.print_log(msg='Preserving ./%s due to interactive_spice' % os.path.relpath(targetpath,start='../'))
+                                continue
+                            if os.path.isdir(targetpath):
+                                shutil.rmtree(targetpath)
+                            else:
+                                os.remove(targetpath)
+                            self.print_log(type='D',msg='Removing ./%s' % os.path.relpath(targetpath,start='../'))
                 except:
                     self.print_log(type='W',msg='Could not remove ./%s' % os.path.relpath(targetpath,start='../'))
-            if not keepdb:
+            if not keepdb and not self.preserve_iofiles and not self.preserve_spicefiles:
                 try:
                     # Eldo needs some time to disconnect from the jwdb server
                     # Another dirty hack to check that the process is dead before cleaning
@@ -1115,7 +1110,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         
     def run_spice(self):
         """Externally called function to execute spice simulation."""
-        if self.load_state == '': 
+        if self.load_state != '': 
+            # Loading a previously stored state
+            self._read_state()
+        else:
             # Normal execution of full simulation
             self.tb = stb(self)
             self.tb.iofiles = self.iofile_bundle
@@ -1134,35 +1132,8 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self.connect_spice_outputs()
             self.extract_powers()
             self.read_oppts()
+            # Save entity state
+            if self.save_state:
+                self._write_state()
             # Clean simulation results
             del self.spicesimpath
-        else:
-            #Loading previous simulation results and not simulating again
-            try:
-                self.runname = self.load_state
-                if self.runname == 'latest' or self.runname == 'last':
-                    results = glob.glob(self.entitypath+'/Simulations/spicesim/*')
-                    latest = max(results, key=os.path.getctime)
-                    self.runname = latest.split('/')[-1]
-                simpath = self.entitypath+'/Simulations/spicesim/'+self.runname
-                if not (os.path.exists(simpath)):
-                    self.print_log(type='E',msg='Existing results not found in %s.' % simpath)
-                    existing = os.listdir(self.entitypath+'/Simulations/spicesim/')
-                    self.print_log(type='I',msg='Found results:')
-                    for f in existing:
-                        self.print_log(type='I',msg='%s' % f)
-                else:
-                    self.print_log(type='I',msg='Loading results from %s.' % simpath)
-                    self.tb = stb(self)
-                    self.tb.iofiles = self.iofile_bundle
-                    self.tb.dcsources = self.dcsource_bundle
-                    self.tb.simcmds = self.simcmd_bundle
-                    self.connect_spice_inputs()
-                    self.read_spice_outputs()
-                    self.connect_spice_outputs()
-                    self.extract_powers()
-                    self.read_oppts()
-            except:
-                self.print_log(type='I',msg=traceback.format_exc())
-                self.print_log(type='F',msg='Failed while loading results from %s.' % self._spicesimpath)
-
