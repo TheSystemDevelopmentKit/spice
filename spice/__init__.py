@@ -595,16 +595,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self._name=os.path.splitext(os.path.basename(self._classfile))[0]
         return self._name
 
-    #@property
-    #def entitypath(self):
-    #    """String
-
-    #    Path to the entity root.
-    #    """
-    #    if not hasattr(self, '_entitypath'):
-    #        self._entitypath= os.path.dirname(os.path.dirname(self._classfile))
-    #    return self._entitypath
-
     @property
     def spicesrcpath(self):
         """String
@@ -816,6 +806,21 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @plotprogcmd.setter
     def plotprogcmd(self, value):
         self._plotprogcmd=value
+
+    @property
+    def save_database(self): 
+        """ True | False (default)
+
+        Whether to save the waveform database (.wdb-file for eldo, raw-database
+        for spectre), when save_state=True.
+
+        """
+        if not hasattr(self,'_save_database'):
+            self._save_database=False
+        return self._save_database 
+    @save_database.setter
+    def save_database(self,value): 
+        self._save_database=value
 
     def connect_spice_inputs(self):
         """Automatically called function to connect iofiles (inputs) to top
@@ -1135,5 +1140,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             # Save entity state
             if self.save_state:
                 self._write_state()
+                if self.save_database:
+                    dbname = self.spicedbpath.split('/')[-1]
+                    self.print_log(msg='Saving waveform database %s' % dbname)
+                    if os.path.isdir(self.spicedbpath):
+                        shutil.copytree(self.spicedbpath,'%s/%s' % (self.statedir,dbname))
+                    else:
+                        shutil.copyfile(self.spicedbpath,'%s/%s' % (self.statedir,dbname))
             # Clean simulation results
             del self.spicesimpath
