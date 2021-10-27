@@ -283,7 +283,7 @@ class spice_iofile(iofile):
                 arr=np.vstack((arr[:,0], arr[:,1]+1j*arr[:,2])).T
             queue.put((label,arr))
         except:
-            self.parent.print_log(type='E',msg='Failed reading event output %s' % label)
+            self.print_log(type='E',msg='Failed reading event output %s' % label)
             queue.put((label,None))
 
     # Overloaded read from thesdk.iofile
