@@ -239,7 +239,7 @@ class testbench(spice_module):
                         self._dspfincludecmd += "%s \"%s\"\n" % (self.parent.syntaxdict["dspfinclude"],dspfpath)
                     except:
                         self.print_log(type='W',msg='DSPF-file not found: %s' % dspfpath)
-                        self.print_log(type='I',msg=traceback.format_exc())
+                        self.print_log(type='W',msg=traceback.format_exc())
             else:
                 self.postlayout = False
                 self._dspfincludecmd = ''
@@ -499,7 +499,7 @@ class testbench(spice_module):
                 if str(sim).lower() == 'tran':
                     simtime = val.tstop if val.tstop is not None else self._trantime
                     if val.tstop is None:
-                        self.print_log(type='I',msg='Inferred transient duration is %g s from \'%s\'.' % (simtime,self._trantime_name))
+                        self.print_log(type='D',msg='Inferred transient duration is %g s from \'%s\'.' % (simtime,self._trantime_name))
                     #TODO could this if-else be avoided?
                     if self.parent.model=='eldo':
                         self._simcmdstr += '.%s %s %s %s\n' % \
@@ -820,7 +820,7 @@ class testbench(spice_module):
         Internally called function to write the testbench to a file.
         """
         if not os.path.isfile(self.file):
-            self.print_log(type='I',msg='Exporting spice testbench to %s.' %(self.file))
+            self.print_log(type='D',msg='Exporting spice testbench to %s' %(self.file))
             with open(self.file, "w") as module_file:
                 module_file.write(self.contents)
 
@@ -840,7 +840,7 @@ class testbench(spice_module):
         if len(self.parent.dspf) == 0 and self.postlayout:
             return
         if not os.path.isfile(self.parent.spicesubcktsrc):
-            self.print_log(type='I',msg='Exporting spice subcircuit to %s.' %(self.parent.spicesubcktsrc))
+            self.print_log(type='D',msg='Exporting spice subcircuit to %s' %(self.parent.spicesubcktsrc))
             with open(self.parent.spicesubcktsrc, "w") as module_file:
                 module_file.write(self.subckt)
 

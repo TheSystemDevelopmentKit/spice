@@ -327,7 +327,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
             self.runname = 'test'
 
-        would generate the simulation files in `Simulations/spicesim/test/`.
+        would generate the simulation files in `simulations/<model>/test/`.
 
         """
         if hasattr(self,'_runname'):
@@ -520,7 +520,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         if not hasattr(self, '_spice_submission'):
             try:
                 if not self.has_lsf:
-                    self.print_log(type='I', msg='LSF not configured. Running locally')
+                    self.print_log(type='I', msg='LSF not configured, running locally.')
                     self._spice_submission=''
                 else:
                     if self.interactive_spice:
@@ -636,7 +636,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def spicetbsrc(self):
         """String
 
-        Path to the spice testbench ('./Simulations/spicesim/<runname>/tb_entityname.<suffix>').
+        Path to the spice testbench ('<spicesimpath>/tb_entityname.<suffix>').
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicetbsrc'):
@@ -647,7 +647,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def spicesubcktsrc(self):
         """String
 
-        Path to the parsed subcircuit file. ('./Simulations/spicesim/<runname>/subckt_entityname.<suffix>').
+        Path to the parsed subcircuit file. ('<spicesimpath>/subckt_entityname.<suffix>').
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicesubcktsrc'):
@@ -658,17 +658,17 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def spicesimpath(self):
         """String
 
-        Simulation path. (./Simulations/spicesim/<runname>)
+        Simulation path. (./simulations/<model>/<runname>)
         This shouldn't be set manually.
         """
         if not hasattr(self,'_spicesimpath'):
-            self._spicesimpath = self.entitypath+'/Simulations/spicesim/'+self.runname
+            self._spicesimpath = self.entitypath+'/simulations/'+self.model+'/'+self.runname
             try:
                 if not (os.path.exists(self._spicesimpath)):
                     os.makedirs(self._spicesimpath)
-                    self.print_log(type='I',msg='Creating %s.' % self._spicesimpath)
+                    self.print_log(type='I',msg='Creating %s' % self._spicesimpath)
             except:
-                self.print_log(type='E',msg='Failed to create %s.' % self._spicesimpath)
+                self.print_log(type='E',msg='Failed to create %s' % self._spicesimpath)
         return self._spicesimpath
     @spicesimpath.deleter
     def spicesimpath(self):
@@ -761,7 +761,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def spicedbpath(self):
         """String
 
-        Path to output waveform database. (./Simulations/spicesim/<runname>/tb_<entityname>.<resultfile_ext>)
+        Path to output waveform database. (<spicesimpath>/tb_<entityname>.<resultfile_ext>)
         For now only for spectre.
         This shouldn't be set manually.
         """
@@ -862,7 +862,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                         try:
                             self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()]
                         except KeyError:
-                            self.print_log(type='W', msg='Invalid ioname %s for iofile %s' % (val.ionames[0], name))
+                            self.print_log(type='E',msg='Invalid ioname %s for iofile %s' % (val.ionames[0], name))
                     else: # Iofile is a bus?
                         data=[]
                         for i, key in enumerate(val.ionames):
@@ -873,9 +873,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                                     try:
                                         data=np.r_['1', data, self.iofile_eventdict[key.upper()]]
                                     except ValueError:
-                                        self.print_log(type='W', msg='Invalid dimensions for concatenating arrays for IO %s!' % name)
+                                        self.print_log(type='W',msg='Invalid dimensions for concatenating arrays for IO %s!' % name)
                             except KeyError:
-                                self.print_log(type='W', msg='Invalid ioname %s for iofile %s' % (key, name))
+                                self.print_log(type='E', msg='Invalid ioname %s for iofile %s' % (key, name))
                         self.iofile_bundle.Members[name].Data=data
                 else:
                     self.iofile_bundle.Members[name].read()
@@ -918,7 +918,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         try:
             ret=os.system(cmd)
             if ret != 0:
-                self.print_log(type='W', msg='%s returned with exit status %d!' % (self.plotprogram, ret))
+                self.print_log(type='W', msg='%s returned with exit status %d.' % (self.plotprogram, ret))
         except: 
             self.print_log(type='W',msg='Something went wrong while launcing %s.' % self.plotprogram)
             self.print_log(type='W',msg=traceback.format_exc())
@@ -1141,11 +1141,14 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             if self.save_state:
                 self._write_state()
                 if self.save_database:
-                    dbname = self.spicedbpath.split('/')[-1]
-                    self.print_log(msg='Saving waveform database %s' % dbname)
-                    if os.path.isdir(self.spicedbpath):
-                        shutil.copytree(self.spicedbpath,'%s/%s' % (self.statedir,dbname))
-                    else:
-                        shutil.copyfile(self.spicedbpath,'%s/%s' % (self.statedir,dbname))
+                    try:
+                        dbname = self.spicedbpath.split('/')[-1]
+                        if os.path.isdir(self.spicedbpath):
+                            shutil.copytree(self.spicedbpath,'%s/%s' % (self.statedir,dbname))
+                        else:
+                            shutil.copyfile(self.spicedbpath,'%s/%s' % (self.statedir,dbname))
+                        self.print_log(msg='Saving waveform database to ./%s/%s' % (os.path.relpath(self.statedir,start='../'),dbname))
+                    except:
+                        self.print_log(type='E',msg='Failed saving waveform database to ./%s/%s' % (os.path.relpath(self.statedir,start='../'),dbname))
             # Clean simulation results
             del self.spicesimpath
