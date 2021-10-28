@@ -594,6 +594,8 @@ class testbench(spice_module):
                     self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
                 if val.mc and self.parent.model=='spectre':
                     self._simcmdstr += '}\n\n'
+        if self.parent.model=='spectre':
+            self._simcmdstr += 'element info what=inst where=rawfile \nmodelParameter info what=models where=rawfile\n\n'
         return self._simcmdstr
     @simcmdstr.setter
     def simcmdstr(self,value):
