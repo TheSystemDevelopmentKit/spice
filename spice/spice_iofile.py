@@ -160,7 +160,7 @@ class spice_iofile(iofile):
         """
         self._file = []
         for ioname in self.ionames:
-            filepath = self.parent.spicesimpath+'/'
+            filepath = self.parent.simpath+'/'
             # For now, all outputs are event type stored in a common file
             if self.dir == 'out':
                 filename = 'tb_%s.print' % (self.parent.name)

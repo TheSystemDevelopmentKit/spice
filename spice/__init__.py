@@ -315,32 +315,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self._spiceparameters = value
 
     @property
-    def runname(self):
-        """String 
-        
-        Automatically generated name for the simulation. 
-        
-        Formatted as timestamp_randomtag, i.e. '20201002103638_tmpdbw11nr4'.
-        Can be overridden by assigning self.runname = 'myname'.
-
-        Example::
-
-            self.runname = 'test'
-
-        would generate the simulation files in `simulations/<model>/test/`.
-
-        """
-        if hasattr(self,'_runname'):
-            return self._runname
-        else:
-            self._runname='%s_%s' % \
-                    (datetime.now().strftime('%Y%m%d%H%M%S'),os.path.basename(tempfile.mkstemp()[1]))
-        return self._runname
-    @runname.setter
-    def runname(self,value):
-        self._runname=value
-
-    @property
     def interactive_spice(self):
         """ True | False (default)
         
@@ -528,9 +502,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                             self._spice_submission = thesdk.GLOBALS['LSFINTERACTIVE'] + ' '
                         else: # Spectre LSF doesn't support interactive queues
                             self.print_log(type='W', msg='Cannot run in interactive mode if distributed mode is on!')
-                            self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
+                            self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.simpath)
                     else:
-                        self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
+                        self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.simpath)
 
             except:
                 self.print_log(type='W',msg='Error while defining spice submission command. Running locally.')
@@ -636,43 +610,27 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def spicetbsrc(self):
         """String
 
-        Path to the spice testbench ('<spicesimpath>/tb_entityname.<suffix>').
+        Path to the spice testbench ('<simpath>/tb_entityname.<suffix>').
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicetbsrc'):
-            self._spicetbsrc=self.spicesimpath + '/tb_' + self.name + self.syntaxdict["cmdfile_ext"]
+            self._spicetbsrc=self.simpath + '/tb_' + self.name + self.syntaxdict["cmdfile_ext"]
         return self._spicetbsrc
 
     @property
     def spicesubcktsrc(self):
         """String
 
-        Path to the parsed subcircuit file. ('<spicesimpath>/subckt_entityname.<suffix>').
+        Path to the parsed subcircuit file. ('<simpath>/subckt_entityname.<suffix>').
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicesubcktsrc'):
-            self._spicesubcktsrc=self.spicesimpath + '/subckt_' + self.name + self.syntaxdict["cmdfile_ext"]
+            self._spicesubcktsrc=self.simpath + '/subckt_' + self.name + self.syntaxdict["cmdfile_ext"]
         return self._spicesubcktsrc
 
-    @property
-    def spicesimpath(self):
-        """String
-
-        Simulation path. (./simulations/<model>/<runname>)
-        This shouldn't be set manually.
-        """
-        if not hasattr(self,'_spicesimpath'):
-            self._spicesimpath = self.entitypath+'/simulations/'+self.model+'/'+self.runname
-            try:
-                if not (os.path.exists(self._spicesimpath)):
-                    os.makedirs(self._spicesimpath)
-                    self.print_log(type='I',msg='Creating %s' % self._spicesimpath)
-            except:
-                self.print_log(type='E',msg='Failed to create %s' % self._spicesimpath)
-        return self._spicesimpath
-    @spicesimpath.deleter
-    def spicesimpath(self):
-        if os.path.exists(self.spicesimpath):
+    @thesdk.simpath.deleter
+    def simpath(self):
+        if os.path.exists(self.simpath):
             # This is used to check if the waveform database would prevent the deletion of the directory
             keepdb = False
             # Collect iofile filepaths to preserve them if requested
@@ -681,8 +639,8 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 for fpath in val.file:
                     iofilepaths.append(fpath)
             # Delete everything (conditionally skip iofiles or spicefiles)
-            for target in os.listdir(self.spicesimpath):
-                targetpath = '%s/%s' % (self.spicesimpath,target)
+            for target in os.listdir(self.simpath):
+                targetpath = '%s/%s' % (self.simpath,target)
                 try:
                     if targetpath in iofilepaths:
                         # Target is an iofile
@@ -720,10 +678,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                             waittime += 1
                             if waittime > 60:
                                 break
-                    shutil.rmtree(self.spicesimpath)
-                    self.print_log(type='D',msg='Removing ./%s/' % os.path.relpath(self.spicesimpath,start='../'))
+                    shutil.rmtree(self.simpath)
+                    self.print_log(type='D',msg='Removing ./%s/' % os.path.relpath(self.simpath,start='../'))
                 except:
-                    self.print_log(type='W',msg='Could not remove ./%s/' % os.path.relpath(self.spicesimpath,start='../'))
+                    self.print_log(type='W',msg='Could not remove ./%s/' % os.path.relpath(self.simpath,start='../'))
 
     @property
     def spicecmd(self):
@@ -748,7 +706,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 spicesimcmd = "eldo -64b %s " % (nprocflag)
             elif self.model=='spectre':
                 spicesimcmd = ("spectre -64 +lqtimeout=0 ++aps=%s %s %s -outdir %s " 
-                        % (self.errpreset,plflag,nprocflag,self.spicesimpath))
+                        % (self.errpreset,plflag,nprocflag,self.simpath))
             elif self.model=='ngspice':
                 spicesimcmd = self.syntaxdict["simulatorcmd"] + ' '
             self._spicecmd = self.spice_submission+spicesimcmd+self.spicetbsrc
@@ -761,12 +719,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def spicedbpath(self):
         """String
 
-        Path to output waveform database. (<spicesimpath>/tb_<entityname>.<resultfile_ext>)
+        Path to output waveform database. (<simpath>/tb_<entityname>.<resultfile_ext>)
         For now only for spectre.
         This shouldn't be set manually.
         """
         if not hasattr(self,'_spicedbpath'):
-            self._spicedbpath=self.spicesimpath+'/tb_'+self.name+self.syntaxdict["resultfile_ext"]
+            self._spicedbpath=self.simpath+'/tb_'+self.name+self.syntaxdict["resultfile_ext"]
         return self._spicedbpath
     @spicedbpath.setter
     def spicedbpath(self, value):
@@ -795,7 +753,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         if not hasattr(self, '_plotprogcmd'):
             if self.plotprogram == 'ezwave':
                 self._plotprogcmd='%s -MAXWND -LOGfile %s/ezwave.log %s &' % \
-                        (self.plotprogram,self.spicesimpath,self.spicedbpath)
+                        (self.plotprogram,self.simpath,self.spicedbpath)
             elif self.plotprogram == 'viva':
                 self._plotprogcmd='%s -datadir %s -nocdsinit &' % \
                         (self.plotprogram,self.spicedbpath)
@@ -1072,10 +1030,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                             break
                 # For distributed runs
                 if self.distributed_run:
-                    path=os.path.join(self.spicesimpath,'tb_%s.raw' % self.name, '[0-9]*', fname)
+                    path=os.path.join(self.simpath,'tb_%s.raw' % self.name, '[0-9]*', fname)
                     files = sorted(glob.glob(path),key=sorter)
                 else:
-                    path=os.path.join(self.spicesimpath,'tb_%s.raw' % self.name, fname)
+                    path=os.path.join(self.simpath,'tb_%s.raw' % self.name, fname)
                     files = glob.glob(path)
                 valbegin = 'VALUE\n'
                 eof = 'END\n'
@@ -1140,6 +1098,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             # Save entity state
             if self.save_state:
                 self._write_state()
+                # If this is generic enough between simulators, it can be moved
+                # to thesdk (basically if spicedbpath has an equivalent in
+                # other simulators too)
                 if self.save_database:
                     try:
                         dbname = self.spicedbpath.split('/')[-1]
@@ -1151,4 +1112,4 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     except:
                         self.print_log(type='E',msg='Failed saving waveform database to ./%s/%s' % (os.path.relpath(self.statedir,start='../'),dbname))
             # Clean simulation results
-            del self.spicesimpath
+            del self.simpath

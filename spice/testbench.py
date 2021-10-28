@@ -35,7 +35,7 @@ class testbench(spice_module):
 
     def __init__(self, parent=None, **kwargs):
         if parent==None:
-            self.print_log(type='F', msg="Parent of spice testbench not given")
+            self.print_log(type='F', msg="Parent of spice testbench not given.")
         else:
             self.parent=parent
         try:  
@@ -45,7 +45,7 @@ class testbench(spice_module):
             # This attribute holds duration of longest input vector after reading input files
             self._trantime=0
         except:
-            self.print_log(type='F', msg="Spice Testbench file definition failed")
+            self.print_log(type='F', msg="Spice Testbench file definition failed.")
         
         #The methods for these are derived from spice_module
         self._name=''
