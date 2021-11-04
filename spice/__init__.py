@@ -645,26 +645,26 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     if targetpath in iofilepaths:
                         # Target is an iofile
                         if self.preserve_iofiles:
-                            self.print_log(type='D',msg='Preserving ./%s' % os.path.relpath(targetpath,start='../'))
+                            self.print_log(type='D',msg='Preserving %s' % targetpath)
                         else:
                             os.remove(targetpath)
-                            self.print_log(type='D',msg='Removing ./%s' % os.path.relpath(targetpath,start='../'))
+                            self.print_log(type='D',msg='Removing %s' % targetpath)
                     else:
                         # Target is a spicefile (anything that isn't an iofile)
                         if self.preserve_spicefiles:
-                            self.print_log(type='D',msg='Preserving ./%s' % os.path.relpath(targetpath,start='../'))
+                            self.print_log(type='D',msg='Preserving %s' % targetpath)
                         else:
                             if targetpath == self.spicedbpath and self.interactive_spice:
                                 keepdb = True
-                                self.print_log(msg='Preserving ./%s due to interactive_spice' % os.path.relpath(targetpath,start='../'))
+                                self.print_log(msg='Preserving %s due to interactive_spice' % targetpath)
                                 continue
                             if os.path.isdir(targetpath):
                                 shutil.rmtree(targetpath)
                             else:
                                 os.remove(targetpath)
-                            self.print_log(type='D',msg='Removing ./%s' % os.path.relpath(targetpath,start='../'))
+                            self.print_log(type='D',msg='Removing %s' % targetpath)
                 except:
-                    self.print_log(type='W',msg='Could not remove ./%s' % os.path.relpath(targetpath,start='../'))
+                    self.print_log(type='W',msg='Could not remove %s' % targetpath)
             if not keepdb and not self.preserve_iofiles and not self.preserve_spicefiles:
                 try:
                     # Eldo needs some time to disconnect from the jwdb server
@@ -679,9 +679,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                             if waittime > 60:
                                 break
                     shutil.rmtree(self.simpath)
-                    self.print_log(type='D',msg='Removing ./%s/' % os.path.relpath(self.simpath,start='../'))
+                    self.print_log(type='D',msg='Removing %s/' % self.simpath)
                 except:
-                    self.print_log(type='W',msg='Could not remove ./%s/' % os.path.relpath(self.simpath,start='../'))
+                    self.print_log(type='W',msg='Could not remove %s/' % self.simpath)
 
     @property
     def spicecmd(self):
@@ -1108,8 +1108,8 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                             shutil.copytree(self.spicedbpath,'%s/%s' % (self.statedir,dbname))
                         else:
                             shutil.copyfile(self.spicedbpath,'%s/%s' % (self.statedir,dbname))
-                        self.print_log(msg='Saving waveform database to ./%s/%s' % (os.path.relpath(self.statedir,start='../'),dbname))
+                        self.print_log(msg='Saving waveform database to %s/%s' % (self.statedir,dbname))
                     except:
-                        self.print_log(type='E',msg='Failed saving waveform database to ./%s/%s' % (os.path.relpath(self.statedir,start='../'),dbname))
+                        self.print_log(type='E',msg='Failed saving waveform database to %s/%s' % (self.statedir,dbname))
             # Clean simulation results
             del self.simpath
