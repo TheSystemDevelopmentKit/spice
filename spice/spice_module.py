@@ -44,6 +44,13 @@ class spice_module(thesdk):
         return self._name
 
     @property
+    def DEBUG(self):
+        """ This fixes DEBUG prints in spice_iofile, by propagating the DEBUG
+        flag of the parent entity.
+        """
+        return self.parent.DEBUG 
+
+    @property
     def postlayout(self):
         """Boolean
         
@@ -92,7 +99,7 @@ class spice_module(thesdk):
             # Extract the module definition
             if os.path.isfile(self._dutfile):
                 try:
-                    self.print_log(type='I',msg='Parsing source netlist %s.' % self._dutfile)
+                    self.print_log(type='D',msg='Parsing source netlist %s' % self._dutfile)
                     with open(self._dutfile) as infile:
                         wholefile=infile.readlines()
                         startfound=False
@@ -102,11 +109,11 @@ class spice_module(thesdk):
                             if not startfound and cellnamematch.search(line) != None:
                                 words = line.split()
                                 cellname = words[-1]
-                                self.print_log(type='I',msg='Found top-level cell name "%s".' % cellname)
+                                self.print_log(type='D',msg='Found top-level cell name "%s".' % cellname)
                                 self.origcellname = cellname
                             # First subcircuit not started, finding Calibre xRC written program name
                             if not startfound and prognamematch.search(line) != None:
-                                self.print_log(type='I',msg='Post-layout netlist detected (%s).' % (' '.join(line.split()[2:])))
+                                self.print_log(type='D',msg='Post-layout netlist detected (%s).' % (' '.join(line.split()[2:])))
                                 # Parsing the post-layout netlist line by line is way too slow
                                 # Copying the file and editing it seems better
                                 self.postlayout = True
@@ -131,7 +138,7 @@ class spice_module(thesdk):
                                     self._subckt += line 
                                     sys.stdout.write(line)
                                 if cellname != self.parent.name:
-                                    self.print_log(type='I',msg='Renaming design cell %s to %s.' % (cellname,self.parent.name))
+                                    self.print_log(type='D',msg='Renaming design cell %s to %s.' % (cellname,self.parent.name))
                                 # Notice the return here
                                 return self._subckt
                             # First subcircuit not started, starts on this line though
@@ -142,12 +149,12 @@ class spice_module(thesdk):
                                 # in the header -> assuming first subcircuit is top-level circuit
                                 if cellname == '':
                                     cellname = words[1].lower()
-                                    self.print_log(type='I',msg='Renaming design cell %s to %s.' % (cellname,self.parent.name))
+                                    self.print_log(type='D',msg='Renaming design cell %s to %s.' % (cellname,self.parent.name))
                                 if words[1].lower() == cellname.lower():
                                     self._subckt+="\n%s Subcircuit definition for %s module\n" % (self.parent.syntaxdict["commentchar"],self.parent.name)
                                     words[1] = self.parent.name.upper()
                                     if cellname != self.parent.name:
-                                        self.print_log(type='I',msg='Renaming design cell "%s" to "%s".' % (cellname,self.parent.name))
+                                        self.print_log(type='D',msg='Renaming design cell "%s" to "%s".' % (cellname,self.parent.name))
                                     line = ' '.join(words) + "\n"
                                     linecount += 1
                             # Inside the subcircuit clause -> copy all lines except comments
@@ -173,10 +180,10 @@ class spice_module(thesdk):
                             # End of subcircuit found
                             if startfound and endmatch.search(line) != None:
                                 startfound=False
-                    self.print_log(type='I',msg='Source netlist parsing done (%d lines).' % linecount)
+                    self.print_log(type='D',msg='Source netlist parsing done (%d lines).' % linecount)
                 except:
                     self.print_log(type='E',msg='Something went wrong while parsing %s.' % self._dutfile)
-                    self.print_log(type='I',msg=traceback.format_exc())
+                    self.print_log(type='E',msg=traceback.format_exc())
             else:
                 self.print_log(type='W',msg='File %s not found.' % self._dutfile)
         return self._subckt
@@ -316,7 +323,7 @@ class spice_module(thesdk):
             return self._subinst
         except:
             self.print_log(type='E',msg='Something went wrong while generating subcircuit instance.')
-            self.print_log(type='I',msg=traceback.format_exc())
+            self.print_log(type='E',msg=traceback.format_exc())
             pdb.set_trace()
     @subinst.setter
     def subinst(self,value):

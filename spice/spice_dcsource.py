@@ -102,7 +102,7 @@ class spice_dcsource(thesdk):
         self.extract=True.
         """
         if not hasattr(self,'_ext_file'):
-            self._ext_file = '%s/tb_%s.print' % (self.parent.spicesimpath,self.parent.name)
+            self._ext_file = '%s/tb_%s.print' % (self.parent.simpath,self.parent.name)
         return self._ext_file
     @ext_file.setter
     def ext_file(self,val):

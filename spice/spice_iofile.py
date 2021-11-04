@@ -160,7 +160,7 @@ class spice_iofile(iofile):
         """
         self._file = []
         for ioname in self.ionames:
-            filepath = self.parent.spicesimpath+'/'
+            filepath = self.parent.simpath+'/'
             # For now, all outputs are event type stored in a common file
             if self.dir == 'out':
                 filename = 'tb_%s.print' % (self.parent.name)
@@ -198,6 +198,13 @@ class spice_iofile(iofile):
         self._ionames=val
         return self._ionames
 
+    @property
+    def DEBUG(self):
+        """ This fixes DEBUG prints in spice_iofile, by propagating the DEBUG
+        flag of the parent entity.
+        """
+        return self.parent.DEBUG 
+
     # Overloaded write from thesdk.iofile
     def write(self,**kwargs):
         """
@@ -208,14 +215,14 @@ class spice_iofile(iofile):
                 data = self.Data
                 for i in range(len(self.file)):
                     np.savetxt(self.file[i],data[:,[2*i,2*i+1]],delimiter=',')
-                    self.print_log(type='I',msg='Writing event input %s' % self.file[i])
+                    self.print_log(type='D',msg='Writing event input %s' % self.file[i])
             except:
                     self.print_log(type='E',msg=traceback.format_exc())
                     self.print_log(type='E',msg='Failed writing %s' % self.file[i])
         elif self.iotype == 'sample':
             try:
                 for i in range(len(self.file)):
-                    self.print_log(type='I',msg='Writing sample input %s' % self.file[i])
+                    self.print_log(type='D',msg='Writing sample input %s' % self.file[i])
                     if not isinstance(self.Data,int):
                         # Input is a vector
                         vec = self.Data[:,i]
@@ -271,8 +278,6 @@ class spice_iofile(iofile):
         """
         try:
             arr=np.genfromtxt(filepath,dtype=dtype,skip_header=start,skip_footer=stop,encoding='utf-8')
-            # TODO: This is not enabled by setting self.DEBUG = True for some
-            # reason.. Should this class inherit thesdk?
             self.print_log(type='D',msg='Reading event output %s' % label)
             if dtype=='complex': # Complex data has separate columns in file for real and imag parts
                 arr=np.vstack((arr[:,0], arr[:,1]+1j*arr[:,2])).T
@@ -394,7 +399,7 @@ class spice_iofile(iofile):
                             tsamp = self.interp_crossings(trig_event,self.vth,256,self.edgetype)
 
                         # Processing each bit in the bus
-                        self.print_log(type='I',msg='Sampling %s with %s (%s).'%(self.ionames[i],trig,self.edgetype))
+                        self.print_log(type='D',msg='Sampling %s with %s (%s).'%(self.ionames[i],trig,self.edgetype))
                         failed = False
                         bitmat = None
                         for j in busrange:

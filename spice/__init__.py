@@ -142,37 +142,19 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     #Name derived from the file
 
     @property
-    def preserve_result(self):  
-        """True | False (default)
-
-        If True, do not delete result files after simulations.
-        """
-        if not hasattr(self,'_preserve_result'):
-            self._preserve_result=False
-        return self._preserve_result
-    @preserve_result.setter
-    def preserve_result(self,value):
-        self._preserve_result=value
-
-    @property
     def preserve_iofiles(self):  
         """True | False (default)
 
         If True, do not delete file IO files after simulations. Useful for
         debugging the file IO.
         
-        .. note::
-            Replaced by `preserve_result` in v1.7
         """
         if not hasattr(self,'_preserve_iofiles'):
             self._preserve_iofiles=False
         return self._preserve_iofiles
     @preserve_iofiles.setter
     def preserve_iofiles(self,value):
-        self.print_log(type='O',msg='preserve_iofiles is replaced with preserve_result since v1.7')
         self._preserve_iofiles=value
-        self.print_log(msg='Setting preserve_result to %s' % str(value))
-        self._preserve_result=value
         
     @property
     def preserve_spicefiles(self):  
@@ -181,18 +163,13 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         If True, do not delete generated Spice files (testbench, subcircuit,
         etc.) after simulations.  Useful for debugging.
         
-        .. note::
-            Replaced by `preserve_result` in v1.7
         """
         if not hasattr(self,'_preserve_spicefiles'):
             self._preserve_spicefiles=False
         return self._preserve_spicefiles
     @preserve_spicefiles.setter
     def preserve_spicefiles(self,value):
-        self.print_log(type='O',msg='preserve_spicefiles is replaced with preserve_result since v1.7')
         self._preserve_spicefiles=value
-        self.print_log(msg='Setting preserve_result to %s' % str(value))
-        self._preserve_result=value
 
     @property
     def distributed_run(self):
@@ -336,32 +313,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @spiceparameters.setter
     def spiceparameters(self,value): 
             self._spiceparameters = value
-
-    @property
-    def runname(self):
-        """String 
-        
-        Automatically generated name for the simulation. 
-        
-        Formatted as timestamp_randomtag, i.e. '20201002103638_tmpdbw11nr4'.
-        Can be overridden by assigning self.runname = 'myname'.
-
-        Example::
-
-            self.runname = 'test'
-
-        would generate the simulation files in `Simulations/spicesim/test/`.
-
-        """
-        if hasattr(self,'_runname'):
-            return self._runname
-        else:
-            self._runname='%s_%s' % \
-                    (datetime.now().strftime('%Y%m%d%H%M%S'),os.path.basename(tempfile.mkstemp()[1]))
-        return self._runname
-    @runname.setter
-    def runname(self,value):
-        self._runname=value
 
     @property
     def interactive_spice(self):
@@ -543,7 +494,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         if not hasattr(self, '_spice_submission'):
             try:
                 if not self.has_lsf:
-                    self.print_log(type='I', msg='LSF not configured. Running locally')
+                    self.print_log(type='I', msg='LSF not configured, running locally.')
                     self._spice_submission=''
                 else:
                     if self.interactive_spice:
@@ -551,9 +502,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                             self._spice_submission = thesdk.GLOBALS['LSFINTERACTIVE'] + ' '
                         else: # Spectre LSF doesn't support interactive queues
                             self.print_log(type='W', msg='Cannot run in interactive mode if distributed mode is on!')
-                            self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
+                            self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.simpath)
                     else:
-                        self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
+                        self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.simpath)
 
             except:
                 self.print_log(type='W',msg='Error while defining spice submission command. Running locally.')
@@ -619,16 +570,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         return self._name
 
     @property
-    def entitypath(self):
-        """String
-
-        Path to the entity root.
-        """
-        if not hasattr(self, '_entitypath'):
-            self._entitypath= os.path.dirname(os.path.dirname(self._classfile))
-        return self._entitypath
-
-    @property
     def spicesrcpath(self):
         """String
 
@@ -669,60 +610,62 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def spicetbsrc(self):
         """String
 
-        Path to the spice testbench ('./Simulations/spicesim/<runname>/tb_entityname.<suffix>').
+        Path to the spice testbench ('<simpath>/tb_entityname.<suffix>').
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicetbsrc'):
-            self._spicetbsrc=self.spicesimpath + '/tb_' + self.name + self.syntaxdict["cmdfile_ext"]
+            self._spicetbsrc=self.simpath + '/tb_' + self.name + self.syntaxdict["cmdfile_ext"]
         return self._spicetbsrc
 
     @property
     def spicesubcktsrc(self):
         """String
 
-        Path to the parsed subcircuit file. ('./Simulations/spicesim/<runname>/subckt_entityname.<suffix>').
+        Path to the parsed subcircuit file. ('<simpath>/subckt_entityname.<suffix>').
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicesubcktsrc'):
-            self._spicesubcktsrc=self.spicesimpath + '/subckt_' + self.name + self.syntaxdict["cmdfile_ext"]
+            self._spicesubcktsrc=self.simpath + '/subckt_' + self.name + self.syntaxdict["cmdfile_ext"]
         return self._spicesubcktsrc
 
-    @property
-    def spicesimpath(self):
-        """String
-
-        Simulation path. (./Simulations/spicesim/<runname>)
-        This shouldn't be set manually.
-        """
-        if not hasattr(self,'_spicesimpath'):
-            self._spicesimpath = self.entitypath+'/Simulations/spicesim/'+self.runname
-            try:
-                if not (os.path.exists(self._spicesimpath)):
-                    os.makedirs(self._spicesimpath)
-                    self.print_log(type='I',msg='Creating %s.' % self._spicesimpath)
-            except:
-                self.print_log(type='E',msg='Failed to create %s.' % self._spicesimpath)
-        return self._spicesimpath
-    @spicesimpath.deleter
-    def spicesimpath(self):
-        if os.path.exists(self.spicesimpath) and not self.preserve_result:
-            self.print_log(msg='Cleaning ./%s/ (set preserve_result=True to prevent cleaning).' % os.path.relpath(self._spicesimpath,start='../'))
+    @thesdk.simpath.deleter
+    def simpath(self):
+        if os.path.exists(self.simpath):
+            # This is used to check if the waveform database would prevent the deletion of the directory
             keepdb = False
-            for target in os.listdir(self.spicesimpath):
-                targetpath = '%s/%s' % (self.spicesimpath,target)
+            # Collect iofile filepaths to preserve them if requested
+            iofilepaths = []
+            for name,val in self.iofile_bundle.Members.items():
+                for fpath in val.file:
+                    iofilepaths.append(fpath)
+            # Delete everything (conditionally skip iofiles or spicefiles)
+            for target in os.listdir(self.simpath):
+                targetpath = '%s/%s' % (self.simpath,target)
                 try:
-                    if targetpath == self.spicedbpath and self.interactive_spice:
-                        keepdb = True
-                        self.print_log(msg='Preserving ./%s due to interactive_spice' % os.path.relpath(targetpath,start='../'))
-                        continue
-                    if os.path.isdir(targetpath):
-                        shutil.rmtree(targetpath)
+                    if targetpath in iofilepaths:
+                        # Target is an iofile
+                        if self.preserve_iofiles:
+                            self.print_log(type='D',msg='Preserving ./%s' % os.path.relpath(targetpath,start='../'))
+                        else:
+                            os.remove(targetpath)
+                            self.print_log(type='D',msg='Removing ./%s' % os.path.relpath(targetpath,start='../'))
                     else:
-                        os.remove(targetpath)
-                    self.print_log(type='D',msg='Removing ./%s' % os.path.relpath(targetpath,start='../'))
+                        # Target is a spicefile (anything that isn't an iofile)
+                        if self.preserve_spicefiles:
+                            self.print_log(type='D',msg='Preserving ./%s' % os.path.relpath(targetpath,start='../'))
+                        else:
+                            if targetpath == self.spicedbpath and self.interactive_spice:
+                                keepdb = True
+                                self.print_log(msg='Preserving ./%s due to interactive_spice' % os.path.relpath(targetpath,start='../'))
+                                continue
+                            if os.path.isdir(targetpath):
+                                shutil.rmtree(targetpath)
+                            else:
+                                os.remove(targetpath)
+                            self.print_log(type='D',msg='Removing ./%s' % os.path.relpath(targetpath,start='../'))
                 except:
                     self.print_log(type='W',msg='Could not remove ./%s' % os.path.relpath(targetpath,start='../'))
-            if not keepdb:
+            if not keepdb and not self.preserve_iofiles and not self.preserve_spicefiles:
                 try:
                     # Eldo needs some time to disconnect from the jwdb server
                     # Another dirty hack to check that the process is dead before cleaning
@@ -735,10 +678,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                             waittime += 1
                             if waittime > 60:
                                 break
-                    shutil.rmtree(self.spicesimpath)
-                    self.print_log(type='D',msg='Removing ./%s/' % os.path.relpath(self.spicesimpath,start='../'))
+                    shutil.rmtree(self.simpath)
+                    self.print_log(type='D',msg='Removing ./%s/' % os.path.relpath(self.simpath,start='../'))
                 except:
-                    self.print_log(type='W',msg='Could not remove ./%s/' % os.path.relpath(self.spicesimpath,start='../'))
+                    self.print_log(type='W',msg='Could not remove ./%s/' % os.path.relpath(self.simpath,start='../'))
 
     @property
     def spicecmd(self):
@@ -763,7 +706,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 spicesimcmd = "eldo -64b %s " % (nprocflag)
             elif self.model=='spectre':
                 spicesimcmd = ("spectre -64 +lqtimeout=0 ++aps=%s %s %s -outdir %s " 
-                        % (self.errpreset,plflag,nprocflag,self.spicesimpath))
+                        % (self.errpreset,plflag,nprocflag,self.simpath))
             elif self.model=='ngspice':
                 spicesimcmd = self.syntaxdict["simulatorcmd"] + ' '
             self._spicecmd = self.spice_submission+spicesimcmd+self.spicetbsrc
@@ -776,12 +719,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def spicedbpath(self):
         """String
 
-        Path to output waveform database. (./Simulations/spicesim/<runname>/tb_<entityname>.<resultfile_ext>)
+        Path to output waveform database. (<simpath>/tb_<entityname>.<resultfile_ext>)
         For now only for spectre.
         This shouldn't be set manually.
         """
         if not hasattr(self,'_spicedbpath'):
-            self._spicedbpath=self.spicesimpath+'/tb_'+self.name+self.syntaxdict["resultfile_ext"]
+            self._spicedbpath=self.simpath+'/tb_'+self.name+self.syntaxdict["resultfile_ext"]
         return self._spicedbpath
     @spicedbpath.setter
     def spicedbpath(self, value):
@@ -810,7 +753,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         if not hasattr(self, '_plotprogcmd'):
             if self.plotprogram == 'ezwave':
                 self._plotprogcmd='%s -MAXWND -LOGfile %s/ezwave.log %s &' % \
-                        (self.plotprogram,self.spicesimpath,self.spicedbpath)
+                        (self.plotprogram,self.simpath,self.spicedbpath)
             elif self.plotprogram == 'viva':
                 self._plotprogcmd='%s -datadir %s -nocdsinit &' % \
                         (self.plotprogram,self.spicedbpath)
@@ -821,6 +764,21 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @plotprogcmd.setter
     def plotprogcmd(self, value):
         self._plotprogcmd=value
+
+    @property
+    def save_database(self): 
+        """ True | False (default)
+
+        Whether to save the waveform database (.wdb-file for eldo, raw-database
+        for spectre), when save_state=True.
+
+        """
+        if not hasattr(self,'_save_database'):
+            self._save_database=False
+        return self._save_database 
+    @save_database.setter
+    def save_database(self,value): 
+        self._save_database=value
 
     def connect_spice_inputs(self):
         """Automatically called function to connect iofiles (inputs) to top
@@ -862,7 +820,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                         try:
                             self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()]
                         except KeyError:
-                            self.print_log(type='W', msg='Invalid ioname %s for iofile %s' % (val.ionames[0], name))
+                            self.print_log(type='E',msg='Invalid ioname %s for iofile %s' % (val.ionames[0], name))
                     else: # Iofile is a bus?
                         data=[]
                         for i, key in enumerate(val.ionames):
@@ -873,9 +831,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                                     try:
                                         data=np.r_['1', data, self.iofile_eventdict[key.upper()]]
                                     except ValueError:
-                                        self.print_log(type='W', msg='Invalid dimensions for concatenating arrays for IO %s!' % name)
+                                        self.print_log(type='W',msg='Invalid dimensions for concatenating arrays for IO %s!' % name)
                             except KeyError:
-                                self.print_log(type='W', msg='Invalid ioname %s for iofile %s' % (key, name))
+                                self.print_log(type='E', msg='Invalid ioname %s for iofile %s' % (key, name))
                         self.iofile_bundle.Members[name].Data=data
                 else:
                     self.iofile_bundle.Members[name].read()
@@ -918,7 +876,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         try:
             ret=os.system(cmd)
             if ret != 0:
-                self.print_log(type='W', msg='%s returned with exit status %d!' % (self.plotprogram, ret))
+                self.print_log(type='W', msg='%s returned with exit status %d.' % (self.plotprogram, ret))
         except: 
             self.print_log(type='W',msg='Something went wrong while launcing %s.' % self.plotprogram)
             self.print_log(type='W',msg=traceback.format_exc())
@@ -1072,10 +1030,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                             break
                 # For distributed runs
                 if self.distributed_run:
-                    path=os.path.join(self.spicesimpath,'tb_%s.raw' % self.name, '[0-9]*', fname)
+                    path=os.path.join(self.simpath,'tb_%s.raw' % self.name, '[0-9]*', fname)
                     files = sorted(glob.glob(path),key=sorter)
                 else:
-                    path=os.path.join(self.spicesimpath,'tb_%s.raw' % self.name, fname)
+                    path=os.path.join(self.simpath,'tb_%s.raw' % self.name, fname)
                     files = glob.glob(path)
                 valbegin = 'VALUE\n'
                 eof = 'END\n'
@@ -1115,7 +1073,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         
     def run_spice(self):
         """Externally called function to execute spice simulation."""
-        if self.load_state == '': 
+        if self.load_state != '': 
+            # Loading a previously stored state
+            self._read_state()
+        else:
             # Normal execution of full simulation
             self.tb = stb(self)
             self.tb.iofiles = self.iofile_bundle
@@ -1134,35 +1095,21 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self.connect_spice_outputs()
             self.extract_powers()
             self.read_oppts()
+            # Save entity state
+            if self.save_state:
+                self._write_state()
+                # If this is generic enough between simulators, it can be moved
+                # to thesdk (basically if spicedbpath has an equivalent in
+                # other simulators too)
+                if self.save_database:
+                    try:
+                        dbname = self.spicedbpath.split('/')[-1]
+                        if os.path.isdir(self.spicedbpath):
+                            shutil.copytree(self.spicedbpath,'%s/%s' % (self.statedir,dbname))
+                        else:
+                            shutil.copyfile(self.spicedbpath,'%s/%s' % (self.statedir,dbname))
+                        self.print_log(msg='Saving waveform database to ./%s/%s' % (os.path.relpath(self.statedir,start='../'),dbname))
+                    except:
+                        self.print_log(type='E',msg='Failed saving waveform database to ./%s/%s' % (os.path.relpath(self.statedir,start='../'),dbname))
             # Clean simulation results
-            del self.spicesimpath
-        else:
-            #Loading previous simulation results and not simulating again
-            try:
-                self.runname = self.load_state
-                if self.runname == 'latest' or self.runname == 'last':
-                    results = glob.glob(self.entitypath+'/Simulations/spicesim/*')
-                    latest = max(results, key=os.path.getctime)
-                    self.runname = latest.split('/')[-1]
-                simpath = self.entitypath+'/Simulations/spicesim/'+self.runname
-                if not (os.path.exists(simpath)):
-                    self.print_log(type='E',msg='Existing results not found in %s.' % simpath)
-                    existing = os.listdir(self.entitypath+'/Simulations/spicesim/')
-                    self.print_log(type='I',msg='Found results:')
-                    for f in existing:
-                        self.print_log(type='I',msg='%s' % f)
-                else:
-                    self.print_log(type='I',msg='Loading results from %s.' % simpath)
-                    self.tb = stb(self)
-                    self.tb.iofiles = self.iofile_bundle
-                    self.tb.dcsources = self.dcsource_bundle
-                    self.tb.simcmds = self.simcmd_bundle
-                    self.connect_spice_inputs()
-                    self.read_spice_outputs()
-                    self.connect_spice_outputs()
-                    self.extract_powers()
-                    self.read_oppts()
-            except:
-                self.print_log(type='I',msg=traceback.format_exc())
-                self.print_log(type='F',msg='Failed while loading results from %s.' % self._spicesimpath)
-
+            del self.simpath
