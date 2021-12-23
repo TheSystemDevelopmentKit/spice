@@ -338,7 +338,10 @@ class testbench(spice_module):
                     if val.iotype.lower()=='event':
                         for i in range(len(val.ionames)):
                             # Finding the max time instant
-                            maxtime = val.Data[-1,0]
+                            try:
+                                maxtime = val.Data[-1,0]
+                            except TypeError:
+                                self.print_log(type='F', msg='Input data not assinged to IO %s! Terminating.' % name)
                             if float(self._trantime) < float(maxtime):
                                 self._trantime = maxtime
                             # Adding the source
@@ -346,9 +349,14 @@ class testbench(spice_module):
                                 self._inputsignals += "%s%s %s 0 pwl(file=\"%s\")\n" % \
                                         (val.sourcetype.upper(),val.ionames[i].lower(),val.ionames[i].upper(),val.file[i])
                             elif self.parent.model=='spectre':
-                                self._inputsignals += "%s%s %s 0 %ssource type=pwl file=\"%s\"\n" % \
-                                        (val.sourcetype.upper(),self.esc_bus(val.ionames[i].lower()),
-                                        self.esc_bus(val.ionames[i]),val.sourcetype.lower(),val.file[i])
+                                if val.pos and val.neg:
+                                    self._inputsignals += "%s%s %s %s %ssource type=pwl file=\"%s\"\n" % \
+                                            (val.sourcetype.upper(),self.esc_bus(val.ionames[i].lower()),
+                                            self.esc_bus(val.pos), self.esc_bus(val.neg),val.sourcetype.lower(),val.file[i])
+                                else:
+                                    self._inputsignals += "%s%s %s 0 %ssource type=pwl file=\"%s\"\n" % \
+                                            (val.sourcetype.upper(),self.esc_bus(val.ionames[i].lower()),
+                                            self.esc_bus(val.ionames[i]),val.sourcetype.lower(),val.file[i])
                             elif self.parent.model=='ngspice':
                                 self._inputsignals += "a%s %%vd[%s 0] filesrc%s\n" % \
                                         (self.esc_bus(val.ionames[i].lower()),

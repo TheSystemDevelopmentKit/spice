@@ -145,6 +145,8 @@ class spice_iofile(iofile):
             self.tfall=kwargs.get('tfall',5e-12)
             self.trise=kwargs.get('trise',5e-12)
             self.sourcetype=kwargs.get('sourcetype','V')
+            self.pos=kwargs.get('pos', None)
+            self.neg=kwargs.get('neg', None)
         except:
             self.print_log(type='F', msg="spice IO file definition failed.")
 
