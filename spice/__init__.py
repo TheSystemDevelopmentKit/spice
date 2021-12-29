@@ -1008,13 +1008,14 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             Function for sorting the files in correct order
             Files that are output from simulation are of form
 
-            dcSweep-<integer>_oppoint.dc
+            SweepN-<integer>_SweepN+1-<integer>_ ... _oppoint.dc
 
             Strategy: extract integer from filename and sort based on the integer.
 
             '''
-            key=val.split('-')[1].split('_')[0]
-            return int(key)
+
+            keys = val.split('_')[:-1]
+            return sum([int(key.split('-')[-1]) for key in keys])
 
         try:
             if self.model=='spectre' and 'dc' in self.simcmd_bundle.Members.keys():
@@ -1022,12 +1023,14 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 # Get dc simulation file name
                 for name, val in self.simcmd_bundle.Members.items():
                     if name == 'dc':
-                        if val.sweep != '':
-                            fname = '%sSweep*.dc' % val.sweep
-                            break
+                        fname=''
+                        if len(val.sweep) != 0:
+                            for i in range(0, len(val.sweep)):
+                                fname += 'Sweep%d-[0-9]*_' % i
+                            fname+='oppoint.dc'
                         else:
                             fname = 'oppoint*.dc'
-                            break
+                        break
                 # For distributed runs
                 if self.distributed_run:
                     path=os.path.join(self.simpath,'tb_%s.raw' % self.name, '[0-9]*', fname)

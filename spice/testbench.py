@@ -540,24 +540,39 @@ class testbench(spice_module):
                     if self.parent.model=='eldo':
                         self._simcmdstr='.op'
                     elif self.parent.model=='spectre':
-                        if val.sweep == '': # This is not a sweep analysis
+                        if len(val.sweep) == 0: # This is not a sweep analysis
                             self._simcmdstr+='oppoint dc\n\n'
                         else:
                             if self.parent.distributed_run:
                                 distributestr = 'distribute=lsf numprocesses=%d' % self.parent.num_processes 
                             else:
                                 distributestr = ''
-                            if val.subcktname != '': # Sweep subckt parameter
-                                self._simcmdstr+='%sSweep sweep param=%s sub=%s start=%s stop=%s step=%s %s { \n' \
-                                    % (val.sweep, val.sweep, val.subcktname, val.swpstart, val.swpstop, val.swpstep, distributestr)
-                            elif val.devname != '': # Sweep device parameter
-                                self._simcmdstr+='%sSweep sweep param=%s dev=%s start=%s stop=%s step=%s %s { \n' \
-                                    % (val.sweep, val.sweep, val.devname, val.swpstart, val.swpstop, val.swpstep, distributestr)
+                            if len(val.subcktname) != 0: # Sweep subckt parameter
+                                length=len(val.subcktname)
+                                if any(len(lst) != length for lst in [val.sweep, val.swpstart, val.swpstop, val.swpstep]):
+                                    self.print_log(type='F', msg='Mismatch in length of simulation parameters.\nEnsure that sweep points and subcircuit names have the same number of elements!')
+                                for i in range(len(val.subcktname)):
+                                    self._simcmdstr+='Sweep%d sweep param=%s sub=%s start=%s stop=%s step=%s %s { \n' \
+                                        % (i, val.sweep[i], val.subcktname[i], val.swpstart[i], val.swpstop[i], val.swpstep[i], distributestr)
+                            elif len(val.devname) != 0: # Sweep device parameter
+                                length=len(val.devname)
+                                if any(len(lst) != length for lst in [val.sweep, val.swpstart, val.swpstop, val.swpstep]):
+                                    self.print_log(type='F', msg='Mismatch in length of simulation parameters.\nEnsure that sweep points and device names have the same number of elements!')
+                                for i in range(len(val.devname)):
+                                    self._simcmdstr+='Sweep%d sweep param=%s dev=%s start=%s stop=%s step=%s %s { \n' \
+                                        % (i, val.sweep[i], val.devname[i], val.swpstart[i], val.swpstop[i], val.swpstep[i], distributestr)
                             else: # Sweep top-level netlist parameter
-                                self._simcmdstr+='%sSweep sweep param=%s start=%s stop=%s step=%s %s { \n' \
-                                    % (val.sweep, val.sweep, val.swpstart, val.swpstop, val.swpstep, distributestr)
-                            self._simcmdstr+='\toppoint dc\n}\n\n'
-
+                                length=len(val.sweep)
+                                if any(len(lst) != length for lst in [val.swpstart, val.swpstop, val.swpstep]):
+                                    self.print_log(type='F', msg='Mismatch in length of simulation parameters.\nEnsure that sweep points and parameter names have the same number of elements!')
+                                for i in range(len(val.sweep)):
+                                    self._simcmdstr+='Sweep%d sweep param=%s start=%s stop=%s step=%s %s { \n' \
+                                        % (i, val.sweep[i], val.swpstart[i], val.swpstop[i], val.swpstep[i], distributestr)
+                            self._simcmdstr+='oppoint dc\n'
+                            # Closing brackets
+                            for j in range(i, -1, -1):
+                                self._simcmdstr+='}\n'
+                            self._simcmdstr+='\n'
                     else:
                         self.print_log(type='E',msg='Unsupported model %s.' % self.parent.model)
                 elif str(sim).lower() == 'ac':
