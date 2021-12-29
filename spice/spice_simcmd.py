@@ -190,6 +190,9 @@ class spice_simcmd(thesdk):
         if hasattr(self.parent,'simcmd_bundle'):
             # This limits it to 1 of each simulation type. Is this ok?
             self.parent.simcmd_bundle.new(name=self.sim,val=self)
+        if self.sim == 'dc' and self.parent.model=='spectre':
+            self.print_log(type='I', msg='Saving results in human-readable format (requirement for DC simulation)!')
+            self.parent.spiceoptions.update({'rawfmt': 'psfascii'})
         if self.subcktname != '' and self.devname != '':
             self.print_log(type='F', msg='Cannot specify subckt sweep and device sweep in the same simcmd instance!')
 
