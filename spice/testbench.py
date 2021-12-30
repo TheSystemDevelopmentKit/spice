@@ -691,6 +691,9 @@ class testbench(spice_module):
                         self._plotcmd += "run\n"
 
                     # Parsing output iofiles
+                    savestr=''
+                    plotstr=''
+                    first=True
                     for name, val in self.iofiles.Members.items():
                         # Output iofile becomes a plot/print command
                         if val.dir.lower()=='out' or val.dir.lower()=='output':
@@ -700,16 +703,21 @@ class testbench(spice_module):
                                     if self.parent.model=='eldo':
                                         self._plotcmd += '.printfile %s(%s) file=%s\n' % (val.sourcetype,signame,val.file[i])
                                     elif self.parent.model=='spectre':
-                                        self._plotcmd += 'save %s\n' % signame
-                                        self._plotcmd += 'simulator lang=spice\n'
-                                        self._plotcmd += '.option ingold 2\n'
-                                        # Implement complex value probing
-                                        if val.datatype.lower() == 'complex':
-                                            self._plotcmd += '.print %sr(%s) %si(%s) \n' % \
-                                                    (val.sourcetype,val.ionames[i],val.sourcetype,val.ionames[i])
+                                        if first:
+                                            savestr += 'save %s' % signame
+                                            if val.datatype.lower() == 'complex':
+                                                plotstr += '.print %sr(%s) %si(%s)' % \
+                                                        (val.sourcetype, val.ionames[i], val.sourcetype, val.ionames[i])
+                                            else:
+                                                plotstr += '.print %s(%s)' % (val.sourcetype, val.ionames[i])
+                                            first=False
                                         else:
-                                            self._plotcmd += '.print %s(%s)\n' % (val.sourcetype,val.ionames[i])
-                                        self._plotcmd += 'simulator lang=spectre\n'
+                                            savestr += ' %s' % signame
+                                            if val.datatype.lower() == 'complex':
+                                                plotstr += ' %sr(%s) %si(%s)' % \
+                                                        (val.sourcetype, val.ionames[i], val.sourcetype, val.ionames[i])
+                                            else:
+                                                plotstr += ' %s(%s)' % (val.sourcetype, val.ionames[i])
                                     elif self.parent.model=='ngspice':
                                         # Plots in tb only for interactive. Does not work in batch
                                         if self.parent.interactive_spice:
@@ -738,11 +746,13 @@ class testbench(spice_module):
                                     if trig not in self.parent.iofile_eventdict:
                                         self.parent.iofile_eventdict[trig] = None
                                         if self.parent.model=='spectre':
-                                            self._plotcmd += 'save %s\n' % self.esc_bus(trig)
-                                            self._plotcmd += 'simulator lang=spice\n'
-                                            self._plotcmd += '.option ingold 2\n'
-                                            self._plotcmd += '.print v(%s)\n' % trig
-                                            self._plotcmd += 'simulator lang=spectre\n'
+                                            if first:
+                                                savestr += 'save %s' % self.esc_bus(trig)
+                                                plotstr += '.print v(%s)' % (trig)
+                                                first=False
+                                            else:
+                                                savestr += ' %s' % self.esc_bus(trig) 
+                                                plotstr += ' v(%s)' % (trig)
                                         elif self.parent.model=='eldo':
                                             self._plotcmd += '.printfile %s(%s) file=%s\n' % (val.sourcetype,self.esc_bus(trig),val.file[i])
                                         elif self.parent.model=='ngspice':
@@ -761,11 +771,13 @@ class testbench(spice_module):
                                         if bitname not in self.parent.iofile_eventdict:
                                             self.parent.iofile_eventdict[bitname] = None
                                             if self.parent.model=='spectre':
-                                                self._plotcmd += 'save %s\n' % self.esc_bus(bitname)
-                                                self._plotcmd += 'simulator lang=spice\n'
-                                                self._plotcmd += '.option ingold 2\n'
-                                                self._plotcmd += '.print %s(%s)\n' % (val.sourcetype,bitname)
-                                                self._plotcmd += 'simulator lang=spectre\n'
+                                                if first:
+                                                    savestr += 'save %s' % self.esc_bus(bitname)
+                                                    plotstr += '.print %s(%s)' % (val.sourcetype, bitname)
+                                                    first=False
+                                                else:
+                                                    savestr += ' %s' % self.esc_bus(bitname)
+                                                    plotstr += ' %s(%s)' % (val.sourcetype, bitname)
                                             elif self.parent.model=='eldo':
                                                 self._plotcmd += '.printfile %s(%s) file=%s\n' % (val.sourcetype,self.esc_bus(bitname),val.file[i])
                                             elif self.parent.model=='ngspice':
@@ -785,11 +797,13 @@ class testbench(spice_module):
                                         # -> add to eventdict + save to output database
                                         self.parent.iofile_eventdict[val.ionames[i]] = None
                                         if self.parent.model == 'spectre':
-                                            self._plotcmd += 'save %s\n' % signame
-                                            self._plotcmd += 'simulator lang=spice\n'
-                                            self._plotcmd += '.option ingold 2\n'
-                                            self._plotcmd += '.print %s(%s)\n' % (val.sourcetype,val.ionames[i])
-                                            self._plotcmd += 'simulator lang=spectre\n'
+                                            if first:
+                                                savestr += 'save %s' % signame
+                                                plotstr += '.print %s(%s)' % (val.sourcetype, val.ionames[i])
+                                                first=False
+                                            else:
+                                                savestr += ' %s' % signame
+                                                plotstr += ' %s(%s)' % (val.sourcetype, val.ionames[i])
                                         elif self.parent.model == 'eldo':
                                             self._plotcmd += '.printfile %s(%s) file=%s\n' % (val.sourcetype,signame,val.file[i])
                                         elif self.parent.model == 'ngspice':
@@ -819,17 +833,27 @@ class testbench(spice_module):
                                 # Writing source current consumption to a file
                                 self._plotcmd += '.printfile I(%s) file=%s\n' % (supply,val.ext_file)
                             elif self.parent.model == 'spectre':
-                                self._plotcmd += 'save %s:pwr\n' % supply
-                                self._plotcmd += 'save %s:p\n' % supply
-                                self._plotcmd += 'simulator lang=spice\n'
-                                self._plotcmd += '.option ingold 2\n'
-                                self._plotcmd += '.print I(%s)\n' % supply
-                                self._plotcmd += 'simulator lang=spectre\n'
+                                if first:
+                                    savestr += 'save %s:pwr %s:p' % (supply,supply)
+                                    plotstr += '.print I(%s)' % (supply)
+                                    first=False
+                                else:
+                                    savestr += ' %s:pwr %s:p' % (supply,supply)
+                                    plotstr += ' I(%s)' % (supply)
                             elif self.parent.model == 'ngspice':
                                 # Plots in tb only for interactive. Does not work in batch
                                 if self.parent.interactive_spice:
                                     self._plotcmd += "plot I(%s)\n" % supply
                                 self._plotcmd += "wrdata %s I(%s)\n" % (val.ext_file,supply)
+                    # Output accumulated save and print statement to plotcmd
+                    if self.parent.model=='spectre':
+                        savestr += '\n'
+                        plotstr += '\n'
+                        self._plotcmd += savestr
+                        self._plotcmd += 'simulator lang=spice\n'
+                        self._plotcmd += '.option ingold 2\n'
+                        self._plotcmd += plotstr
+                        self._plotcmd += 'simulator lang=spectre\n'
             if self.parent.model=='ngspice':
                 self._plotcmd += ".endc\n"
         return self._plotcmd
