@@ -818,6 +818,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                         first=False
                     if len(val.ionames) == 1:
                         try:
+                            try:
+                                tdiff = np.diff(self.iofile_eventdict[val.ionames[0].upper()][:,0])
+                                if np.any(tdiff == 0.0):
+                                        self.print_log(type='W', msg='Accuracy of output file is insufficient. Increase value of \'digits\' parameter and re-run simulation!')
+                            except TypeError: # Requested output wasn't in output file, do nothing
+                                pass
                             self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()]
                         except KeyError:
                             self.print_log(type='E',msg='Invalid ioname %s for iofile %s' % (val.ionames[0], name))
