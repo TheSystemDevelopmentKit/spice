@@ -344,7 +344,6 @@ class spice_iofile(iofile):
                         proc = multiprocessing.Process(target=self.parse_io_from_file,args=(file,start,stop,dtype,labels[k],queue))
                         procs.append(proc)
                         proc.start() 
-                    pdb.set_trace()
                     for i,p in enumerate(procs):
                         try:
                             ret = queues[i].get()
@@ -374,6 +373,8 @@ class spice_iofile(iofile):
                     else:
                         self.print_log(type='W', msg='Label format mismatch with \'%s\'.' %  (label))
         else:
+            if len(self.file) == 0:
+                self.print_log(type='W', msg='No output file defined for IO %s. Check self.ionames!' % self.name)
             for i in range(len(self.file)):
                 try:
                     if self.iotype=='vsample':
