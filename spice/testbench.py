@@ -282,35 +282,36 @@ class testbench(spice_module):
         if not hasattr(self,'_dcsourcestr'):
             self._dcsourcestr = "%s DC sources\n" % self.parent.syntaxdict["commentchar"]
             for name, val in self.dcsources.Members.items():
+                value = val.value if val.paramname is None else val.paramname
                 supply = '%s%s' % (val.sourcetype.upper(),val.name.upper())
                 if self.parent.model == 'eldo':
                     if val.ramp == 0:
-                        self._dcsourcestr += "%s %s %s %g %s\n" % \
-                                (supply,val.pos,val.neg,val.value, \
+                        self._dcsourcestr += "%s %s %s %s %s\n" % \
+                                (supply,val.pos,val.neg,value, \
                                 'NONOISE' if not val.noise else '')
                     else:
                         self._dcsourcestr += "%s %s %s %s %s\n" % \
                                 (supply,val.pos,val.neg, \
-                                'pulse(0 %g 0 %g)' % (val.value,abs(val.ramp)), \
+                                'pulse(0 %g 0 %g)' % (value,abs(val.ramp)), \
                                 'NONOISE' if not val.noise else '')
                 elif self.parent.model == 'spectre':
                     if val.ramp == 0:
-                        self._dcsourcestr += "%s %s %s %s%g\n" % \
+                        self._dcsourcestr += "%s %s %s %s%s\n" % \
                                 (supply,self.esc_bus(val.pos),self.esc_bus(val.neg),\
-                                ('%ssource dc=' % val.sourcetype.lower()),val.value)
+                                ('%ssource dc=' % val.sourcetype.lower()),value)
                     else:
-                        self._dcsourcestr += "%s %s %s %s type=pulse val0=0 val1=%g rise=%g\n" % \
+                        self._dcsourcestr += "%s %s %s %s type=pulse val0=0 val1=%s rise=%g\n" % \
                                 (supply,self.esc_bus(val.pos),self.esc_bus(val.neg),\
-                                ('%ssource' % val.sourcetype.lower()),val.value,val.ramp)
+                                ('%ssource' % val.sourcetype.lower()),value,val.ramp)
                 elif self.parent.model == 'ngspice':
                     if val.ramp == 0:
-                        self._dcsourcestr += "%s %s %s %g %s\n" % \
-                                (supply,val.pos,val.neg,val.value, \
+                        self._dcsourcestr += "%s %s %s %s %s\n" % \
+                                (supply,val.pos,val.neg,value, \
                                 'NONOISE' if not val.noise else '')
                     else:
                         self._dcsourcestr += "%s %s %s %s %s\n" % \
                                 (supply,val.pos,val.neg, \
-                                'pulse(0 %g 0 %g)' % (val.value,abs(val.ramp)), \
+                                'pulse(0 %g 0 %g)' % (value,abs(val.ramp)), \
                                 'NONOISE' if not val.noise else '')
         return self._dcsourcestr
     @dcsourcestr.setter

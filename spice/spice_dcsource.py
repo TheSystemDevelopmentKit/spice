@@ -33,6 +33,10 @@ class spice_dcsource(thesdk):
         Name of the source.
     value : float
         Value of the source.
+    paramname : str
+        To parameterize the DC source, provide this value during instantiation.
+        The parameter will be automatically added to spiceparameters with the
+        default value of self.value.
     sourcetype : 'V' or 'I'
         Type of the DC source. Either 'V' for voltage or 'I' for current.
     pos : str
@@ -83,6 +87,7 @@ class spice_dcsource(thesdk):
             self.pos=kwargs.get('pos','POSNODE')
             self.neg=kwargs.get('neg','NEGNODE')
             self.value=kwargs.get('value',0)
+            self.paramname=kwargs.get('paramname', None)
             self.extract=kwargs.get('extract',False)
             self.ext_start=kwargs.get('ext_start',None)
             self.ext_stop=kwargs.get('ext_stop',None)
@@ -90,7 +95,9 @@ class spice_dcsource(thesdk):
             self.ramp=kwargs.get('ramp',0)
         except:
             self.print_log(type='F', msg="Spice DC source definition failed.")
-
+        # This enables e.g. DC sweeps
+        if isinstance(self.paramname, str):
+            self.parent.spiceparameters.update({self.paramname:self.value})
         if hasattr(self.parent,'dcsource_bundle'):
             self.parent.dcsource_bundle.new(name=self.name,val=self)
 
