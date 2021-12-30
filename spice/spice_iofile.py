@@ -330,28 +330,33 @@ class spice_iofile(iofile):
                             self.print_log(type='W', msg='Couldn\'t find IO on line %d from file %s' %  (line,file))
                 if len(labels) == len(linenumbers):
                     numlines = int(subprocess.check_output("wc -l %s | awk '{print $1}'" % file,shell=True).decode('utf-8'))
-                    procs = []
-                    queues = []
-                    for k in range(len(linenumbers)):
-                        start=linenumbers[k] # Indexing of line numbers starts from one
-                        if k == len(linenumbers)-1:
-                            stop=1
-                        else:
-                            stop=numlines-(linenumbers[k+1]-6) # Previous data column ends 5 rows before start of next one
-                        dtype=self.datatype if self.datatype=='complex' else 'float' # Default is int for thesdk_spicefile, let's infer from data
-                        queue = multiprocessing.Queue()
-                        queues.append(queue)
-                        proc = multiprocessing.Process(target=self.parse_io_from_file,args=(file,start,stop,dtype,labels[k],queue))
-                        procs.append(proc)
-                        proc.start() 
-                    for i,p in enumerate(procs):
-                        try:
-                            ret = queues[i].get()
-                            for item in ret:
-                                self.parent.iofile_eventdict[item[0].upper()]=item[1]
-                            p.join()
-                        except KeyError:
-                            self.print_log(type='W', msg='Failed reading %s' % (ret[0]))
+                    # Maximum number of concurrent open files. This may or may not help with "too many open files" -error.
+                    num_parallel = 50
+                    num_loops = int(np.ceil(len(linenumbers)/num_parallel))
+                    for it in range(num_loops):
+                        lnrange = range(num_parallel*it,min([num_parallel*(it+1),len(linenumbers)]))
+                        procs = []
+                        queues = []
+                        for k in lnrange:
+                            start=linenumbers[k] # Indexing of line numbers starts from one
+                            if k == len(linenumbers)-1:
+                                stop=1
+                            else:
+                                stop=numlines-(linenumbers[k+1]-6) # Previous data column ends 5 rows before start of next one
+                            dtype=self.datatype if self.datatype=='complex' else 'float' # Default is int for thesdk_spicefile, let's infer from data
+                            queue = multiprocessing.Queue()
+                            queues.append(queue)
+                            proc = multiprocessing.Process(target=self.parse_io_from_file,args=(file,start,stop,dtype,labels[k],queue))
+                            procs.append(proc)
+                            proc.start() 
+                        for i,p in enumerate(procs):
+                            try:
+                                ret = queues[i].get()
+                                for item in ret:
+                                    self.parent.iofile_eventdict[item[0].upper()]=item[1]
+                                p.join()
+                            except KeyError:
+                                self.print_log(type='W', msg='Failed reading %s' % (ret[0]))
                 else:
                     self.print_log(type='W', msg='Couldn\'t read IOs from file %s. Missing ioname?' % file)
             elif self.parent.model == 'eldo':

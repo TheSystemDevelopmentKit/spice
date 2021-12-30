@@ -605,6 +605,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             if not os.path.exists(self._spicesrc):
                 self.print_log(type='W',msg='No source circuit found in %s.' % self._spicesrc)
         return self._spicesrc
+    @spicesrc.setter
+    def spicesrc(self,value): 
+            self._spicesrc = value
 
     @property
     def spicetbsrc(self):
