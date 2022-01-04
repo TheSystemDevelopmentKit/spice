@@ -145,6 +145,8 @@ class spice_iofile(iofile):
             self.tfall=kwargs.get('tfall',5e-12)
             self.trise=kwargs.get('trise',5e-12)
             self.sourcetype=kwargs.get('sourcetype','V')
+            self.pos=kwargs.get('pos', None)
+            self.neg=kwargs.get('neg', None)
         except:
             self.print_log(type='F', msg="spice IO file definition failed.")
 
@@ -271,20 +273,33 @@ class spice_iofile(iofile):
         else:
             pass
 
-    def parse_io_from_file(self,filepath,start,stop,dtype,label,queue):
+    def parse_io_from_file(self,filepath,start,stop,dtype,labels,queue):
         """ Parse specific lines from a spectre print file.
 
         This is wrapped to a function to allow parallelism.
         """
+        stack = [(label, None) for label in labels]
         try:
             arr=np.genfromtxt(filepath,dtype=dtype,skip_header=start,skip_footer=stop,encoding='utf-8')
-            self.print_log(type='D',msg='Reading event output %s' % label)
-            if dtype=='complex': # Complex data has separate columns in file for real and imag parts
-                arr=np.vstack((arr[:,0], arr[:,1]+1j*arr[:,2])).T
-            queue.put((label,arr))
         except:
+            self.print_log(type='E',msg=traceback.format_exc())
+            self.print_log(type='F',msg='Failed while reading files for %s.' % self.name)
+        try:
+            n = 0
+            for i, label in enumerate(labels):
+                self.print_log(type='D',msg='Reading event output %s' % label)
+                if dtype=='complex': # Complex data has separate columns in file for real and imag parts
+                    temp=np.vstack((arr[:,0], arr[:,n+1]+1j*arr[:,n+2])).T
+                    n += 2
+                else:
+                    temp=np.vstack((arr[:,0], arr[:,n+1])).T
+                    n += 1
+                stack[i] = (label, temp)
+            queue.put(stack)
+        except:
+            self.print_log(type='E',msg=traceback.format_exc())
             self.print_log(type='E',msg='Failed reading event output %s' % label)
-            queue.put((label,None))
+            queue.put(stack)
 
     # Overloaded read from thesdk.iofile
     def read(self,**kwargs):
@@ -308,34 +323,40 @@ class spice_iofile(iofile):
                             linenumbers.append(line)
                         except ValueError:
                             self.print_log(type='W', msg='Couldn\'t decode linenumber from file %s' %  file)
-                        label=label_match.search(parts[1])
-                        if label:
-                            labels.append(label.group(1)) # Capture inner group (== ioname)
+                        labelgrp=label_match.findall(parts[1])
+                        if labelgrp:
+                            labels.append(labelgrp)
                         else:
                             self.print_log(type='W', msg='Couldn\'t find IO on line %d from file %s' %  (line,file))
                 if len(labels) == len(linenumbers):
                     numlines = int(subprocess.check_output("wc -l %s | awk '{print $1}'" % file,shell=True).decode('utf-8'))
-                    procs = []
-                    queues = []
-                    for k in range(len(linenumbers)):
-                        start=linenumbers[k] # Indexing of line numbers starts from one
-                        if k == len(linenumbers)-1:
-                            stop=1
-                        else:
-                            stop=numlines-(linenumbers[k+1]-6) # Previous data column ends 5 rows before start of next one
-                        dtype=self.datatype if self.datatype=='complex' else 'float' # Default is int for thesdk_spicefile, let's infer from data
-                        queue = multiprocessing.Queue()
-                        queues.append(queue)
-                        proc = multiprocessing.Process(target=self.parse_io_from_file,args=(file,start,stop,dtype,labels[k],queue))
-                        procs.append(proc)
-                        proc.start() 
-                    for i,p in enumerate(procs):
-                        try:
-                            ret = queues[i].get()
-                            self.parent.iofile_eventdict[ret[0].upper()]=ret[1]
-                            p.join()
-                        except KeyError:
-                            self.print_log(type='W', msg='Failed reading %s' % (ret[0]))
+                    # Maximum number of concurrent open files. This may or may not help with "too many open files" -error.
+                    num_parallel = 50
+                    num_loops = int(np.ceil(len(linenumbers)/num_parallel))
+                    for it in range(num_loops):
+                        lnrange = range(num_parallel*it,min([num_parallel*(it+1),len(linenumbers)]))
+                        procs = []
+                        queues = []
+                        for k in lnrange:
+                            start=linenumbers[k] # Indexing of line numbers starts from one
+                            if k == len(linenumbers)-1:
+                                stop=1
+                            else:
+                                stop=numlines-(linenumbers[k+1]-6) # Previous data column ends 5 rows before start of next one
+                            dtype=self.datatype if self.datatype=='complex' else 'float' # Default is int for thesdk_spicefile, let's infer from data
+                            queue = multiprocessing.Queue()
+                            queues.append(queue)
+                            proc = multiprocessing.Process(target=self.parse_io_from_file,args=(file,start,stop,dtype,labels[k],queue))
+                            procs.append(proc)
+                            proc.start() 
+                        for i,p in enumerate(procs):
+                            try:
+                                ret = queues[i].get()
+                                for item in ret:
+                                    self.parent.iofile_eventdict[item[0].upper()]=item[1]
+                                p.join()
+                            except KeyError:
+                                self.print_log(type='W', msg='Failed reading %s' % (ret[0]))
                 else:
                     self.print_log(type='W', msg='Couldn\'t read IOs from file %s. Missing ioname?' % file)
             elif self.parent.model == 'eldo':
@@ -357,6 +378,8 @@ class spice_iofile(iofile):
                     else:
                         self.print_log(type='W', msg='Label format mismatch with \'%s\'.' %  (label))
         else:
+            if len(self.file) == 0:
+                self.print_log(type='W', msg='No output file defined for IO %s. Check self.ionames!' % self.name)
             for i in range(len(self.file)):
                 try:
                     if self.iotype=='vsample':

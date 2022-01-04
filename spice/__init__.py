@@ -605,6 +605,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             if not os.path.exists(self._spicesrc):
                 self.print_log(type='W',msg='No source circuit found in %s.' % self._spicesrc)
         return self._spicesrc
+    @spicesrc.setter
+    def spicesrc(self,value): 
+            self._spicesrc = value
 
     @property
     def spicetbsrc(self):
@@ -818,6 +821,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                         first=False
                     if len(val.ionames) == 1:
                         try:
+                            try:
+                                tdiff = np.diff(self.iofile_eventdict[val.ionames[0].upper()][:,0])
+                                if np.any(tdiff == 0.0):
+                                        self.print_log(type='W', msg='Accuracy of output file is insufficient. Increase value of \'digits\' parameter and re-run simulation!')
+                            except TypeError: # Requested output wasn't in output file, do nothing
+                                pass
                             self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()]
                         except KeyError:
                             self.print_log(type='E',msg='Invalid ioname %s for iofile %s' % (val.ionames[0], name))
@@ -1008,13 +1017,14 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             Function for sorting the files in correct order
             Files that are output from simulation are of form
 
-            dcSweep-<integer>_oppoint.dc
+            SweepN-<integer>_SweepN+1-<integer>_ ... _oppoint.dc
 
             Strategy: extract integer from filename and sort based on the integer.
 
             '''
-            key=val.split('-')[1].split('_')[0]
-            return int(key)
+
+            keys = val.split('_')[:-1]
+            return sum([int(key.split('-')[-1]) for key in keys])
 
         try:
             if self.model=='spectre' and 'dc' in self.simcmd_bundle.Members.keys():
@@ -1022,12 +1032,14 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 # Get dc simulation file name
                 for name, val in self.simcmd_bundle.Members.items():
                     if name == 'dc':
-                        if val.sweep != '':
-                            fname = '%sSweep*.dc' % val.sweep
-                            break
+                        fname=''
+                        if len(val.sweep) != 0:
+                            for i in range(0, len(val.sweep)):
+                                fname += 'Sweep%d-[0-9]*_' % i
+                            fname+='oppoint.dc'
                         else:
                             fname = 'oppoint*.dc'
-                            break
+                        break
                 # For distributed runs
                 if self.distributed_run:
                     path=os.path.join(self.simpath,'tb_%s.raw' % self.name, '[0-9]*', fname)

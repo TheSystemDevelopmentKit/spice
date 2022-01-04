@@ -72,15 +72,17 @@ class spice_simcmd(thesdk):
             self.excludelist = [XTB_NAME*DUMMY_ID*],
 
         where DUMMY_ID is extraction tool / runset specific dummy identifier.
-    sweep : str
-        DC & Spectre models only. If given, sweeps the top-level parameter
-        given as value. For example::
+    sweep : List[str]
+        DC & Spectre models only. Name of parameter to be swept in DC analysis.
+        If given as a list, performs a nested sweep of the parameters defined
+        by the list (first element will be the outermost sweep).
+        For example:
         
             _spice_simcmd(sim='dc',sweep='temp',swpstart=27,swpstop=87)
         
-        sweeps the top-level parameter temp (temperature) from 27 to 87 at 10
+        sweeps the top-level parameter temp (temperature) from 27 to 87 in 10
         degree increments.
-    subcktname : str
+    subcktname : List[str]
         If given, sweeps the parameter defined by property sweep from the
         subcircuit given by this property. For example::
         
@@ -89,7 +91,7 @@ class spice_simcmd(thesdk):
         
         sweeps the Vb parameter from subcircuit XSUBCKT from 0.1 volts to 1.5
         volts with 0.05 volt increments.
-    devname : str
+    devname : List[str]
         If given, sweeps the parameter defined by property sweep from the
         device given by this property. For example::
         
@@ -165,12 +167,12 @@ class spice_simcmd(thesdk):
             self.sim = kwargs.get('sim','tran')
             self.plotlist = kwargs.get('plotlist',[])
             self.excludelist = kwargs.get('excludelist',[])
-            self.sweep = kwargs.get('sweep','')
-            self.subcktname = kwargs.get('subcktname','')
-            self.devname = kwargs.get('devname','')
-            self.swpstart = kwargs.get('swpstart',0)
-            self.swpstop = kwargs.get('swpstop',0)
-            self.swpstep = kwargs.get('swpstep',10)
+            self.sweep = kwargs.get('sweep',[])
+            self.subcktname = kwargs.get('subcktname',[])
+            self.devname = kwargs.get('devname',[])
+            self.swpstart = kwargs.get('swpstart',[0])
+            self.swpstop = kwargs.get('swpstop',[0])
+            self.swpstep = kwargs.get('swpstep',[10])
             self.tprint = kwargs.get('tprint',1e-12)
             self.tstop = kwargs.get('tstop',None)
             self.uic = kwargs.get('uic',False)
@@ -190,6 +192,9 @@ class spice_simcmd(thesdk):
         if hasattr(self.parent,'simcmd_bundle'):
             # This limits it to 1 of each simulation type. Is this ok?
             self.parent.simcmd_bundle.new(name=self.sim,val=self)
-        if self.subcktname != '' and self.devname != '':
+        if self.sim == 'dc' and self.parent.model=='spectre':
+            self.print_log(type='I', msg='Saving results in human-readable format (requirement for DC simulation)!')
+            self.parent.spiceoptions.update({'rawfmt': 'psfascii'})
+        if len(self.subcktname) != 0 and len(self.devname) != 0:
             self.print_log(type='F', msg='Cannot specify subckt sweep and device sweep in the same simcmd instance!')
 

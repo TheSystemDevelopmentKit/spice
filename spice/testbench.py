@@ -282,35 +282,36 @@ class testbench(spice_module):
         if not hasattr(self,'_dcsourcestr'):
             self._dcsourcestr = "%s DC sources\n" % self.parent.syntaxdict["commentchar"]
             for name, val in self.dcsources.Members.items():
+                value = val.value if val.paramname is None else val.paramname
                 supply = '%s%s' % (val.sourcetype.upper(),val.name.upper())
                 if self.parent.model == 'eldo':
                     if val.ramp == 0:
-                        self._dcsourcestr += "%s %s %s %g %s\n" % \
-                                (supply,val.pos,val.neg,val.value, \
+                        self._dcsourcestr += "%s %s %s %s %s\n" % \
+                                (supply,val.pos,val.neg,value, \
                                 'NONOISE' if not val.noise else '')
                     else:
                         self._dcsourcestr += "%s %s %s %s %s\n" % \
                                 (supply,val.pos,val.neg, \
-                                'pulse(0 %g 0 %g)' % (val.value,abs(val.ramp)), \
+                                'pulse(0 %g 0 %g)' % (value,abs(val.ramp)), \
                                 'NONOISE' if not val.noise else '')
                 elif self.parent.model == 'spectre':
                     if val.ramp == 0:
-                        self._dcsourcestr += "%s %s %s %s%g\n" % \
+                        self._dcsourcestr += "%s %s %s %s%s\n" % \
                                 (supply,self.esc_bus(val.pos),self.esc_bus(val.neg),\
-                                ('%ssource dc=' % val.sourcetype.lower()),val.value)
+                                ('%ssource dc=' % val.sourcetype.lower()),value)
                     else:
-                        self._dcsourcestr += "%s %s %s %s type=pulse val0=0 val1=%g rise=%g\n" % \
+                        self._dcsourcestr += "%s %s %s %s type=pulse val0=0 val1=%s rise=%g\n" % \
                                 (supply,self.esc_bus(val.pos),self.esc_bus(val.neg),\
-                                ('%ssource' % val.sourcetype.lower()),val.value,val.ramp)
+                                ('%ssource' % val.sourcetype.lower()),value,val.ramp)
                 elif self.parent.model == 'ngspice':
                     if val.ramp == 0:
-                        self._dcsourcestr += "%s %s %s %g %s\n" % \
-                                (supply,val.pos,val.neg,val.value, \
+                        self._dcsourcestr += "%s %s %s %s %s\n" % \
+                                (supply,val.pos,val.neg,value, \
                                 'NONOISE' if not val.noise else '')
                     else:
                         self._dcsourcestr += "%s %s %s %s %s\n" % \
                                 (supply,val.pos,val.neg, \
-                                'pulse(0 %g 0 %g)' % (val.value,abs(val.ramp)), \
+                                'pulse(0 %g 0 %g)' % (value,abs(val.ramp)), \
                                 'NONOISE' if not val.noise else '')
         return self._dcsourcestr
     @dcsourcestr.setter
@@ -338,7 +339,10 @@ class testbench(spice_module):
                     if val.iotype.lower()=='event':
                         for i in range(len(val.ionames)):
                             # Finding the max time instant
-                            maxtime = val.Data[-1,0]
+                            try:
+                                maxtime = val.Data[-1,0]
+                            except TypeError:
+                                self.print_log(type='F', msg='Input data not assinged to IO %s! Terminating.' % name)
                             if float(self._trantime) < float(maxtime):
                                 self._trantime = maxtime
                             # Adding the source
@@ -346,9 +350,14 @@ class testbench(spice_module):
                                 self._inputsignals += "%s%s %s 0 pwl(file=\"%s\")\n" % \
                                         (val.sourcetype.upper(),val.ionames[i].lower(),val.ionames[i].upper(),val.file[i])
                             elif self.parent.model=='spectre':
-                                self._inputsignals += "%s%s %s 0 %ssource type=pwl file=\"%s\"\n" % \
-                                        (val.sourcetype.upper(),self.esc_bus(val.ionames[i].lower()),
-                                        self.esc_bus(val.ionames[i]),val.sourcetype.lower(),val.file[i])
+                                if val.pos and val.neg:
+                                    self._inputsignals += "%s%s %s %s %ssource type=pwl file=\"%s\"\n" % \
+                                            (val.sourcetype.upper(),self.esc_bus(val.ionames[i].lower()),
+                                            self.esc_bus(val.pos), self.esc_bus(val.neg),val.sourcetype.lower(),val.file[i])
+                                else:
+                                    self._inputsignals += "%s%s %s 0 %ssource type=pwl file=\"%s\"\n" % \
+                                            (val.sourcetype.upper(),self.esc_bus(val.ionames[i].lower()),
+                                            self.esc_bus(val.ionames[i]),val.sourcetype.lower(),val.file[i])
                             elif self.parent.model=='ngspice':
                                 self._inputsignals += "a%s %%vd[%s 0] filesrc%s\n" % \
                                         (self.esc_bus(val.ionames[i].lower()),
@@ -532,24 +541,39 @@ class testbench(spice_module):
                     if self.parent.model=='eldo':
                         self._simcmdstr='.op'
                     elif self.parent.model=='spectre':
-                        if val.sweep == '': # This is not a sweep analysis
+                        if len(val.sweep) == 0: # This is not a sweep analysis
                             self._simcmdstr+='oppoint dc\n\n'
                         else:
                             if self.parent.distributed_run:
                                 distributestr = 'distribute=lsf numprocesses=%d' % self.parent.num_processes 
                             else:
                                 distributestr = ''
-                            if val.subcktname != '': # Sweep subckt parameter
-                                self._simcmdstr+='%sSweep sweep param=%s sub=%s start=%s stop=%s step=%s %s { \n' \
-                                    % (val.sweep, val.sweep, val.subcktname, val.swpstart, val.swpstop, val.swpstep, distributestr)
-                            elif val.devname != '': # Sweep device parameter
-                                self._simcmdstr+='%sSweep sweep param=%s dev=%s start=%s stop=%s step=%s %s { \n' \
-                                    % (val.sweep, val.sweep, val.devname, val.swpstart, val.swpstop, val.swpstep, distributestr)
+                            if len(val.subcktname) != 0: # Sweep subckt parameter
+                                length=len(val.subcktname)
+                                if any(len(lst) != length for lst in [val.sweep, val.swpstart, val.swpstop, val.swpstep]):
+                                    self.print_log(type='F', msg='Mismatch in length of simulation parameters.\nEnsure that sweep points and subcircuit names have the same number of elements!')
+                                for i in range(len(val.subcktname)):
+                                    self._simcmdstr+='Sweep%d sweep param=%s sub=%s start=%s stop=%s step=%s %s { \n' \
+                                        % (i, val.sweep[i], val.subcktname[i], val.swpstart[i], val.swpstop[i], val.swpstep[i], distributestr)
+                            elif len(val.devname) != 0: # Sweep device parameter
+                                length=len(val.devname)
+                                if any(len(lst) != length for lst in [val.sweep, val.swpstart, val.swpstop, val.swpstep]):
+                                    self.print_log(type='F', msg='Mismatch in length of simulation parameters.\nEnsure that sweep points and device names have the same number of elements!')
+                                for i in range(len(val.devname)):
+                                    self._simcmdstr+='Sweep%d sweep param=%s dev=%s start=%s stop=%s step=%s %s { \n' \
+                                        % (i, val.sweep[i], val.devname[i], val.swpstart[i], val.swpstop[i], val.swpstep[i], distributestr)
                             else: # Sweep top-level netlist parameter
-                                self._simcmdstr+='%sSweep sweep param=%s start=%s stop=%s step=%s %s { \n' \
-                                    % (val.sweep, val.sweep, val.swpstart, val.swpstop, val.swpstep, distributestr)
-                            self._simcmdstr+='\toppoint dc\n}\n\n'
-
+                                length=len(val.sweep)
+                                if any(len(lst) != length for lst in [val.swpstart, val.swpstop, val.swpstep]):
+                                    self.print_log(type='F', msg='Mismatch in length of simulation parameters.\nEnsure that sweep points and parameter names have the same number of elements!')
+                                for i in range(len(val.sweep)):
+                                    self._simcmdstr+='Sweep%d sweep param=%s start=%s stop=%s step=%s %s { \n' \
+                                        % (i, val.sweep[i], val.swpstart[i], val.swpstop[i], val.swpstep[i], distributestr)
+                            self._simcmdstr+='oppoint dc\n'
+                            # Closing brackets
+                            for j in range(i, -1, -1):
+                                self._simcmdstr+='}\n'
+                            self._simcmdstr+='\n'
                     else:
                         self.print_log(type='E',msg='Unsupported model %s.' % self.parent.model)
                 elif str(sim).lower() == 'ac':
@@ -668,6 +692,9 @@ class testbench(spice_module):
                         self._plotcmd += "run\n"
 
                     # Parsing output iofiles
+                    savestr=''
+                    plotstr=''
+                    first=True
                     for name, val in self.iofiles.Members.items():
                         # Output iofile becomes a plot/print command
                         if val.dir.lower()=='out' or val.dir.lower()=='output':
@@ -677,16 +704,21 @@ class testbench(spice_module):
                                     if self.parent.model=='eldo':
                                         self._plotcmd += '.printfile %s(%s) file=%s\n' % (val.sourcetype,signame,val.file[i])
                                     elif self.parent.model=='spectre':
-                                        self._plotcmd += 'save %s\n' % signame
-                                        self._plotcmd += 'simulator lang=spice\n'
-                                        self._plotcmd += '.option ingold 2\n'
-                                        # Implement complex value probing
-                                        if val.datatype.lower() == 'complex':
-                                            self._plotcmd += '.print %sr(%s) %si(%s) \n' % \
-                                                    (val.sourcetype,val.ionames[i],val.sourcetype,val.ionames[i])
+                                        if first:
+                                            savestr += 'save %s' % signame
+                                            if val.datatype.lower() == 'complex':
+                                                plotstr += '.print %sr(%s) %si(%s)' % \
+                                                        (val.sourcetype, val.ionames[i], val.sourcetype, val.ionames[i])
+                                            else:
+                                                plotstr += '.print %s(%s)' % (val.sourcetype, val.ionames[i])
+                                            first=False
                                         else:
-                                            self._plotcmd += '.print %s(%s)\n' % (val.sourcetype,val.ionames[i])
-                                        self._plotcmd += 'simulator lang=spectre\n'
+                                            savestr += ' %s' % signame
+                                            if val.datatype.lower() == 'complex':
+                                                plotstr += ' %sr(%s) %si(%s)' % \
+                                                        (val.sourcetype, val.ionames[i], val.sourcetype, val.ionames[i])
+                                            else:
+                                                plotstr += ' %s(%s)' % (val.sourcetype, val.ionames[i])
                                     elif self.parent.model=='ngspice':
                                         # Plots in tb only for interactive. Does not work in batch
                                         if self.parent.interactive_spice:
@@ -715,11 +747,13 @@ class testbench(spice_module):
                                     if trig not in self.parent.iofile_eventdict:
                                         self.parent.iofile_eventdict[trig] = None
                                         if self.parent.model=='spectre':
-                                            self._plotcmd += 'save %s\n' % self.esc_bus(trig)
-                                            self._plotcmd += 'simulator lang=spice\n'
-                                            self._plotcmd += '.option ingold 2\n'
-                                            self._plotcmd += '.print v(%s)\n' % trig
-                                            self._plotcmd += 'simulator lang=spectre\n'
+                                            if first:
+                                                savestr += 'save %s' % self.esc_bus(trig)
+                                                plotstr += '.print v(%s)' % (trig)
+                                                first=False
+                                            else:
+                                                savestr += ' %s' % self.esc_bus(trig) 
+                                                plotstr += ' v(%s)' % (trig)
                                         elif self.parent.model=='eldo':
                                             self._plotcmd += '.printfile %s(%s) file=%s\n' % (val.sourcetype,self.esc_bus(trig),val.file[i])
                                         elif self.parent.model=='ngspice':
@@ -738,11 +772,13 @@ class testbench(spice_module):
                                         if bitname not in self.parent.iofile_eventdict:
                                             self.parent.iofile_eventdict[bitname] = None
                                             if self.parent.model=='spectre':
-                                                self._plotcmd += 'save %s\n' % self.esc_bus(bitname)
-                                                self._plotcmd += 'simulator lang=spice\n'
-                                                self._plotcmd += '.option ingold 2\n'
-                                                self._plotcmd += '.print %s(%s)\n' % (val.sourcetype,bitname)
-                                                self._plotcmd += 'simulator lang=spectre\n'
+                                                if first:
+                                                    savestr += 'save %s' % self.esc_bus(bitname)
+                                                    plotstr += '.print %s(%s)' % (val.sourcetype, bitname)
+                                                    first=False
+                                                else:
+                                                    savestr += ' %s' % self.esc_bus(bitname)
+                                                    plotstr += ' %s(%s)' % (val.sourcetype, bitname)
                                             elif self.parent.model=='eldo':
                                                 self._plotcmd += '.printfile %s(%s) file=%s\n' % (val.sourcetype,self.esc_bus(bitname),val.file[i])
                                             elif self.parent.model=='ngspice':
@@ -762,11 +798,13 @@ class testbench(spice_module):
                                         # -> add to eventdict + save to output database
                                         self.parent.iofile_eventdict[val.ionames[i]] = None
                                         if self.parent.model == 'spectre':
-                                            self._plotcmd += 'save %s\n' % signame
-                                            self._plotcmd += 'simulator lang=spice\n'
-                                            self._plotcmd += '.option ingold 2\n'
-                                            self._plotcmd += '.print %s(%s)\n' % (val.sourcetype,val.ionames[i])
-                                            self._plotcmd += 'simulator lang=spectre\n'
+                                            if first:
+                                                savestr += 'save %s' % signame
+                                                plotstr += '.print %s(%s)' % (val.sourcetype, val.ionames[i])
+                                                first=False
+                                            else:
+                                                savestr += ' %s' % signame
+                                                plotstr += ' %s(%s)' % (val.sourcetype, val.ionames[i])
                                         elif self.parent.model == 'eldo':
                                             self._plotcmd += '.printfile %s(%s) file=%s\n' % (val.sourcetype,signame,val.file[i])
                                         elif self.parent.model == 'ngspice':
@@ -796,17 +834,27 @@ class testbench(spice_module):
                                 # Writing source current consumption to a file
                                 self._plotcmd += '.printfile I(%s) file=%s\n' % (supply,val.ext_file)
                             elif self.parent.model == 'spectre':
-                                self._plotcmd += 'save %s:pwr\n' % supply
-                                self._plotcmd += 'save %s:p\n' % supply
-                                self._plotcmd += 'simulator lang=spice\n'
-                                self._plotcmd += '.option ingold 2\n'
-                                self._plotcmd += '.print I(%s)\n' % supply
-                                self._plotcmd += 'simulator lang=spectre\n'
+                                if first:
+                                    savestr += 'save %s:pwr %s:p' % (supply,supply)
+                                    plotstr += '.print I(%s)' % (supply)
+                                    first=False
+                                else:
+                                    savestr += ' %s:pwr %s:p' % (supply,supply)
+                                    plotstr += ' I(%s)' % (supply)
                             elif self.parent.model == 'ngspice':
                                 # Plots in tb only for interactive. Does not work in batch
                                 if self.parent.interactive_spice:
                                     self._plotcmd += "plot I(%s)\n" % supply
                                 self._plotcmd += "wrdata %s I(%s)\n" % (val.ext_file,supply)
+                    # Output accumulated save and print statement to plotcmd
+                    if self.parent.model=='spectre':
+                        savestr += '\n'
+                        plotstr += '\n'
+                        self._plotcmd += savestr
+                        self._plotcmd += 'simulator lang=spice\n'
+                        self._plotcmd += '.option ingold 2\n'
+                        self._plotcmd += plotstr
+                        self._plotcmd += 'simulator lang=spectre\n'
             if self.parent.model=='ngspice':
                 self._plotcmd += ".endc\n"
         return self._plotcmd
