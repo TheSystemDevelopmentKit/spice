@@ -332,7 +332,6 @@ class testbench(spice_module):
         if not hasattr(self,'_inputsignals'):
             self._inputsignals = "%s Input signals\n" % self.parent.syntaxdict["commentchar"]
             for name, val in self.iofiles.Members.items():
-                self._trantime_name = name
                 # Input file becomes a source
                 if val.dir.lower()=='in' or val.dir.lower()=='input':
                     # Event signals are analog
@@ -344,6 +343,7 @@ class testbench(spice_module):
                             except TypeError:
                                 self.print_log(type='F', msg='Input data not assinged to IO %s! Terminating.' % name)
                             if float(self._trantime) < float(maxtime):
+                                self._trantime_name = name
                                 self._trantime = maxtime
                             # Adding the source
                             if self.parent.model=='eldo':
@@ -406,6 +406,7 @@ class testbench(spice_module):
                                 try:
                                     if float(self._trantime) < len(val.Data)/val.rs:
                                         self._trantime = len(val.Data)/val.rs
+                                        self._trantime_name = name
                                 except:
                                     pass
 
