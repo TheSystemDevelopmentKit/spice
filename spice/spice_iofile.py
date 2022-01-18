@@ -179,6 +179,7 @@ class spice_iofile(iofile):
         if self.iotype=='event' and self.dir=='out':
             self._file=list(set(self._file))
         return self._file
+
     @file.setter
     def file(self,val):
         self._file=val
@@ -605,3 +606,20 @@ class spice_iofile(iofile):
                 padded[:self.Data.shape[0],:self.Data.shape[1]] = self.Data
                 self.Data = padded
             self.Data = np.hstack((self.Data,arr))
+
+    # Remove the file when no longer needed
+    def remove(self):
+        '''Remove the files
+
+        '''
+        if self.preserve:
+            self.print_log(type="I", msg="Preserve_value is %s" %(self.preserve))
+            self.print_log(type="I", msg="Preserving file %s" %(self.file))
+        else:
+            try:
+                for fpath in self.file:
+                    os.remove(fpath)
+            except:
+                pass
+ 
+ 
