@@ -152,6 +152,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         if not hasattr(self,'_preserve_iofiles'):
             self._preserve_iofiles=False
         return self._preserve_iofiles
+
     @preserve_iofiles.setter
     def preserve_iofiles(self,value):
         self._preserve_iofiles=value
@@ -170,6 +171,61 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @preserve_spicefiles.setter
     def preserve_spicefiles(self,value):
         self._preserve_spicefiles=value
+
+
+    @property 
+    def spicesimpath(self):
+        if not hasattr(self,'_spicesimpath'):
+            self._spicesimpath=self.simpath
+        return self._spicesimpath
+
+    def delete_spicesimpath(self):
+        if os.path.exists(self.spicesimpath):
+            # This is used to check if the waveform database would prevent the deletion of the directory
+            keepdb = False
+            # Collect iofile filepaths not to delete them
+            iofilepaths = []
+            for name,val in self.iofile_bundle.Members.items():
+                for fpath in val.file:
+                    iofilepaths.append(fpath)
+            # Delete everything (conditionally skip iofiles or spicefiles)
+            for target in os.listdir(self.spicesimpath):
+                targetpath = '%s/%s' % (self.spicesimpath,target)
+                try:
+                    if targetpath not in iofilepaths:
+                        # Target is a spicefile (anything that isn't an iofile)
+                        if self.preserve_spicefiles:
+                            self.print_log(type='I',msg='Preserving %s' % targetpath)
+                        else:
+                            if targetpath == self.spicedbpath and self.interactive_spice:
+                                keepdb = True
+                                self.print_log(type='I', msg='Preserving %s due to interactive_spice' % targetpath)
+                                continue
+                            if os.path.isdir(targetpath):
+                                shutil.rmtree(targetpath)
+                            else:
+                                os.remove(targetpath)
+                            self.print_log(type='D',msg='Removing %s' % targetpath)
+                except:
+                    self.print_log(type='W',msg='Could not remove %s' % targetpath)
+            if not keepdb and not self.preserve_iofiles and not self.preserve_spicefiles:
+                try:
+                    # Eldo needs some time to disconnect from the jwdb server
+                    # Another dirty hack to check that the process is dead before cleaning
+                    # TODO: figure out if this can be prevented
+                    if self.model == 'eldo':
+                        self.print_log(type='I',msg='Waiting for Eldo to exit...')
+                        waittime = 0
+                        while os.system('pgrep \"easynch_64.exe\" >/dev/null') == 0:
+                            time.sleep(1)
+                            waittime += 1
+                            if waittime > 60:
+                                break
+                    shutil.rmtree(self.spicesimpath)
+                    self.print_log(type='D',msg='Removing %s/' % self.spicesimpath)
+                except:
+                    self.print_log(type='W',msg='Could not remove %s/' % self.spicesimpath)
+
 
     @property
     def distributed_run(self):
@@ -413,21 +469,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         self._iofile_eventdict=val
 
     @property
-    def iofile_bundle(self):
-        """ Bundle
-
-        A thesdk.Bundle containing `spice_iofile` objects. The `spice_iofile`
-        objects are automatically added to this Bundle, nothing should be
-        manually added.
-        """
-        if not hasattr(self,'_iofile_bundle'):
-            self._iofile_bundle=Bundle()
-        return self._iofile_bundle
-    @iofile_bundle.setter
-    def iofile_bundle(self,value):
-        self._iofile_bundle=value
-
-    @property
     def dcsource_bundle(self):
         """ Bundle
 
@@ -502,9 +543,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                             self._spice_submission = thesdk.GLOBALS['LSFINTERACTIVE'] + ' '
                         else: # Spectre LSF doesn't support interactive queues
                             self.print_log(type='W', msg='Cannot run in interactive mode if distributed mode is on!')
-                            self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.simpath)
+                            self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
                     else:
-                        self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.simpath)
+                        self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
 
             except:
                 self.print_log(type='W',msg='Error while defining spice submission command. Running locally.')
@@ -613,78 +654,23 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def spicetbsrc(self):
         """String
 
-        Path to the spice testbench ('<simpath>/tb_entityname.<suffix>').
+        Path to the spice testbench ('<spicesimpath>/tb_entityname.<suffix>').
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicetbsrc'):
-            self._spicetbsrc=self.simpath + '/tb_' + self.name + self.syntaxdict["cmdfile_ext"]
+            self._spicetbsrc=self.spicesimpath + '/tb_' + self.name + self.syntaxdict["cmdfile_ext"]
         return self._spicetbsrc
 
     @property
     def spicesubcktsrc(self):
         """String
 
-        Path to the parsed subcircuit file. ('<simpath>/subckt_entityname.<suffix>').
+        Path to the parsed subcircuit file. ('<spicesimpath>/subckt_entityname.<suffix>').
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicesubcktsrc'):
-            self._spicesubcktsrc=self.simpath + '/subckt_' + self.name + self.syntaxdict["cmdfile_ext"]
+            self._spicesubcktsrc=self.spicesimpath + '/subckt_' + self.name + self.syntaxdict["cmdfile_ext"]
         return self._spicesubcktsrc
-
-    @thesdk.simpath.deleter
-    def simpath(self):
-        if os.path.exists(self.simpath):
-            # This is used to check if the waveform database would prevent the deletion of the directory
-            keepdb = False
-            # Collect iofile filepaths to preserve them if requested
-            iofilepaths = []
-            for name,val in self.iofile_bundle.Members.items():
-                for fpath in val.file:
-                    iofilepaths.append(fpath)
-            # Delete everything (conditionally skip iofiles or spicefiles)
-            for target in os.listdir(self.simpath):
-                targetpath = '%s/%s' % (self.simpath,target)
-                try:
-                    if targetpath in iofilepaths:
-                        # Target is an iofile
-                        if self.preserve_iofiles:
-                            self.print_log(type='D',msg='Preserving %s' % targetpath)
-                        else:
-                            os.remove(targetpath)
-                            self.print_log(type='D',msg='Removing %s' % targetpath)
-                    else:
-                        # Target is a spicefile (anything that isn't an iofile)
-                        if self.preserve_spicefiles:
-                            self.print_log(type='D',msg='Preserving %s' % targetpath)
-                        else:
-                            if targetpath == self.spicedbpath and self.interactive_spice:
-                                keepdb = True
-                                self.print_log(msg='Preserving %s due to interactive_spice' % targetpath)
-                                continue
-                            if os.path.isdir(targetpath):
-                                shutil.rmtree(targetpath)
-                            else:
-                                os.remove(targetpath)
-                            self.print_log(type='D',msg='Removing %s' % targetpath)
-                except:
-                    self.print_log(type='W',msg='Could not remove %s' % targetpath)
-            if not keepdb and not self.preserve_iofiles and not self.preserve_spicefiles:
-                try:
-                    # Eldo needs some time to disconnect from the jwdb server
-                    # Another dirty hack to check that the process is dead before cleaning
-                    # TODO: figure out if this can be prevented
-                    if self.model == 'eldo':
-                        self.print_log(type='I',msg='Waiting for Eldo to exit...')
-                        waittime = 0
-                        while os.system('pgrep \"easynch_64.exe\" >/dev/null') == 0:
-                            time.sleep(1)
-                            waittime += 1
-                            if waittime > 60:
-                                break
-                    shutil.rmtree(self.simpath)
-                    self.print_log(type='D',msg='Removing %s/' % self.simpath)
-                except:
-                    self.print_log(type='W',msg='Could not remove %s/' % self.simpath)
 
     @property
     def spicecmd(self):
@@ -709,7 +695,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 spicesimcmd = "eldo -64b %s " % (nprocflag)
             elif self.model=='spectre':
                 spicesimcmd = ("spectre -64 +lqtimeout=0 ++aps=%s %s %s -outdir %s " 
-                        % (self.errpreset,plflag,nprocflag,self.simpath))
+                        % (self.errpreset,plflag,nprocflag,self.spicesimpath))
             elif self.model=='ngspice':
                 spicesimcmd = self.syntaxdict["simulatorcmd"] + ' '
             self._spicecmd = self.spice_submission+spicesimcmd+self.spicetbsrc
@@ -722,12 +708,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def spicedbpath(self):
         """String
 
-        Path to output waveform database. (<simpath>/tb_<entityname>.<resultfile_ext>)
+        Path to output waveform database. (<spicesimpath>/tb_<entityname>.<resultfile_ext>)
         For now only for spectre.
         This shouldn't be set manually.
         """
         if not hasattr(self,'_spicedbpath'):
-            self._spicedbpath=self.simpath+'/tb_'+self.name+self.syntaxdict["resultfile_ext"]
+            self._spicedbpath=self.spicesimpath+'/tb_'+self.name+self.syntaxdict["resultfile_ext"]
         return self._spicedbpath
     @spicedbpath.setter
     def spicedbpath(self, value):
@@ -756,7 +742,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         if not hasattr(self, '_plotprogcmd'):
             if self.plotprogram == 'ezwave':
                 self._plotprogcmd='%s -MAXWND -LOGfile %s/ezwave.log %s &' % \
-                        (self.plotprogram,self.simpath,self.spicedbpath)
+                        (self.plotprogram,self.spicesimpath,self.spicedbpath)
             elif self.plotprogram == 'viva':
                 self._plotprogcmd='%s -datadir %s -nocdsinit &' % \
                         (self.plotprogram,self.spicedbpath)
@@ -782,6 +768,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     @save_database.setter
     def save_database(self,value): 
         self._save_database=value
+
 
     def connect_spice_inputs(self):
         """Automatically called function to connect iofiles (inputs) to top
@@ -1042,10 +1029,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                         break
                 # For distributed runs
                 if self.distributed_run:
-                    path=os.path.join(self.simpath,'tb_%s.raw' % self.name, '[0-9]*', fname)
+                    path=os.path.join(self.spicesimpath,'tb_%s.raw' % self.name, '[0-9]*', fname)
                     files = sorted(glob.glob(path),key=sorter)
                 else:
-                    path=os.path.join(self.simpath,'tb_%s.raw' % self.name, fname)
+                    path=os.path.join(self.spicesimpath,'tb_%s.raw' % self.name, fname)
                     files = glob.glob(path)
                 valbegin = 'VALUE\n'
                 eof = 'END\n'
@@ -1124,4 +1111,5 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     except:
                         self.print_log(type='E',msg='Failed saving waveform database to %s/%s' % (self.statedir,dbname))
             # Clean simulation results
-            del self.simpath
+            self.delete_iofile_bundle()
+            self.delete_spicesimpath()
