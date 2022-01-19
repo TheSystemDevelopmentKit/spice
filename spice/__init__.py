@@ -494,18 +494,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         self._extracts=value
 
     @property 
-    def has_lsf(self):
-        """ True | False (default)
-
-        True if LSF submissions are properly defined.
-        """
-        if ( not thesdk.GLOBALS['LSFINTERACTIVE'] == '' ) and (not thesdk.GLOBALS['LSFSUBMISSION'] == ''):
-            self._has_lsf = True
-        else:
-            self._has_lsf = False
-        return self._has_lsf
-
-    @property 
     def spice_submission(self):
         """ String
 
@@ -530,6 +518,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                         self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
 
             except:
+                print(self.has_lsf)
                 self.print_log(type='W',msg='Error while defining spice submission command. Running locally.')
                 self._spice_submission=''
         return self._spice_submission
