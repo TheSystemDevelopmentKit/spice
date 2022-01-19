@@ -9,8 +9,6 @@ Provides utilities to import spice-like modules to Python environment and
 generate testbenches for the various simulation cases.
 
 Initially written by Okko Järvinen, 2019
-
-Release 1.6, Jun 2020 supports Eldo and Spectre
 """
 import os
 import sys
@@ -141,22 +139,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         self._syntaxdict=value
     #Name derived from the file
 
-    @property
-    def preserve_iofiles(self):  
-        """True | False (default)
-
-        If True, do not delete file IO files after simulations. Useful for
-        debugging the file IO.
-        
-        """
-        if not hasattr(self,'_preserve_iofiles'):
-            self._preserve_iofiles=False
-        return self._preserve_iofiles
-
-    @preserve_iofiles.setter
-    def preserve_iofiles(self,value):
-        self._preserve_iofiles=value
-        
     @property
     def preserve_spicefiles(self):  
         """True | False (default)
