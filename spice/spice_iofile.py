@@ -290,8 +290,13 @@ class spice_iofile(iofile):
             for i, label in enumerate(labels):
                 self.print_log(type='D',msg='Reading event output %s' % label)
                 if dtype=='complex': # Complex data has separate columns in file for real and imag parts
-                    temp=np.vstack((arr[:,0], arr[:,n+1]+1j*arr[:,n+2])).T
-                    n += 2
+                    try:
+                        temp=np.vstack((arr[:,0], arr[:,n+1]+1j*arr[:,n+2])).T
+                        n += 2
+                    except IndexError: # If the data isn't complex (might be the case if there is some real valued extract), parse as usual
+                        self.print_log(type='W', msg='Index overrange when reading data for output %s. Inferred datatype incorrect?' % label)
+                        temp = np.vstack((arr[:,0], arr[:,n+1])).T
+                        n += 1
                 else:
                     temp=np.vstack((arr[:,0], arr[:,n+1])).T
                     n += 1
@@ -326,7 +331,8 @@ class spice_iofile(iofile):
                             self.print_log(type='W', msg='Couldn\'t decode linenumber from file %s' %  file)
                         labelgrp=label_match.findall(parts[1])
                         if labelgrp:
-                            labels.append(labelgrp)
+                            tmp = list(dict.fromkeys(labelgrp))
+                            labels.append(tmp)
                         else:
                             self.print_log(type='W', msg='Couldn\'t find IO on line %d from file %s' %  (line,file))
                 if len(labels) == len(linenumbers):
