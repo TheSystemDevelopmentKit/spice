@@ -143,6 +143,8 @@ class spice_simcmd(thesdk):
         post-processing results in Python.
     mc_seed : int
         Random seed for the Monte Carlo instance. Default None (random seed).
+    model_info : bool
+        For Spectre only! If true, print model parameters to raw-file.
 
     Examples
     --------
@@ -181,6 +183,7 @@ class spice_simcmd(thesdk):
             self.cmin = kwargs.get('cmin',None)
             self.mc = kwargs.get('mc',False)
             self.mc_seed = kwargs.get('mc_seed',None)
+            self.model_info = kwargs.get('model_info', False)
             # Make list, if they are not already
             self.sweep = kwargs.get('sweep',[]) if type(kwargs.get('sweep', [])) == list else [kwargs.get('sweep')]
             self.subcktname = kwargs.get('subcktname',[]) if type(kwargs.get('subcktname', [])) == list else [kwargs.get('subcktname')]

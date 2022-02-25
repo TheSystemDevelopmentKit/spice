@@ -614,13 +614,14 @@ class testbench(spice_module):
                             self.print_log(type='F', msg='Unsupported frequency scale %s for AC simulation!' % val.fscale)
                         self._simcmdstr += '.ac %s %s %s' % \
                                 (pts_str,val.fmin,val.fmax)
+                    self._simcmdstr += '\n\n'
 
                 else:
                     self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
                 if val.mc and self.parent.model=='spectre':
                     self._simcmdstr += '}\n\n'
-        if self.parent.model=='spectre':
-            self._simcmdstr += 'element info what=inst where=rawfile \nmodelParameter info what=models where=rawfile\n\n'
+            if val.model_info and self.parent.model=='spectre':
+                self._simcmdstr += 'element info what=inst where=rawfile \nmodelParameter info what=models where=rawfile\n\n'
         return self._simcmdstr
     @simcmdstr.setter
     def simcmdstr(self,value):
