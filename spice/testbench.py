@@ -530,6 +530,10 @@ class testbench(spice_module):
                             self._simcmdstr += 'method=%s ' %  (str(val.method))
                         if val.cmin is not None:
                             self._simcmdstr += 'cmin=%s ' %  (str(val.cmin))
+                        if val.maxstep is not None:
+                            self._simcmdstr += 'maxstep=%s ' % (str(val.maxstep))
+                        if val.step is not None:
+                            self._simcmdstr += 'step=%s ' % (str(val.step))
                         self._simcmdstr += '\n\n' 
                     elif self.parent.model=='ngspice':
                         self._simcmdstr += '.%s %s %s %s\n' % \
