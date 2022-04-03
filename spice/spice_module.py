@@ -201,7 +201,7 @@ class spice_module(thesdk):
         Parameters
         ----------
         **kwargs:  
-            subckt : string
+                subckt : string
 
         """
         subckt=kwargs.get('subckt')
