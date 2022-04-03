@@ -198,9 +198,10 @@ class spice_module(thesdk):
         """ Method that parses the subcircuit definition and 
             constructs a subcircuit instance out of it
 
-            Parameters :
-            ------------
-                subckt : string
+        Parameters :
+        ------------
+        **kwargs:  
+            subckt : string
 
         """
         subckt=kwargs.get('subckt')
