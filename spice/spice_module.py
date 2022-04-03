@@ -195,7 +195,7 @@ class spice_module(thesdk):
         self._subckt=None
 
     def subinst_constructor(self,**kwargs):
-        """ Method that parses the subcircuit definition and 
+        ''' Method that parses the subcircuit definition and 
             constructs a subcircuit instance out of it
 
         Parameters :
@@ -203,7 +203,7 @@ class spice_module(thesdk):
         **kwargs:  
             subckt : string
 
-        """
+        '''
         subckt=kwargs.get('subckt')
         startmatch=re.compile(r"%s %s " %(self.parent.syntaxdict["subckt"], self.parent.name.upper())
                 ,re.IGNORECASE)
