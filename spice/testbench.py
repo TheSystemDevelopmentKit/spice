@@ -145,7 +145,7 @@ class testbench(spice_module):
                         self._libcmd = "*** Eldo device models\n"
                         self._libcmd += ".lib " + libfile + " " + corner + "\n"
                 except:
-                    self.print_log(type='W',msg='Global TheSDK variable ELDOLIBPATH not set.')
+                    self.print_log(type='W',msg='Global TheSDK variable ELDOLIBFILE not set.')
                     self._libcmd = "*** Eldo device models (undefined)\n"
                     self._libcmd += "*.lib " + libfile + " " + corner + "\n"
                 self._libcmd += ".temp " + str(temp) + "\n"
@@ -158,7 +158,7 @@ class testbench(spice_module):
                         self._libcmd = "// Spectre device models\n"
                         self._libcmd += 'include "%s" section=%s\n' % (libfile,corner)
                 except:
-                    self.print_log(type='W',msg='Global TheSDK variable SPECTRELIBPATH not set.')
+                    self.print_log(type='W',msg='Global TheSDK variable SPECTRELIBFILE not set.')
                     self._libcmd = "// Spectre device models (undefined)\n"
                     self._libcmd += "//include " + libfile + " " + corner + "\n"
                 self._libcmd += 'tempOption options temp=%s\n' % str(temp)
@@ -171,7 +171,7 @@ class testbench(spice_module):
                         self._libcmd = "*** Ngspice device models\n"
                         self._libcmd += ".lib " + libfile + " " + corner + "\n"
                 except:
-                    self.print_log(type='W',msg='Global TheSDK variable ELDOLIBPATH not set.')
+                    self.print_log(type='W',msg='Global TheSDK variable ELDOLIBFILE not set.')
                     self._libcmd = "*** Eldo device models (undefined)\n"
                     self._libcmd += "*.lib " + libfile + " " + corner + "\n"
                 self._libcmd += ".temp " + str(temp) + "\n"
