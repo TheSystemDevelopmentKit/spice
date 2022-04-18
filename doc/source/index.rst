@@ -1,39 +1,17 @@
-.. inverter documentation master file.
-   You can adapt this file completely to your liking, 
-   but it should at least contain the root `toctree` directive.
+.. rtl documentation master file, created by
+   sphinx-quickstart on Thu Aug 15 11:47:06 2019.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
+
+=============================================
+Spice Entity - Spice-like simulator interface
+=============================================
 
 .. toctree::
    :maxdepth: 3
    :caption: Contents:
 
-.. automodule:: spice
-   :members:
-   :undoc-members:
+   sections
 
-.. automodule:: spice.spice_iofile
-   :members:
-   :undoc-members:
+   indices_and_tables
 
-.. automodule:: spice.spice_simcmd
-   :members:
-   :undoc-members:
-
-.. automodule:: spice.spice_dcsource
-   :members:
-   :undoc-members:
-
-.. automodule:: spice.testbench
-   :members:
-   :undoc-members:
-
-.. automodule:: spice.spice_module
-   :members:
-   :undoc-members:
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
