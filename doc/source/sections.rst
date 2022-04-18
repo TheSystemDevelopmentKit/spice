@@ -1,3 +1,5 @@
+Spice simulator interface classess
+==================================
 .. automodule:: spice
    :members:
    :undoc-members:
