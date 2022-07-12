@@ -156,9 +156,18 @@ class testbench(spice_module):
                         raise ValueError
                     else:
                         self._libcmd = "// Spectre device models\n"
-                        self._libcmd += 'include "%s" section=%s\n' % (libfile,corner)
-                except:
-                    self.print_log(type='W',msg='Global TheSDK variable SPECTRELIBFILE not set.')
+                        files = libfile.split(',')
+                        if len(files)>1:
+                            if isinstance(corner,list) and len(files) == len(corner):
+                                for path,corn in zip(files,corner):
+                                    self._libcmd += 'include "%s" section=%s\n' % (path,corn)
+                            else:
+                                self.print_log(type='W',msg='Multiple entries in SPECTRELIBFILE but spicecorner wasn\'t a list or contained different number of elements!')
+                                self._libcmd += 'include "%s" section=%s\n' % (files[0], corner)
+                        else:
+                            self._libcmd += 'include "%s" section=%s\n' % (files[0], corner)
+                except ValueError:
+                    self.print_log(type='W',msg='Global TheSDK variable SPECTRELIBPATH not set.')
                     self._libcmd = "// Spectre device models (undefined)\n"
                     self._libcmd += "//include " + libfile + " " + corner + "\n"
                 self._libcmd += 'tempOption options temp=%s\n' % str(temp)
