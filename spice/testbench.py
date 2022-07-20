@@ -166,7 +166,7 @@ class testbench(spice_module):
                                 self._libcmd += 'include "%s" section=%s\n' % (files[0], corner)
                         else:
                             self._libcmd += 'include "%s" section=%s\n' % (files[0], corner)
-                except ValueError:
+                except:
                     self.print_log(type='W',msg='Global TheSDK variable SPECTRELIBPATH not set.')
                     self._libcmd = "// Spectre device models (undefined)\n"
                     self._libcmd += "//include " + libfile + " " + corner + "\n"
