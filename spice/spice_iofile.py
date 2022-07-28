@@ -229,6 +229,10 @@ class spice_iofile(iofile):
                     self.print_log(type='D',msg='Writing sample input %s' % self.file[i])
                     if not isinstance(self.Data,int):
                         # Input is a vector
+                        if self.Data.ndim == 1:
+                            self.print_log(type='W', msg='Data for io %s was flat, expected column vector. I\'ve reshaped it for you, but keep an eye out for odd behaviour!' % self.name)
+                            self.Data=self.Data.reshape(-1,1) # Is this quaranteed to be always correct!?
+                        rows, cols = self.Data.shape 
                         vec = self.Data[:,i]
                     else:
                         # Input is a scalar value
