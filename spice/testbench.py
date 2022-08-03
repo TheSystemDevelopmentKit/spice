@@ -145,7 +145,7 @@ class testbench(spice_module):
                         self._libcmd = "*** Eldo device models\n"
                         self._libcmd += ".lib " + libfile + " " + corner + "\n"
                 except:
-                    self.print_log(type='W',msg='Global TheSDK variable ELDOLIBPATH not set.')
+                    self.print_log(type='W',msg='Global TheSDK variable ELDOLIBFILE not set.')
                     self._libcmd = "*** Eldo device models (undefined)\n"
                     self._libcmd += "*.lib " + libfile + " " + corner + "\n"
                 self._libcmd += ".temp " + str(temp) + "\n"
@@ -156,7 +156,16 @@ class testbench(spice_module):
                         raise ValueError
                     else:
                         self._libcmd = "// Spectre device models\n"
-                        self._libcmd += 'include "%s" section=%s\n' % (libfile,corner)
+                        files = libfile.split(',')
+                        if len(files)>1:
+                            if isinstance(corner,list) and len(files) == len(corner):
+                                for path,corn in zip(files,corner):
+                                    self._libcmd += 'include "%s" section=%s\n' % (path,corn)
+                            else:
+                                self.print_log(type='W',msg='Multiple entries in SPECTRELIBFILE but spicecorner wasn\'t a list or contained different number of elements!')
+                                self._libcmd += 'include "%s" section=%s\n' % (files[0], corner)
+                        else:
+                            self._libcmd += 'include "%s" section=%s\n' % (files[0], corner)
                 except:
                     self.print_log(type='W',msg='Global TheSDK variable SPECTRELIBPATH not set.')
                     self._libcmd = "// Spectre device models (undefined)\n"
@@ -171,7 +180,7 @@ class testbench(spice_module):
                         self._libcmd = "*** Ngspice device models\n"
                         self._libcmd += ".lib " + libfile + " " + corner + "\n"
                 except:
-                    self.print_log(type='W',msg='Global TheSDK variable ELDOLIBPATH not set.')
+                    self.print_log(type='W',msg='Global TheSDK variable ELDOLIBFILE not set.')
                     self._libcmd = "*** Eldo device models (undefined)\n"
                     self._libcmd += "*.lib " + libfile + " " + corner + "\n"
                 self._libcmd += ".temp " + str(temp) + "\n"
@@ -530,6 +539,10 @@ class testbench(spice_module):
                             self._simcmdstr += 'method=%s ' %  (str(val.method))
                         if val.cmin is not None:
                             self._simcmdstr += 'cmin=%s ' %  (str(val.cmin))
+                        if val.maxstep is not None:
+                            self._simcmdstr += 'maxstep=%s ' % (str(val.maxstep))
+                        if val.step is not None:
+                            self._simcmdstr += 'step=%s ' % (str(val.step))
                         self._simcmdstr += '\n\n' 
                     elif self.parent.model=='ngspice':
                         self._simcmdstr += '.%s %s %s %s\n' % \
@@ -614,13 +627,14 @@ class testbench(spice_module):
                             self.print_log(type='F', msg='Unsupported frequency scale %s for AC simulation!' % val.fscale)
                         self._simcmdstr += '.ac %s %s %s' % \
                                 (pts_str,val.fmin,val.fmax)
+                    self._simcmdstr += '\n\n'
 
                 else:
                     self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
                 if val.mc and self.parent.model=='spectre':
                     self._simcmdstr += '}\n\n'
-        if self.parent.model=='spectre':
-            self._simcmdstr += 'element info what=inst where=rawfile \nmodelParameter info what=models where=rawfile\n\n'
+            if val.model_info and self.parent.model=='spectre':
+                self._simcmdstr += 'element info what=inst where=rawfile \nmodelParameter info what=models where=rawfile\n\n'
         return self._simcmdstr
     @simcmdstr.setter
     def simcmdstr(self,value):

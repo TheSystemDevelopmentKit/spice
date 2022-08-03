@@ -143,6 +143,12 @@ class spice_simcmd(thesdk):
         post-processing results in Python.
     mc_seed : int
         Random seed for the Monte Carlo instance. Default None (random seed).
+    model_info : bool
+        For Spectre only! If true, print model parameters to raw-file.
+    maxstep : float
+        Maximum time step Spectre simulator will use during transient analysis
+    step: float
+        According to Spectre: minimum time step used by the simulator solely to maintain the aesthetics of the computed waveforms.
 
     Examples
     --------
@@ -167,12 +173,6 @@ class spice_simcmd(thesdk):
             self.sim = kwargs.get('sim','tran')
             self.plotlist = kwargs.get('plotlist',[])
             self.excludelist = kwargs.get('excludelist',[])
-            self.sweep = kwargs.get('sweep',[])
-            self.subcktname = kwargs.get('subcktname',[])
-            self.devname = kwargs.get('devname',[])
-            self.swpstart = kwargs.get('swpstart',[0])
-            self.swpstop = kwargs.get('swpstop',[0])
-            self.swpstep = kwargs.get('swpstep',[10])
             self.tprint = kwargs.get('tprint',1e-12)
             self.tstop = kwargs.get('tstop',None)
             self.uic = kwargs.get('uic',False)
@@ -187,7 +187,18 @@ class spice_simcmd(thesdk):
             self.cmin = kwargs.get('cmin',None)
             self.mc = kwargs.get('mc',False)
             self.mc_seed = kwargs.get('mc_seed',None)
+            self.model_info = kwargs.get('model_info', False)
+            self.step = kwargs.get('step', None)
+            self.maxstep = kwargs.get('maxstep', None)
+            # Make list, if they are not already
+            self.sweep = kwargs.get('sweep',[]) if type(kwargs.get('sweep', [])) == list else [kwargs.get('sweep')]
+            self.subcktname = kwargs.get('subcktname',[]) if type(kwargs.get('subcktname', [])) == list else [kwargs.get('subcktname')]
+            self.devname = kwargs.get('devname',[]) if type(kwargs.get('devname', [])) == list else [kwargs.get('devname')]
+            self.swpstart = kwargs.get('swpstart',[]) if type(kwargs.get('swpstart', [])) == list else [kwargs.get('swpstart')]
+            self.swpstop = kwargs.get('swpstop',[]) if type(kwargs.get('swpstop', [])) == list else [kwargs.get('swpstop')]
+            self.swpstep = kwargs.get('swpstep',[]) if type(kwargs.get('swpstep', [])) == list else [kwargs.get('swpstep')]
         except:
+            self.print_log(type='E',msg=traceback.format_exc())
             self.print_log(type='F', msg="Simulation command definition failed.")
         if hasattr(self.parent,'simcmd_bundle'):
             # This limits it to 1 of each simulation type. Is this ok?

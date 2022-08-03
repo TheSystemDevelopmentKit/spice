@@ -13,6 +13,7 @@ import os
 import sys
 import subprocess
 import multiprocessing
+from time import sleep
 import pdb
 from abc import * 
 from thesdk import *
@@ -228,6 +229,10 @@ class spice_iofile(iofile):
                     self.print_log(type='D',msg='Writing sample input %s' % self.file[i])
                     if not isinstance(self.Data,int):
                         # Input is a vector
+                        if self.Data.ndim == 1:
+                            self.print_log(type='W', msg='Data for io %s was flat, expected column vector. I\'ve reshaped it for you, but keep an eye out for odd behaviour!' % self.name)
+                            self.Data=self.Data.reshape(-1,1) # Is this quaranteed to be always correct!?
+                        rows, cols = self.Data.shape 
                         vec = self.Data[:,i]
                     else:
                         # Input is a scalar value
@@ -290,8 +295,13 @@ class spice_iofile(iofile):
             for i, label in enumerate(labels):
                 self.print_log(type='D',msg='Reading event output %s' % label)
                 if dtype=='complex': # Complex data has separate columns in file for real and imag parts
-                    temp=np.vstack((arr[:,0], arr[:,n+1]+1j*arr[:,n+2])).T
-                    n += 2
+                    try:
+                        temp=np.vstack((arr[:,0], arr[:,n+1]+1j*arr[:,n+2])).T
+                        n += 2
+                    except IndexError: # If the data isn't complex (might be the case if there is some real valued extract), parse as usual
+                        self.print_log(type='W', msg='Index overrange when reading data for output %s. Inferred datatype incorrect?' % label)
+                        temp = np.vstack((arr[:,0], arr[:,n+1])).T
+                        n += 1
                 else:
                     temp=np.vstack((arr[:,0], arr[:,n+1])).T
                     n += 1
@@ -311,12 +321,27 @@ class spice_iofile(iofile):
             file=self.file[0] # File is the same for all event type outputs
             label_match=re.compile(r'\(([^)]+)\)') # Match one or more characters that are not ) and capture.
             if self.parent.model in ['spectre','ngspice']:
-                lines=subprocess.check_output('grep -n \"time\|freq\" %s | sed \'s/^\([0-9]\+\):/\\1|/\'' % file, shell=True).decode('utf-8')
-                lines=lines.split('\n') 
+                for i in range(5):
+                    # Try to find the lines of print file where data headers are defined. The file may contain multiple header lines, depending on the number of save statements
+                    block_count=subprocess.check_output('grep -n \"time\|freq\" %s | sed \'s/^\([0-9]\+\):/\\1|/\'' % file, shell=True).decode('utf-8')
+                    # If not found, wait 2 sec, try again (it may take some time for the file to show up on disk)
+                    if not block_count:
+                        sleep(2)
+                        self.print_log(type='D', msg='.print file not found %s after %d seconds, trying again in 2 seconds.' % ('/' + '/'.join(file.split('/')[:-1]), i*2))
+                    else: # Found the block count
+                        break
+                if not block_count: 
+                    # We couldn't find the block count, exit
+                    if os.path.isfile(file):
+                        self.print_log(type='F', msg='Missing header row(s) from .print file!')
+                    else:
+                        self.print_log(type='F', msg='.print file at %s doesn\'t exist!' % file)
+                blocks=block_count.split('\n') 
                 linenumbers=[]
                 labels=[]
-                for line in lines:
-                    parts=line.split('|')
+                # Parse linenumbers of header blocks
+                for block in blocks:
+                    parts=block.split('|')
                     if len(parts) > 1: # Line should now contain linenumber in first element, ioname in second
                         line = 0
                         try:
@@ -324,13 +349,19 @@ class spice_iofile(iofile):
                             linenumbers.append(line)
                         except ValueError:
                             self.print_log(type='W', msg='Couldn\'t decode linenumber from file %s' %  file)
-                        labelgrp=label_match.findall(parts[1])
+                        labelgrp=label_match.findall(parts[1]) # Parse IO labels (nodenames)
                         if labelgrp:
-                            labels.append(labelgrp)
+                            tmp = list(dict.fromkeys(labelgrp))
+                            labels.append(tmp)
                         else:
                             self.print_log(type='W', msg='Couldn\'t find IO on line %d from file %s' %  (line,file))
                 if len(labels) == len(linenumbers):
-                    numlines = int(subprocess.check_output("wc -l %s | awk '{print $1}'" % file,shell=True).decode('utf-8'))
+                    try:
+                        numlines = int(subprocess.check_output("wc -l %s | awk '{print $1}'" % file,shell=True).decode('utf-8'))
+                    except FileNotFoundError as e:
+                        self.print_log(type='F', msg='Print-file doesn\'t exist! Invalid node names in saves statement?')
+                    except ValueError as e:
+                        self.print_log(type='F', msg='Print-file doesn\'t exist! Invalid node names in saves statement?')
                     # Maximum number of concurrent open files. This may or may not help with "too many open files" -error.
                     num_parallel = 50
                     num_loops = int(np.ceil(len(linenumbers)/num_parallel))
