@@ -190,6 +190,7 @@ class spice_simcmd(thesdk):
             self.model_info = kwargs.get('model_info', False)
             self.step = kwargs.get('step', None)
             self.maxstep = kwargs.get('maxstep', None)
+            self.strobeperiod = kwargs.get('strobeperiod', None)
             # Make list, if they are not already
             self.sweep = kwargs.get('sweep',[]) if type(kwargs.get('sweep', [])) == list else [kwargs.get('sweep')]
             self.subcktname = kwargs.get('subcktname',[]) if type(kwargs.get('subcktname', [])) == list else [kwargs.get('subcktname')]

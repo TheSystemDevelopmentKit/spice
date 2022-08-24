@@ -785,7 +785,30 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                                         self.print_log(type='W', msg='Accuracy of output file is insufficient. Increase value of \'digits\' parameter and re-run simulation!')
                             except TypeError: # Requested output wasn't in output file, do nothing
                                 pass
-                            self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()]
+                            # TODO:
+                            # this is because the strobeoutput
+                            # parameter for some reason still outputs
+                            # all the data points, even when it is in mode
+                            # strobeonly
+                            # If solution is found to this later from simulator
+                            # remove this.
+                            if self.model == 'spectre':
+                                if 'strobeperiod' in self.tb.simcmdstr:
+                                    maxtime = np.max(self.iofile_eventdict[val.ionames[0].upper()][:,0])
+                                    mintime = np.min(self.iofile_eventdict[val.ionames[0].upper()][:,0])
+                                    for simulationcommand, simulationoption in self.simcmd_bundle.Members.items():
+                                        strobeperiod = simulationoption.strobeperiod
+                                    strobetimestamps = np.arange(mintime,maxtime,strobeperiod)
+                                    # get the number of decimals for rounding to fix bug of
+                                    # missing points
+                                    rounder=int(str(strobeperiod)[-2:])
+                                    idx=np.where(np.in1d(self.iofile_eventdict[val.ionames[0].upper()][:,0],
+                                        np.round(strobetimestamps,rounder)))
+                                    self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()][idx]
+                                else:
+                                    self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()]
+                            else:
+                                self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()]
                         except KeyError:
                             self.print_log(type='E',msg='Invalid ioname %s for iofile %s' % (val.ionames[0], name))
                     else: # Iofile is a bus?
