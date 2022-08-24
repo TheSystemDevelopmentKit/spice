@@ -794,17 +794,31 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                             # remove this.
                             if self.model == 'spectre':
                                 if 'strobeperiod' in self.tb.simcmdstr:
-                                    maxtime = np.max(self.iofile_eventdict[val.ionames[0].upper()][:,0])
-                                    mintime = np.min(self.iofile_eventdict[val.ionames[0].upper()][:,0])
+                                    tvals=self.iofile_eventdict[val.ionames[0].upper()][:,0]
+                                    maxtime = np.max(tvals)
+                                    mintime = np.min(tvals)
                                     for simulationcommand, simulationoption in self.simcmd_bundle.Members.items():
                                         strobeperiod = simulationoption.strobeperiod
                                     strobetimestamps = np.arange(mintime,maxtime,strobeperiod)
                                     # get the number of decimals for rounding to fix bug of
                                     # missing points
-                                    rounder=int(str(strobeperiod)[-2:])
-                                    idx=np.where(np.in1d(self.iofile_eventdict[val.ionames[0].upper()][:,0],
+                                    rounder=int(str(strobeperiod)[-2:])+1
+                                    idx=np.where(np.in1d(np.round(tvals,rounder),
                                         np.round(strobetimestamps,rounder)))
-                                    self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()][idx]
+                                    
+                                    new_array=self.iofile_eventdict[val.ionames[0].upper()][idx]
+
+                                    # For initial debug
+                                    if len(strobetimestamps)!=len(new_array):
+                                        self.print_log(type='W',
+                                                msg='Oh no, something went wrong while reading the strobeperiod data')
+                                        self.print_log(type='W',
+                                                msg='Check data lenghts!')
+                                        pdb.set_trace()
+                                        self.print_log(type='E',
+                                                msg='The length of strobeperiod data is incorrect.')
+
+                                    self.iofile_bundle.Members[name].Data= new_array
                                 else:
                                     self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()]
                             else:
