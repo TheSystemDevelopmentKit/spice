@@ -43,11 +43,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         pass
 
     @property
-    @abstractmethod
-    def _classfile(self):
-        return os.path.dirname(os.path.realpath(__file__)) + "/"+__name__
-
-    @property
     def si_prefix_mult(self):
         """ Dictionary
         
