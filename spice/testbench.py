@@ -544,7 +544,7 @@ class testbench(spice_module):
                         if val.step is not None:
                             self._simcmdstr += 'step=%s ' % (str(val.step))
                         if val.strobeperiod is not None:
-                            self._simcmdstr += 'strobeperiod=%s ' % (str(val.strobeperiod))
+                            self._simcmdstr += 'strobeperiod=%s strobeoutput=strobeonly ' % (str(val.strobeperiod))
                         self._simcmdstr += '\n\n' 
                     elif self.parent.model=='ngspice':
                         self._simcmdstr += '.%s %s %s %s\n' % \

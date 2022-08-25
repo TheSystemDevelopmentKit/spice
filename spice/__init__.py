@@ -805,20 +805,16 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                                     rounder=int(str(strobeperiod)[-2:])+1
                                     idx=np.where(np.in1d(np.round(tvals,rounder),
                                         np.round(strobetimestamps,rounder)))
-                                    
                                     new_array=self.iofile_eventdict[val.ionames[0].upper()][idx]
-
+                                    _,idx=np.unique(np.round(new_array[:,0],rounder-1),return_index=True)
+                                    new_array=new_array[idx]
                                     # For initial debug
                                     if len(strobetimestamps)!=len(new_array):
                                         self.print_log(type='W',
                                                 msg='Oh no, something went wrong while reading the strobeperiod data')
                                         self.print_log(type='W',
                                                 msg='Check data lenghts!')
-                                        pdb.set_trace()
-                                        self.print_log(type='E',
-                                                msg='The length of strobeperiod data is incorrect.')
-
-                                    self.iofile_bundle.Members[name].Data= new_array
+                                    self.iofile_bundle.Members[name].Data=new_array
                                 else:
                                     self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()]
                             else:
