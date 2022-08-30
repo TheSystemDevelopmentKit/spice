@@ -585,31 +585,35 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def spicesrcpath(self):
         """String
 
-        Path to the spice source of the entity ('./spice').
+        Path to the spice source of the entity. Can be set manually to desired location.
+        This variable provides the dspf-parasitic netlist filepath.
+
+        Default: <entity path>/spice
         """
-        self._spicesrcpath  =  self.entitypath + '/spice'
-        try:
-            if not (os.path.exists(self._spicesrcpath)):
-                os.makedirs(self._spicesrcpath)
-                self.print_log(type='I',msg='Creating %s.' % self._spicesrcpath)
-        except:
-            self.print_log(type='E',msg='Failed to create %s.' % self._spicesrcpath)
+        if not hasattr(self, '_spicesrcpath'):
+            self._spicesrcpath  =  self.entitypath + '/spice'
+            try:
+                if not (os.path.exists(self._spicesrcpath)):
+                    os.makedirs(self._spicesrcpath)
+                    self.print_log(type='I',msg='Creating %s.' % self._spicesrcpath)
+            except:
+                self.print_log(type='E',msg='Failed to create %s.' % self._spicesrcpath)
         return self._spicesrcpath
+    @spicesrcpath.setter
+    def spicesrcpath(self,value): 
+            self._spicesrcpath = value
 
     @property
     def spicesrc(self):
         """String
 
-        Path to the source netlist (i.e. 'spice/entityname.scs').
-        This shouldn't be set manually.
+        Path to the source netlist. Can be set manually to desired location.
+        
+        Default: 'spice/entityname.scs'
 
-        .. note::
 
-            Provided netlist name has to match entity name (entityname.scs or entityname.cir).
-
-        .. note::
-            
-            Netlist has to contain the top-level design as a subcircuit definition.
+        N.B!:
+            Netlist has to contain the top-level design as a subcircuit definition!
         """
         if not hasattr(self, '_spicesrc'):
             self._spicesrc=self.spicesrcpath + '/' + self.name + self.syntaxdict["cmdfile_ext"]
