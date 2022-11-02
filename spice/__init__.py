@@ -740,6 +740,20 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def save_database(self,value): 
         self._save_database=value
 
+    @property
+    def relerr(self):
+        """ Number (default 1e-3)
+
+        Sets the relative error allowed for parsing the data when strobing
+        """
+        if not hasattr(self, '_relerr'):
+            self._relerr=1e-3
+        return self._relerr
+    @relerr.setter
+    def relerr(self, value):
+        self._relerr=value
+
+
 
     def connect_spice_inputs(self):
         """Automatically called function to connect iofiles (inputs) to top
@@ -800,15 +814,28 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                                     for simulationcommand, simulationoption in self.simcmd_bundle.Members.items():
                                         strobeperiod = simulationoption.strobeperiod
                                     strobetimestamps = np.arange(mintime,maxtime,strobeperiod)
-                                    # get the number of decimals for rounding to fix bug of
-                                    # missing points
-                                    rounder=int(str(strobeperiod)[-2:])+1
-                                    idx=np.where(np.in1d(np.round(tvals,rounder),
-                                        np.round(strobetimestamps,rounder)))
-                                    new_array=self.iofile_eventdict[val.ionames[0].upper()][idx]
-                                    _,idx=np.unique(np.round(new_array[:,0],rounder-1),return_index=True)
-                                    new_array=new_array[idx]
-                                    # For initial debug
+                                    step = strobetimestamps[1]-strobetimestamps[0]
+                                    #relative tolerable error in the timestep. Values outside of this rage will be discarded.
+                                    steplow=(strobetimestamps-self.relerr*step).reshape(-1,1)
+                                    stephigh=(strobetimestamps+self.relerr*step).reshape(-1,1)
+                                    stepspec=np.r_['1',steplow,stephigh]
+                                    #b=filter(lambda val: val > strobetimestamps[0,0] and val < strobetimestamps[0,1], a) 
+                                    #
+                                    def cond(test,val):
+                                        if val >= test[0] and val <= test[1]:
+                                            return True
+                                        else: 
+                                            return False
+                                    new_array =self.iofile_eventdict[val.ionames[0].upper()]
+                                    #This loops through the values of A only once.
+                                    rowselect=[ False for x in range(new_array.shape[0])]
+                                    selectorindex=0
+                                    for index in range(new_array.shape[0]-1):
+                                        if stepspec[selectorindex,0] < new_array[index,0] < stepspec[selectorindex,1]:
+                                            rowselect[index]=True
+                                            selectorindex += 1
+                                    #np.compress(bool vector satisfying stepspec.new_array,axis=0)
+                                    new_array=np.compress(rowselect,new_array,axis=0)
                                     if len(strobetimestamps)!=len(new_array):
                                         self.print_log(type='W',
                                                 msg='Oh no, something went wrong while reading the strobeperiod data')
