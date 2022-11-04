@@ -19,6 +19,7 @@ import shutil
 import time
 import traceback
 import threading
+import timeit
 from datetime import datetime
 from abc import * 
 from thesdk import *
@@ -785,6 +786,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """Automatically called function to call read() functions of each
         iofile with direction 'output'."""
         first=True
+        magic = []
         for name, val in self.iofile_bundle.Members.items():
             if val.dir.lower()=='out' or val.dir.lower()=='output':
                 if val.iotype=='event': # Event type outs are in same file, read only once to speed up things
@@ -808,40 +810,40 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                             # remove this.
                             if self.model == 'spectre':
                                 if 'strobeperiod' in self.tb.simcmdstr:
-                                    tvals=self.iofile_eventdict[val.ionames[0].upper()][:,0]
-                                    maxtime = np.max(tvals)
-                                    mintime = np.min(tvals)
-                                    for simulationcommand, simulationoption in self.simcmd_bundle.Members.items():
-                                        strobeperiod = simulationoption.strobeperiod
-                                    strobetimestamps = np.arange(mintime,maxtime,strobeperiod)
-                                    step = strobetimestamps[1]-strobetimestamps[0]
-                                    #relative tolerable error in the timestep. Values outside of this rage will be discarded.
-                                    steplow=(strobetimestamps-self.relerr*step).reshape(-1,1)
-                                    stephigh=(strobetimestamps+self.relerr*step).reshape(-1,1)
-                                    stepspec=np.r_['1',steplow,stephigh]
-                                    #b=filter(lambda val: val > strobetimestamps[0,0] and val < strobetimestamps[0,1], a) 
-                                    #
-                                    def cond(test,val):
-                                        if val >= test[0] and val <= test[1]:
-                                            return True
-                                        else: 
-                                            return False
-                                    new_array =self.iofile_eventdict[val.ionames[0].upper()]
-                                    #This loops through the values of A only once.
-                                    rowselect=[ False for x in range(new_array.shape[0])]
-                                    selectorindex=0
-                                    for index in range(new_array.shape[0]-1):
-                                        if stepspec[selectorindex,0] < new_array[index,0] < stepspec[selectorindex,1]:
-                                            rowselect[index]=True
-                                            selectorindex += 1
-                                    #np.compress(bool vector satisfying stepspec.new_array,axis=0)
-                                    new_array=np.compress(rowselect,new_array,axis=0)
-                                    if len(strobetimestamps)!=len(new_array):
-                                        self.print_log(type='W',
-                                                msg='Oh no, something went wrong while reading the strobeperiod data')
-                                        self.print_log(type='W',
-                                                msg='Check data lenghts!')
-                                    self.iofile_bundle.Members[name].Data=new_array
+                                    if len(magic)==0:
+                                        tvals=self.iofile_eventdict[val.ionames[0].upper()][:,0]
+                                        maxtime = np.max(tvals)
+                                        mintime = np.min(tvals)
+                                        for simulationcommand, simulationoption in self.simcmd_bundle.Members.items():
+                                            strobeperiod = simulationoption.strobeperiod
+                                        strobetimestamps = np.arange(mintime,maxtime,strobeperiod)
+                                        magic=np.zeros(len(strobetimestamps)) # indexes to take the values
+                                        seg=300 # length of a segment in the for loop (how many samples at a time)
+                                        idxmin=0
+                                        l=len(strobetimestamps)
+                                        nseg=l//seg # number of segments, rounded down (how many loops required)
+                                        idxmax=0
+                                        for i in np.arange(1,nseg):
+                                            idxmax=(i-1)*seg+np.argmin(abs(tvals[(i-1)*seg:]-strobetimestamps[i*seg])) # find index of the received signal which corresponds to the largest value in reference
+                                            ind=idxmin+abs(strobetimestamps[seg*(i-1):seg*(i),None]-tvals[None,idxmin:idxmax]).argmin(axis=-1) # take index for the seg's values
+                                            idxmin=idxmax
+                                            magic[seg*(i-1):seg*i]=ind  
+                                        # again just in case that the loop does not overflow to take the final samples into account
+                                        idxmax=len(tvals)-1
+                                        ind=idxmin+abs(strobetimestamps[seg*(i):,None]-tvals[None,idxmin:idxmax]).argmin(axis=-1)
+                                        idxmin=idxmax
+                                        magic[seg*(i):]=ind
+                                        magic=magic.astype(int)
+                                        new_array =self.iofile_eventdict[val.ionames[0].upper()][magic]
+                                        if len(strobetimestamps)!=len(new_array):
+                                            self.print_log(type='W',
+                                                    msg='Oh no, something went wrong while reading the strobeperiod data')
+                                            self.print_log(type='W',
+                                                    msg='Check data lenghts!')
+                                        self.iofile_bundle.Members[name].Data=new_array
+                                    else:
+                                        new_array =self.iofile_eventdict[val.ionames[0].upper()][magic]
+                                        self.iofile_bundle.Members[name].Data=new_array
                                 else:
                                     self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()]
                             else:
