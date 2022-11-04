@@ -286,7 +286,8 @@ class spice_iofile(iofile):
         """
         stack = [(label, None) for label in labels]
         try:
-            arr=np.genfromtxt(filepath,dtype=dtype,skip_header=start,skip_footer=stop,encoding='utf-8')
+            arr=pd.read_csv(filepath,skiprows=start,delim_whitespace=True,
+                    encoding='utf-8',engine='c').to_numpy()[:-stop].astype(dtype)
         except:
             self.print_log(type='E',msg=traceback.format_exc())
             self.print_log(type='F',msg='Failed while reading files for %s.' % self.name)
