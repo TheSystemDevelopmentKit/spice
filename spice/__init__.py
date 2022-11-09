@@ -741,21 +741,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def save_database(self,value): 
         self._save_database=value
 
-    @property
-    def relerr(self):
-        """ Number (default 1e-3)
-
-        Sets the relative error allowed for parsing the data when strobing
-        """
-        if not hasattr(self, '_relerr'):
-            self._relerr=1e-3
-        return self._relerr
-    @relerr.setter
-    def relerr(self, value):
-        self._relerr=value
-
-
-
     def connect_spice_inputs(self):
         """Automatically called function to connect iofiles (inputs) to top
         entity IOS Bundle items."""
@@ -834,7 +819,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                                         idxmin=idxmax
                                         magic[seg*(i):]=ind
                                         magic=magic.astype(int)
-                                        magic=magic[:-1]
                                         new_array =self.iofile_eventdict[val.ionames[0].upper()][magic]
                                         if len(strobetimestamps)-1!=len(new_array):
                                             self.print_log(type='W',
