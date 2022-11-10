@@ -778,6 +778,37 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self.print_log(type='W', msg='load_output_file set to True! This will rewrite the entity state on disk!')
         self._load_output_file=value
 
+
+    @property
+    def strobe_indices(self):
+        """
+        Internally set list of indices corresponding to time,amplitude pairs
+        whose time value of is a multiple of the strobeperiod (see spice_simcmd).
+        """
+        if not hasattr(self,'_strobe_indices'):
+            self._strobe_indices=[]
+        return self._strobe_indices
+
+    @strobe_indices.setter
+    def strobe_indices(self,val):
+        if isinstance(val, list) or isinstance(val, np.ndarray):
+            self._strobe_indices=val
+        else:
+            self.print_log(type='W', msg='Cannot set strobe_indices to be of type: %s' % type(val))
+
+    @property
+    def is_strobed(self):
+        '''
+        Check if simulation was strobed or not
+        '''
+        if not hasattr(self, '_is_strobed'):
+            self._is_strobed=False
+            for simtype, simcmd in self.simcmd_bundle.Members.items():
+                if simtype=='tran':
+                    if simcmd.strobeperiod:
+                        self._is_strobed=True
+        return self._is_strobed
+
     def connect_spice_inputs(self):
         """Automatically called function to connect iofiles (inputs) to top
         entity IOS Bundle items."""
@@ -804,68 +835,84 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             if val.dir.lower()=='in' or val.dir.lower()=='input':
                 self.iofile_bundle.Members[name].write()
 
+    def filter_strobed(self, key):
+        """
+        Helper function to read in the strobed simulation results. Only for spectre.
+
+        TODO:
+        this is because the strobeoutput
+        parameter for some reason still outputs
+        all the data points, even when it is in mode
+        strobeonly
+        If solution is found to this later from simulator
+        remove this.
+        """
+        if len(self.strobe_indices)==0:
+            tvals=self.iofile_eventdict[key.upper()][:,0]
+            maxtime = np.max(tvals)
+            mintime = np.min(tvals)
+            for simulationcommand, simulationoption in self.simcmd_bundle.Members.items():
+                strobeperiod = simulationoption.strobeperiod
+                strobedelay = simulationoption.strobedelay
+            if not strobedelay:
+                strobedelay=0
+            strobetimestamps = np.arange(mintime,maxtime,strobeperiod)+strobedelay
+            self.strobe_indices=np.zeros(len(strobetimestamps)) # indexes to take the values
+            seg=min(300, len(strobetimestamps)) # length of a segment in the for loop (how many samples at a time)
+            idxmin=0
+            l=len(strobetimestamps)
+            nseg=l//seg # number of segments, rounded down (how many loops required)
+            idxmax=0
+            i = 0
+            for i in np.arange(1,nseg):
+                idxmax=(i-1)*seg+np.argmin(abs(tvals[(i-1)*seg:]-strobetimestamps[i*seg])) # find index of the received signal which corresponds to the largest value in reference
+                ind=idxmin+abs(strobetimestamps[seg*(i-1):seg*(i),None]-tvals[None,idxmin:idxmax]).argmin(axis=-1) # take index for the seg's values
+                idxmin=idxmax
+                self.strobe_indices[seg*(i-1):seg*i]=ind  
+            # again just in case that the loop does not overflow to take the final samples into account
+            idxmax=len(tvals)-1
+            ind=idxmin+abs(strobetimestamps[seg*(i):,None]-tvals[None,idxmin:idxmax]).argmin(axis=-1)
+            idxmin=idxmax
+            self.strobe_indices[seg*(i):]=ind
+            self.strobe_indices=self.strobe_indices.astype(int)
+            new_array =self.iofile_eventdict[key.upper()][self.strobe_indices]
+            if len(strobetimestamps)!=len(new_array):
+                self.print_log(type='W',
+                        msg='Oh no, something went wrong while reading the strobeperiod data')
+                self.print_log(type='W',
+                        msg='Check data lenghts!')
+        else: # We already know the strobe indices, use them!
+            new_array =self.iofile_eventdict[key.upper()][self.strobe_indices]
+        return new_array
+
+    def check_output_accuracy(self,key):
+        '''
+        Helper function to check output accuracy
+        '''
+        try:
+            tdiff = np.diff(self.iofile_eventdict[key.upper()][:,0])
+            if np.any(tdiff == 0.0):
+                    self.print_log(type='W', msg='Accuracy of output file is insufficient. Increase value of \'digits\' parameter and re-run simulation!')
+        except: # Requested output wasn't in output file, do nothing
+            self.print_log(type='W',msg='Couldn\'t check output file accuracy')
+            self.print_log(type='W',msg=traceback.format_exc())
+
     def read_spice_outputs(self):
         """Automatically called function to call read() functions of each
         iofile with direction 'output'."""
         first=True
-        magic = []
         for name, val in self.iofile_bundle.Members.items():
             if val.dir.lower()=='out' or val.dir.lower()=='output':
                 if val.iotype=='event': # Event type outs are in same file, read only once to speed up things
                     if first:
                         self.iofile_bundle.Members[name].read()
                         first=False
+                        self.check_output_accuracy(val.ionames[0]) # Time stamps are common to all, need to do only once
                     if len(val.ionames) == 1:
                         try:
-                            try:
-                                tdiff = np.diff(self.iofile_eventdict[val.ionames[0].upper()][:,0])
-                                if np.any(tdiff == 0.0):
-                                        self.print_log(type='W', msg='Accuracy of output file is insufficient. Increase value of \'digits\' parameter and re-run simulation!')
-                            except TypeError: # Requested output wasn't in output file, do nothing
-                                pass
-                            # TODO:
-                            # this is because the strobeoutput
-                            # parameter for some reason still outputs
-                            # all the data points, even when it is in mode
-                            # strobeonly
-                            # If solution is found to this later from simulator
-                            # remove this.
                             if self.model == 'spectre':
-                                if 'strobeperiod' in self.tb.simcmdstr:
-                                    if len(magic)==0:
-                                        tvals=self.iofile_eventdict[val.ionames[0].upper()][:,0]
-                                        maxtime = np.max(tvals)
-                                        mintime = np.min(tvals)
-                                        for simulationcommand, simulationoption in self.simcmd_bundle.Members.items():
-                                            strobeperiod = simulationoption.strobeperiod
-                                        strobetimestamps = np.arange(mintime,maxtime,strobeperiod)
-                                        magic=np.zeros(len(strobetimestamps)) # indexes to take the values
-                                        seg=300 # length of a segment in the for loop (how many samples at a time)
-                                        idxmin=0
-                                        l=len(strobetimestamps)
-                                        nseg=l//seg # number of segments, rounded down (how many loops required)
-                                        idxmax=0
-                                        for i in np.arange(1,nseg):
-                                            idxmax=(i-1)*seg+np.argmin(abs(tvals[(i-1)*seg:]-strobetimestamps[i*seg])) # find index of the received signal which corresponds to the largest value in reference
-                                            ind=idxmin+abs(strobetimestamps[seg*(i-1):seg*(i),None]-tvals[None,idxmin:idxmax]).argmin(axis=-1) # take index for the seg's values
-                                            idxmin=idxmax
-                                            magic[seg*(i-1):seg*i]=ind  
-                                        # again just in case that the loop does not overflow to take the final samples into account
-                                        idxmax=len(tvals)-1
-                                        ind=idxmin+abs(strobetimestamps[seg*(i):,None]-tvals[None,idxmin:idxmax]).argmin(axis=-1)
-                                        idxmin=idxmax
-                                        magic[seg*(i):]=ind
-                                        magic=magic.astype(int)
-                                        new_array =self.iofile_eventdict[val.ionames[0].upper()][magic]
-                                        if len(strobetimestamps)!=len(new_array):
-                                            self.print_log(type='W',
-                                                    msg='Oh no, something went wrong while reading the strobeperiod data')
-                                            self.print_log(type='W',
-                                                    msg='Check data lenghts!')
-                                        self.iofile_bundle.Members[name].Data=new_array
-                                    else:
-                                        new_array =self.iofile_eventdict[val.ionames[0].upper()][magic]
-                                        self.iofile_bundle.Members[name].Data=new_array
+                                if self.is_strobed:
+                                    self.iofile_bundle.Members[name].Data=self.filter_strobed(val.ionames[0])
                                 else:
                                     self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()]
                             else:
@@ -877,10 +924,22 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                         for i, key in enumerate(val.ionames):
                             try:
                                 if i == 0:
-                                    data=self.iofile_eventdict[key.upper()]
+                                    # Parse the first member of bus
+                                    if self.model == 'spectre':
+                                        if self.is_strobed:
+                                            data=self.filter_strobed(key)
+                                        else:
+                                            data=self.iofile_eventdict[key.upper()]
+                                    else:
+                                        data=self.iofile_eventdict[key.upper()]
                                 else:
+                                    # Next members are concatenated to array
+                                    if self.model == 'spectre' and self.is_strobed:
+                                        next=self.filter_strobed(key)
+                                    else:
+                                        next=self.iofile_eventdict[key.upper()]
                                     try:
-                                        data=np.r_['1', data, self.iofile_eventdict[key.upper()]]
+                                        data=np.r_['1', data, next]
                                     except ValueError:
                                         self.print_log(type='W',msg='Invalid dimensions for concatenating arrays for IO %s!' % name)
                             except KeyError:
