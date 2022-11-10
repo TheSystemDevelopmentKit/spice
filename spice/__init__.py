@@ -741,6 +741,43 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def save_database(self,value): 
         self._save_database=value
 
+    @property
+    def save_output_file(self):
+        """ True | False (default)
+            
+            If True and save_state is True, copy the output file of simulator
+            to entity statedir. Useful for scavenging results if simulator exited
+            but state was not written to disk for some reason.
+        """
+        if not hasattr(self, '_save_output_file'):
+            self._save_output_file=False
+        return self._save_output_file
+
+    @save_output_file.setter
+    def save_output_file(self, val):
+        self._save_output_file=val
+
+
+    @property
+    def load_output_file(self): 
+        """ True | False (default)
+
+        Whether to load the outputs from simulator output file.
+        This only works if the file exists in the state directory, i.e.
+        the simulator was run with save_output_file=True.
+        WARNING: This will read the IOS from the output file, and REWRITE
+        THE ENTITY STATE on disk.
+
+        """
+        if not hasattr(self,'_load_output_file'):
+            self._load_output_file=False
+        return self._load_output_file 
+    @load_output_file.setter
+    def load_output_file(self,value): 
+        if value:
+            self.print_log(type='W', msg='load_output_file set to True! This will rewrite the entity state on disk!')
+        self._load_output_file=value
+
     def connect_spice_inputs(self):
         """Automatically called function to connect iofiles (inputs) to top
         entity IOS Bundle items."""
@@ -1092,7 +1129,18 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """Externally called function to execute spice simulation."""
         if self.load_state != '': 
             # Loading a previously stored state
-            self._read_state()
+            if self.load_output_file:
+                self.tb = stb(self)
+                self.tb.iofiles = self.iofile_bundle
+                self.tb.dcsources = self.dcsource_bundle
+                self.tb.simcmds = self.simcmd_bundle
+                self.read_spice_outputs()
+                self.connect_spice_outputs()
+                self.extract_powers()
+                self.read_oppts()
+                self._write_state()
+            else:
+                self._read_state()
         else:
             # Normal execution of full simulation
             self.tb = stb(self)
@@ -1128,6 +1176,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                         self.print_log(msg='Saving waveform database to %s/%s' % (self.statedir,dbname))
                     except:
                         self.print_log(type='E',msg='Failed saving waveform database to %s/%s' % (self.statedir,dbname))
+                if self.save_output_file:
+                    output_name = 'tb_%s.print' % self.name
+                    filepath = self.simpath
+                    output_path = os.path.join(filepath, output_name)
+                    targ_path = os.path.join(self.statedir, output_name)
+                    shutil.copyfile(output_path, targ_path)
             # Clean simulation results
             self.delete_iofile_bundle()
             self.delete_spicesimpath()

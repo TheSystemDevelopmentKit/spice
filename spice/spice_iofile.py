@@ -163,18 +163,21 @@ class spice_iofile(iofile):
         """
         self._file = []
         for ioname in self.ionames:
-            filepath = self.parent.simpath+'/'
-            # For now, all outputs are event type stored in a common file
             if self.dir == 'out':
                 filename = 'tb_%s.print' % (self.parent.name)
             else:
                 filename = ( '%s_%s_%s_%s.txt' 
                     % ( self.parent.runname,self.dir,ioname.replace('<','').replace('>','').replace('.','_'),
                         self.iotype))
+            if not self.parent.load_output_file:
+                filepath = self.parent.simpath+'/'
+            else:
+                filepath = self.parent.statedir
+            # For now, all outputs are event type stored in a common file
             if self.parent.model == 'ngspice' and self.dir == 'in':
                 # For some reason Ngspice requires lowercase names
                 filename = filename.lower()
-            filename = filepath + filename    
+            filename = os.path.join(filepath, filename)
             self._file.append(filename)
         # Keep unique filenames only for event-type outputs to keep load times at minimum
         if self.iotype=='event' and self.dir=='out':
