@@ -149,6 +149,8 @@ class spice_simcmd(thesdk):
         Maximum time step Spectre simulator will use during transient analysis
     step: float
         According to Spectre: minimum time step used by the simulator solely to maintain the aesthetics of the computed waveforms.
+    strobedelay: float
+        For Spectre only! Delay between start of transient simulation and first strobed output
 
     Examples
     --------
@@ -191,6 +193,7 @@ class spice_simcmd(thesdk):
             self.step = kwargs.get('step', None)
             self.maxstep = kwargs.get('maxstep', None)
             self.strobeperiod = kwargs.get('strobeperiod', None)
+            self.strobedelay = kwargs.get('strobedelay', None)
             # Make list, if they are not already
             self.sweep = kwargs.get('sweep',[]) if type(kwargs.get('sweep', [])) == list else [kwargs.get('sweep')]
             self.subcktname = kwargs.get('subcktname',[]) if type(kwargs.get('subcktname', [])) == list else [kwargs.get('subcktname')]
