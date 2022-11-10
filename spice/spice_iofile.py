@@ -289,8 +289,13 @@ class spice_iofile(iofile):
         """
         stack = [(label, None) for label in labels]
         try:
-            arr=pd.read_csv(filepath,skiprows=start,delim_whitespace=True,
-                    encoding='utf-8',engine='c').to_numpy()[:-stop].astype(dtype)
+            nrows = stop - start
+            if nrows<0:
+                self.print_log(type='W', msg='Stop index smaller than start index in parse_io_from_file!')
+                nrows=None
+            arr=pd.read_csv(filepath,skiprows=start-1, nrows=nrows,
+                    delim_whitespace=True, encoding='utf-8',engine='c',
+                    dtype=dtype).to_numpy()
         except:
             self.print_log(type='E',msg=traceback.format_exc())
             self.print_log(type='F',msg='Failed while reading files for %s.' % self.name)
@@ -376,9 +381,9 @@ class spice_iofile(iofile):
                         for k in lnrange:
                             start=linenumbers[k] # Indexing of line numbers starts from one
                             if k == len(linenumbers)-1:
-                                stop=1
+                                stop=numlines-1
                             else:
-                                stop=numlines-(linenumbers[k+1]-6) # Previous data column ends 5 rows before start of next one
+                                stop=linenumbers[k+1]-6 # Previous data column ends 5 rows before start of next one
                             dtype=self.datatype if self.datatype=='complex' else 'float' # Default is int for thesdk_spicefile, let's infer from data
                             queue = multiprocessing.Queue()
                             queues.append(queue)
