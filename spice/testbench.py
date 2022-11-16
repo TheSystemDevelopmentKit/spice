@@ -547,6 +547,8 @@ class testbench(spice_module):
                             self._simcmdstr += 'strobeperiod=%s strobeoutput=strobeonly ' % (str(val.strobeperiod))
                         if val.strobedelay is not None:
                             self._simcmdstr += 'strobedelay=%s' % (str(val.strobedelay))
+                        if val.skipstart is not None:
+                            self._simcmdstr += 'skipstart=%s' % (str(val.skipstart))
                         self._simcmdstr += '\n\n' 
                     elif self.parent.model=='ngspice':
                         self._simcmdstr += '.%s %s %s %s\n' % \

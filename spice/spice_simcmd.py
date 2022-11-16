@@ -149,8 +149,15 @@ class spice_simcmd(thesdk):
         Maximum time step Spectre simulator will use during transient analysis
     step: float
         According to Spectre: minimum time step used by the simulator solely to maintain the aesthetics of the computed waveforms.
+    strobeperiod: float
+        For Spectre only! Forces simulator to write output data to file at interval defined
+        by this parameter. Note that the simulator still outputs points between the sampling
+        points.
+    skipstart: float
+        For Spectre only! Delay between start of transient simulation and first strobed output,
+        if strobedelay is None.
     strobedelay: float
-        For Spectre only! Delay between start of transient simulation and first strobed output
+        For Spectre only! Delay between skipstart and the first strobe point.
 
     Examples
     --------
@@ -194,6 +201,7 @@ class spice_simcmd(thesdk):
             self.maxstep = kwargs.get('maxstep', None)
             self.strobeperiod = kwargs.get('strobeperiod', None)
             self.strobedelay = kwargs.get('strobedelay', None)
+            self.skipstart = kwargs.get('skipstart', None)
             # Make list, if they are not already
             self.sweep = kwargs.get('sweep',[]) if type(kwargs.get('sweep', [])) == list else [kwargs.get('sweep')]
             self.subcktname = kwargs.get('subcktname',[]) if type(kwargs.get('subcktname', [])) == list else [kwargs.get('subcktname')]
@@ -212,4 +220,6 @@ class spice_simcmd(thesdk):
             self.parent.spiceoptions.update({'rawfmt': 'psfascii'})
         if len(self.subcktname) != 0 and len(self.devname) != 0:
             self.print_log(type='F', msg='Cannot specify subckt sweep and device sweep in the same simcmd instance!')
-
+        if self.strobeperiod and self.strobedelay:
+            if self.strobedelay > self.strobeperiod:
+                self.print_log(type='F', msg='Strobedelay cannot be larger than strobeperiod!')

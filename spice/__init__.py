@@ -854,9 +854,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             for simulationcommand, simulationoption in self.simcmd_bundle.Members.items():
                 strobeperiod = simulationoption.strobeperiod
                 strobedelay = simulationoption.strobedelay
+                skipstart = simulationoption.skipstart
+            if not skipstart:
+                skipstart=0
             if not strobedelay:
                 strobedelay=0
-            strobetimestamps = np.arange(mintime,maxtime,strobeperiod)+strobedelay
+            strobetimestamps = np.arange(mintime,maxtime,strobeperiod)+strobedelay+skipstart
             self.strobe_indices=np.zeros(len(strobetimestamps)) # indexes to take the values
             seg=min(300, len(strobetimestamps)) # length of a segment in the for loop (how many samples at a time)
             idxmin=0
