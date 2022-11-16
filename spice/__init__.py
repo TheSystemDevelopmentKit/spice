@@ -596,6 +596,9 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         except:
             self.print_log(type='E',msg='Failed to create %s.' % self._spicesrcpath)
         return self._spicesrcpath
+    @spicesrcpath.setter
+    def spicesrcpath(self,val):
+        self._spicesrcpath=val
 
     @property
     def spicesrc(self):
@@ -644,6 +647,31 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self._spicesubcktsrc=self.spicesimpath + '/subckt_' + self.name + self.syntaxdict["cmdfile_ext"]
         return self._spicesubcktsrc
 
+    
+    @property
+    def plflag(self):
+        '''
+        Postlayout simulation accuracy/RC reduction flag.
+        See: https://community.cadence.com/cadence_blogs_8/b/cic/posts/spectre-optimizing-spectre-aps-performance 
+        '''
+        if not hasattr(self, '_plflag'):
+            self._plflag="upa"
+        return self._plflag
+
+    @plflag.setter
+    def plflag(self, val):
+        if self.model=='spectre':
+            if val in ["upa", "hpa"]:
+                self._plflag=val
+            else:
+                self.print_log(type='W', msg='Unsupported postlayout flag: %s' % val)
+        else:
+            # This should be checked, can the other flags given to e.g. ELDO (previously upa was 
+            # passed to all simulators)
+            self.print_log(type='W', msg='Simulator %s supports only postlayout flag: %s' (self.model, val))
+            
+
+
     @property
     def spicecmd(self):
         """String
@@ -658,7 +686,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             else:
                 nprocflag = ""
             if self.tb.postlayout:
-                plflag = '+postlayout=upa'
+                plflag = '+postlayout=%s' % (self.plflag)
                 self.print_log(type='I',msg='Enabling post-layout optimization \'%s\'.' % plflag)
             else:
                 plflag = ''
