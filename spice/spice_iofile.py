@@ -87,6 +87,9 @@ class spice_iofile(iofile):
         Falltime of sample type input. Default 5e-12.
     trise : float
         Risetime of sample type input. Default 5e-12.
+    strobe : bool
+        True if the event type IO uses only the strobe filtered values. False if the IO contains
+        all of the values simulated values (not consistently strobed). Default False.
 
     Examples
     --------
@@ -148,6 +151,7 @@ class spice_iofile(iofile):
             self.sourcetype=kwargs.get('sourcetype','V')
             self.pos=kwargs.get('pos', None)
             self.neg=kwargs.get('neg', None)
+            self.strobe=kwargs.get('strobe', False)
         except:
             self.print_log(type='F', msg="spice IO file definition failed.")
 

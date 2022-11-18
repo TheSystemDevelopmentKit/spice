@@ -906,14 +906,20 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             idxmin=idxmax
             self.strobe_indices[seg*(i):]=ind
             self.strobe_indices=self.strobe_indices.astype(int)
-            new_array =self.iofile_eventdict[key.upper()][self.strobe_indices]
-            if len(strobetimestamps)!=len(new_array):
-                self.print_log(type='W',
-                        msg='Oh no, something went wrong while reading the strobeperiod data')
-                self.print_log(type='W',
-                        msg='Check data lenghts!')
+            if self.iofile_bundle.Members[key.upper()].strobe:
+                new_array =self.iofile_eventdict[key.upper()][self.strobe_indices]
+                if len(strobetimestamps)!=len(new_array):
+                    self.print_log(type='W',
+                            msg='Oh no, something went wrong while reading the strobeperiod data')
+                    self.print_log(type='W',
+                            msg='Check data lenghts!')
+            else:
+                new_array =self.iofile_eventdict[key.upper()]
         else: # We already know the strobe indices, use them!
-            new_array =self.iofile_eventdict[key.upper()][self.strobe_indices]
+            if self.iofile_bundle.Members[key.upper()].strobe:
+                new_array =self.iofile_eventdict[key.upper()][self.strobe_indices]
+            else:
+                new_array =self.iofile_eventdict[key.upper()]
         return new_array
 
     def check_output_accuracy(self,key):
