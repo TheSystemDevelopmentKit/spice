@@ -863,7 +863,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             if val.dir.lower()=='in' or val.dir.lower()=='input':
                 self.iofile_bundle.Members[name].write()
 
-    def filter_strobed(self, key):
+    def filter_strobed(self, key,ioname):
         """
         Helper function to read in the strobed simulation results. Only for spectre.
 
@@ -876,7 +876,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         remove this.
         """
         if len(self.strobe_indices)==0:
-            tvals=self.iofile_eventdict[key.upper()][:,0]
+            tvals=self.iofile_eventdict[ioname.upper()][:,0]
             maxtime = np.max(tvals)
             mintime = np.min(tvals)
             for simulationcommand, simulationoption in self.simcmd_bundle.Members.items():
@@ -906,20 +906,20 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             idxmin=idxmax
             self.strobe_indices[seg*(i):]=ind
             self.strobe_indices=self.strobe_indices.astype(int)
-            if self.iofile_bundle.Members[key.upper()].strobe:
-                new_array =self.iofile_eventdict[key.upper()][self.strobe_indices]
+            if self.iofile_bundle.Members[key].strobe:
+                new_array =self.iofile_eventdict[ioname.upper()][self.strobe_indices]
                 if len(strobetimestamps)!=len(new_array):
                     self.print_log(type='W',
                             msg='Oh no, something went wrong while reading the strobeperiod data')
                     self.print_log(type='W',
                             msg='Check data lenghts!')
             else:
-                new_array =self.iofile_eventdict[key.upper()]
+                new_array =self.iofile_eventdict[ioname.upper()]
         else: # We already know the strobe indices, use them!
-            if self.iofile_bundle.Members[key.upper()].strobe:
-                new_array =self.iofile_eventdict[key.upper()][self.strobe_indices]
+            if self.iofile_bundle.Members[key].strobe:
+                new_array =self.iofile_eventdict[ioname.upper()][self.strobe_indices]
             else:
-                new_array =self.iofile_eventdict[key.upper()]
+                new_array =self.iofile_eventdict[ioname.upper()]
         return new_array
 
     def check_output_accuracy(self,key):
@@ -949,7 +949,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                         try:
                             if self.model == 'spectre':
                                 if self.is_strobed:
-                                    self.iofile_bundle.Members[name].Data=self.filter_strobed(val.ionames[0])
+                                    self.iofile_bundle.Members[name].Data=self.filter_strobed(val.name,val.ionames[0])
                                 else:
                                     self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()]
                             else:
