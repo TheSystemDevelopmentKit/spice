@@ -31,6 +31,9 @@ from spice.spice_iofile import spice_iofile as spice_iofile
 from spice.spice_dcsource import spice_dcsource as spice_dcsource
 from spice.spice_simcmd import spice_simcmd as spice_simcmd
 from spice.spice_module import spice_module as spice_module
+from ngspice.ngspice import ngspice
+from eldo.eldo import eldo
+from spectre.spectre import spectre
 
 class spice(thesdk,metaclass=abc.ABCMeta):
     """Adding this class as a superclass enforces the definitions 
@@ -66,6 +69,21 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     'a':1e-18,
                     }
         return self._si_prefix_mult
+   
+    @property
+    def simulatormodule(self): 
+        """The simulator specific operation is defined with an instance of 
+        simulator specific class. Properties and methods return values from that class.
+        """
+        if not hasattr(self,'_simulatormodule'):
+            if self.model == 'ngspice':
+                self._simulatormodule=ngspice()
+            if self.model == 'eldo':
+                self._simulatormodule=eldo()
+            if self.model == 'spectre':
+                self._simulatormodule=spectre()
+        return self._simulatormodule
+   
 
     @property
     def syntaxdict(self):
@@ -74,65 +92,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         Internally used dictionary for common syntax conversions between
         Spectre, Eldo, and Ngspice.
         """
-        if self.model=='eldo':
-            self._syntaxdict = {
-                    "cmdfile_ext" : '.cir',
-                    "resultfile_ext" : '.wdb',
-                    "commentchar" : '*',
-                    "commentline" : '***********************\n',
-                    "nprocflag" : '-use_proc ', #space required
-                    "simulatorcmd" : 'eldo -64b',
-                    "dcsource_declaration" : '',
-                    "parameter" : '.param ',
-                    "option" : '.option ',
-                    "include" : '.include',
-                    "dspfinclude" : '.include',
-                    "subckt" : '.subckt',
-                    "lastline" : '.end',
-                    "eventoutdelim" : ' ',
-                    "csvskip" : 2
-                    }
-        elif self.model=='spectre':
-            self._syntaxdict = {
-                    "cmdfile_ext" : '.scs',
-                    "resultfile_ext" : '.raw',
-                    "commentchar" : '//',
-                    "commentline" : '///////////////////////\n',
-                    "nprocflag" : '+mt=', #space required??
-                    "simulatorcmd" : 'spectre',
-                    "dcsource_declaration" : 'vsource type=dc dc=',
-                    "parameter" : 'parameters ',
-                    "option" : 'options ',
-                    "include" : 'include ',
-                    "dspfinclude" : 'dspf_include ',
-                    "subckt" : 'subckt',
-                    "lastline" : '///', #needed?
-                    "eventoutdelim" : ',',
-                    "csvskip" : 0
-                    }
-        if self.model=='ngspice':
-            self._syntaxdict = {
-                    "cmdfile_ext" : '.ngcir',
-                    "resultfile_ext" : '',
-                    "commentchar" : '*',
-                    "commentline" : '***********************\n',
-                    "nprocflag" : 'set num_threads=', #Goes to .control section
-                    "simulatorcmd" : 'ngspice -b', 
-                    #"dcsource_declaration" : '',
-                    "parameter" : '.param ',
-                    "option" : '.option ',
-                    "include" : '.include',
-                    "dspfinclude" : '.include',
-                    "subckt" : '.subckt',
-                    "lastline" : '.end',
-                    "eventoutdelim" : '  ', # Two spaces
-                    "csvskip" : 1
-                    }
+        if not hasattr(self,'_syntaxdict'):
+            self._syntaxdict = self.simulatormodule.syntaxdict
         return self._syntaxdict
     @syntaxdict.setter
     def syntaxdict(self,value):
-        self._syntaxdict=value
-    #Name derived from the file
+        self._simulatormodule.syntaxdict=value
 
     @property
     def preserve_spicefiles(self):  
