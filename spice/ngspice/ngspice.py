@@ -36,7 +36,7 @@ class ngspice(thesdk,metaclass=abc.ABCMeta):
                 "commentline" : self.commentline,
                 "nprocflag" : self.nprocflag,
                 "simulatorcmd" : self.simulatorcmd, 
-                #"dcsource_declaration" : '',
+                "dcsource_declaration" : self.dcsource_declaration,
                 "parameter" : self.parameter,
                 "option" : self.option,
                 "include" : self.include,
@@ -82,6 +82,12 @@ class ngspice(thesdk,metaclass=abc.ABCMeta):
         """Simulator execution command : str
         """
         return 'ngspice -b'
+    @property
+    def dcsource_declaration(self):
+        """DC source declaration : str
+        """
+        #self.print_log(type='F', msg='DC source declaration not defined for ngspice')
+        return ''
     @property
     def parameter(self):
         """Netlist parameter definition string : str
