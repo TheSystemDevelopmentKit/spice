@@ -576,7 +576,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             Netlist has to contain the top-level design as a subcircuit definition!
         """
         if not hasattr(self, '_spicesrc'):
-            self._spicesrc=self.spicesrcpath + '/' + self.name + self.syntaxdict["cmdfile_ext"]
+            self._spicesrc=self.spicesrcpath + '/' + self.name + self.simulatormodule.cmdfile_ext
 
             if not os.path.exists(self._spicesrc):
                 self.print_log(type='W',msg='No source circuit found in %s.' % self._spicesrc)
@@ -593,7 +593,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicetbsrc'):
-            self._spicetbsrc=self.spicesimpath + '/tb_' + self.name + self.syntaxdict["cmdfile_ext"]
+            self._spicetbsrc=self.spicesimpath + '/tb_' + self.name + self.simulatormodule.cmdfile_ext
         return self._spicetbsrc
 
     @property
@@ -604,7 +604,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicesubcktsrc'):
-            self._spicesubcktsrc=self.spicesimpath + '/subckt_' + self.name + self.syntaxdict["cmdfile_ext"]
+            self._spicesubcktsrc=self.spicesimpath + '/subckt_' + self.name + self.simulatormodule.cmdfile_ext
         return self._spicesubcktsrc
 
     @property
@@ -616,23 +616,23 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         """
         if not hasattr(self,'_spicecmd'):
             if self.nproc:
-                nprocflag = "%s%d" % (self.syntaxdict["nprocflag"],self.nproc)
+                nprocflag = "%s%d" % (self.simulatormodule.nprocflag,self.nproc)
                 self.print_log(type='I',msg='Enabling multithreading \'%s\'.' % nprocflag)
             else:
                 nprocflag = ""
+            # How is this defined and where. Comes out of the blue
             if self.tb.postlayout:
                 plflag = '+postlayout=upa'
                 self.print_log(type='I',msg='Enabling post-layout optimization \'%s\'.' % plflag)
             else:
                 plflag = ''
             if self.model=='eldo':
-                # Shouldn't this use self.syntaxdict["simulatorcmd"] ?
-                spicesimcmd = "eldo -64b %s " % (nprocflag)
+                spicesimcmd = "%s %s " % (self.simulatormodule.simulatorcmd, nprocflag)
             elif self.model=='spectre':
                 spicesimcmd = ("spectre -64 +lqtimeout=0 ++aps=%s %s %s -outdir %s " 
                         % (self.errpreset,plflag,nprocflag,self.spicesimpath))
             elif self.model=='ngspice':
-                spicesimcmd = self.syntaxdict["simulatorcmd"] + ' '
+                spicesimcmd = self.simulatormodule.simulatorcmd + ' '
             self._spicecmd = self.spice_submission+spicesimcmd+self.spicetbsrc
         return self._spicecmd
     @spicecmd.setter
@@ -648,7 +648,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         This shouldn't be set manually.
         """
         if not hasattr(self,'_spicedbpath'):
-            self._spicedbpath=self.spicesimpath+'/tb_'+self.name+self.syntaxdict["resultfile_ext"]
+            self._spicedbpath=self.spicesimpath+'/tb_'+self.name+self.simulatormodule.resultfile_ext
         return self._spicedbpath
     @spicedbpath.setter
     def spicedbpath(self, value):
