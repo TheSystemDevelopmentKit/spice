@@ -31,9 +31,9 @@ from spice.spice_iofile import spice_iofile as spice_iofile
 from spice.spice_dcsource import spice_dcsource as spice_dcsource
 from spice.spice_simcmd import spice_simcmd as spice_simcmd
 from spice.spice_module import spice_module as spice_module
-from ngspice.ngspice import ngspice
-from eldo.eldo import eldo
-from spectre.spectre import spectre
+from spice.ngspice.ngspice import ngspice
+from spice.eldo.eldo import eldo
+from spice.spectre.spectre import spectre
 
 class spice(thesdk,metaclass=abc.ABCMeta):
     """Adding this class as a superclass enforces the definitions 
