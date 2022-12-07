@@ -543,6 +543,12 @@ class testbench(spice_module):
                             self._simcmdstr += 'maxstep=%s ' % (str(val.maxstep))
                         if val.step is not None:
                             self._simcmdstr += 'step=%s ' % (str(val.step))
+                        if val.strobeperiod is not None:
+                            self._simcmdstr += 'strobeperiod=%s strobeoutput=strobeonly ' % (str(val.strobeperiod))
+                        if val.strobedelay is not None:
+                            self._simcmdstr += 'strobedelay=%s' % (str(val.strobedelay))
+                        if val.skipstart is not None:
+                            self._simcmdstr += 'skipstart=%s' % (str(val.skipstart))
                         self._simcmdstr += '\n\n' 
                     elif self.parent.model=='ngspice':
                         self._simcmdstr += '.%s %s %s %s\n' % \
@@ -728,12 +734,15 @@ class testbench(spice_module):
                                                 plotstr += '.print %s(%s)' % (val.sourcetype, val.ionames[i])
                                             first=False
                                         else:
-                                            savestr += ' %s' % signame
                                             if val.datatype.lower() == 'complex':
-                                                plotstr += ' %sr(%s) %si(%s)' % \
-                                                        (val.sourcetype, val.ionames[i], val.sourcetype, val.ionames[i])
+                                                if f'{val.sourcetype}({val.ionames[i]})' not in plotstr.split(' '):
+                                                    savestr += ' %s' % signame
+                                                    plotstr += ' %sr(%s) %si(%s)' % \
+                                                            (val.sourcetype, val.ionames[i], val.sourcetype, val.ionames[i])
                                             else:
-                                                plotstr += ' %s(%s)' % (val.sourcetype, val.ionames[i])
+                                                if f'{val.sourcetype}({val.ionames[i]})' not in plotstr.split(' '):
+                                                    savestr += ' %s' % signame
+                                                    plotstr += ' %s(%s)' % (val.sourcetype, val.ionames[i])
                                     elif self.parent.model=='ngspice':
                                         # Plots in tb only for interactive. Does not work in batch
                                         if self.parent.interactive_spice:
