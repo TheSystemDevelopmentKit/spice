@@ -44,11 +44,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         pass
 
     @property
-    @abstractmethod
-    def _classfile(self):
-        return os.path.dirname(os.path.realpath(__file__)) + "/"+__name__
-
-    @property
     def si_prefix_mult(self):
         """ Dictionary
         
@@ -586,15 +581,19 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def spicesrcpath(self):
         """String
 
-        Path to the spice source of the entity ('./spice').
+        Path to the spice source of the entity. Can be set manually to desired location.
+        This variable provides the dspf-parasitic netlist filepath.
+
+        Default: <entity path>/spice
         """
-        self._spicesrcpath  =  self.entitypath + '/spice'
-        try:
-            if not (os.path.exists(self._spicesrcpath)):
-                os.makedirs(self._spicesrcpath)
-                self.print_log(type='I',msg='Creating %s.' % self._spicesrcpath)
-        except:
-            self.print_log(type='E',msg='Failed to create %s.' % self._spicesrcpath)
+        if not hasattr(self, '_spicesrcpath'):
+            self._spicesrcpath  =  self.entitypath + '/spice'
+            try:
+                if not (os.path.exists(self._spicesrcpath)):
+                    os.makedirs(self._spicesrcpath)
+                    self.print_log(type='I',msg='Creating %s.' % self._spicesrcpath)
+            except:
+                self.print_log(type='E',msg='Failed to create %s.' % self._spicesrcpath)
         return self._spicesrcpath
     @spicesrcpath.setter
     def spicesrcpath(self,val):
@@ -604,16 +603,13 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def spicesrc(self):
         """String
 
-        Path to the source netlist (i.e. 'spice/entityname.scs').
-        This shouldn't be set manually.
+        Path to the source netlist. Can be set manually to desired location.
+        
+        Default: 'spice/entityname.scs'
 
-        .. note::
 
-            Provided netlist name has to match entity name (entityname.scs or entityname.cir).
-
-        .. note::
-            
-            Netlist has to contain the top-level design as a subcircuit definition.
+        N.B!:
+            Netlist has to contain the top-level design as a subcircuit definition!
         """
         if not hasattr(self, '_spicesrc'):
             self._spicesrc=self.spicesrcpath + '/' + self.name + self.syntaxdict["cmdfile_ext"]
@@ -836,6 +832,43 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     if simcmd.strobeperiod:
                         self._is_strobed=True
         return self._is_strobed
+
+    @property
+    def save_output_file(self):
+        """ True | False (default)
+            
+            If True and save_state is True, copy the output file of simulator
+            to entity statedir. Useful for scavenging results if simulator exited
+            but state was not written to disk for some reason.
+        """
+        if not hasattr(self, '_save_output_file'):
+            self._save_output_file=False
+        return self._save_output_file
+
+    @save_output_file.setter
+    def save_output_file(self, val):
+        self._save_output_file=val
+
+
+    @property
+    def load_output_file(self): 
+        """ True | False (default)
+
+        Whether to load the outputs from simulator output file.
+        This only works if the file exists in the state directory, i.e.
+        the simulator was run with save_output_file=True.
+        WARNING: This will read the IOS from the output file, and REWRITE
+        THE ENTITY STATE on disk.
+
+        """
+        if not hasattr(self,'_load_output_file'):
+            self._load_output_file=False
+        return self._load_output_file 
+    @load_output_file.setter
+    def load_output_file(self,value): 
+        if value:
+            self.print_log(type='W', msg='load_output_file set to True! This will rewrite the entity state on disk!')
+        self._load_output_file=value
 
     def connect_spice_inputs(self):
         """Automatically called function to connect iofiles (inputs) to top

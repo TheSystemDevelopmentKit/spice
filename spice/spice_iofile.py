@@ -368,6 +368,7 @@ class spice_iofile(iofile):
                             labels.append(tmp)
                         else:
                             self.print_log(type='W', msg='Couldn\'t find IO on line %d from file %s' %  (line,file))
+
                 if len(labels) == len(linenumbers):
                     try:
                         numlines = int(subprocess.check_output("wc -l %s | awk '{print $1}'" % file,shell=True).decode('utf-8'))
