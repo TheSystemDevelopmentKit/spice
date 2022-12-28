@@ -52,7 +52,7 @@ class spectre_testbench(testbench_common):
                 self._options += "Option%d " % i # spectre options need unique names
                 i+=1
                 if optval != "":
-                    self._options += self.parent.syntaxdict["option"] + optname + "=" + optval + "\n"
+                    self._options += self.parent.syntaxdict["option"] + ' ' + optname + "=" + optval + "\n"
                 else:
                     self._options += ".option " + optname + "\n"
 

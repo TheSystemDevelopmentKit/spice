@@ -84,27 +84,27 @@ class spectre_lang(thesdk,metaclass=abc.ABCMeta):
     def parameter(self):
         """Netlist parameter definition string : str
         """
-        return 'parameters '
+        return 'parameters'
     @property
     def option(self):
         """Netlist option definition string : str
         """
-        return 'options '
+        return 'options'
     @property
     def include(self):
         """Netlist include string : str
         """
-        return 'include '
+        return 'include'
     @property
     def dspfinclude(self):
         """Netlist dspf-file include string : str
         """
-        return 'dspf_include '
+        return 'dspf_include'
     @property
     def subckt(self):
         """Subcircuit include string : str
         """
-        return 'subckt '
+        return 'subckt'
     @property
     def lastline(self):
         """Last line of the simulator command file : str
@@ -114,7 +114,7 @@ class spectre_lang(thesdk,metaclass=abc.ABCMeta):
     def eventoutdelim(self):
         """Delimiter for the events : str
         """
-        return ',' #Two spaces
+        return ','
     @property
     def csvskip(self):
         """Needs documentation. Lines skipped in result file : int

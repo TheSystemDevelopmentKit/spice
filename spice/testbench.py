@@ -926,6 +926,7 @@ class testbench(testbench_common):
         """
         Internally called function to generate testbench contents.
         """
+
         self.contents = (self.header + "\n" +
                         self.libcmd + "\n" +
                         self.includecmd + "\n" +
@@ -939,6 +940,5 @@ class testbench(testbench_common):
                         self.simcmdstr + "\n" +
                         self.plotcmd + "\n" +
                         self.parent.syntaxdict["lastline"]+"\n")
-
 if __name__=="__main__":
     pass
