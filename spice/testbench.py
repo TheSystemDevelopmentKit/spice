@@ -13,6 +13,8 @@ import shlex
 import fileinput
 from spice.testbench_common import testbench_common
 from spice.ngspice.ngspice_testbench import ngspice_testbench
+from spice.eldo.eldo_testbench import eldo_testbench
+from spice.spectre.spectre_testbench import spectre_testbench
 import pdb
 
 import numpy as np
