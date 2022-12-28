@@ -78,7 +78,7 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
         """The simulator specific operation is defined with an instance of 
         simulator specific class. Properties and methods return values from that class.
         """
-        if not hasattr(self,'_simulatormodule'):
+        if not hasattr(self,'_langmodule'):
             if self.model == 'ngspice':
                 self._langmodule=ngspice_lang()
             if self.model == 'eldo':

@@ -11,10 +11,8 @@ import sys
 import subprocess
 import shlex
 import fileinput
-from abc import * 
-from thesdk import *
-from spice import *
-from spice.spice_module import spice_module
+from spice.testbench_common import testbench_common
+from spice.ngspice.ngspice_testbench import ngspice_testbench
 import pdb
 
 import numpy as np
@@ -23,32 +21,41 @@ from functools import reduce
 import textwrap
 from datetime import datetime
 
-class testbench(spice_module):
+class testbench(testbench_common):
     """
     This class generates all testbench contents.
     This class is utilized by the main spice class.
 
     """
-
     def __init__(self, parent=None, **kwargs):
-        if parent==None:
-            self.print_log(type='F', msg="Parent of spice testbench not given.")
-        else:
-            self.parent=parent
-        try:  
-            self._file=self.parent.spicetbsrc # Testbench
-            self._subcktfile=self.parent.spicesubcktsrc # Parsed subcircuit file
-            self._dutfile=self.parent.spicesrc # Source netlist file
-            # This attribute holds duration of longest input vector after reading input files
-            self._trantime=0
-        except:
-            self.print_log(type='F', msg="Spice Testbench file definition failed.")
+        """ Executes init of testbench_common, thus having the same attributes and 
+        parameters.
+
+        Parameters
+        ----------
+            **kwargs :
+               See module testbench_common
         
-        #The methods for these are derived from spice_module
-        self._name=''
-        self.iofiles=Bundle()
-        self.dcsources=Bundle()
-        self.simcmds=Bundle()
+        """
+
+        #This should be language specific.
+        super().__init__(parent=parent,**kwargs)
+        self.parent=parent
+        self.model=self.parent.model
+
+    @property
+    def langmodule(self): 
+        """The simulator specific operation is defined with an instance of 
+        simulator specific class. Properties and methods return values from that class.
+        """
+        if not hasattr(self,'_tb_langmodule'):
+            if self.model == 'ngspice':
+                self._langmodule=ngspice_testbench(parent=self.parent)
+            if self.model == 'eldo':
+                self._langmodule=eldo_testbench(parent=self.parent)
+            if self.model == 'spectre':
+                self._langmodule=spectre_testbench(parent=self.parent)
+        return self._langmodule
         
     @property
     def file(self):
@@ -92,14 +99,18 @@ class testbench(spice_module):
                     self.print_log(type='I', msg='Consider using option savefilter=rc for post-layout netlists to reduce output file size!')
                 if self.postlayout and 'save' not in self.parent.spiceoptions:
                     self.print_log(type='I', msg='Consider using option save=none and specifiying saves with plotlist for post-layout netlists to reduce output file size!')
-            for optname,optval in self.parent.spiceoptions.items():
-                if self.parent.model=='spectre':
-                    self._options += "Option%d " % i # spectre options need unique names
-                    i+=1
-                if optval != "":
-                    self._options += self.parent.syntaxdict["option"] + optname + "=" + optval + "\n"
-                else:
-                    self._options += ".option " + optname + "\n"
+            elif self.parent.model == 'ngspice':
+                pdb.set_trace()
+                self._options = self.langmodule.options
+            else:
+                for optname,optval in self.parent.spiceoptions.items():
+                    if self.parent.model=='spectre':
+                        self._options += "Option%d " % i # spectre options need unique names
+                        i+=1
+                    if optval != "":
+                        self._options += self.parent.syntaxdict["option"] + optname + "=" + optval + "\n"
+                    else:
+                        self._options += ".option " + optname + "\n"
         return self._options
     @options.setter
     def options(self,value):
@@ -931,30 +942,19 @@ class testbench(spice_module):
         """
         Internally called function to generate testbench contents.
         """
-        headertxt = self.header
-        libcmd = self.libcmd
-        includecmd = self.includecmd
-        subinst = self.subinst
-        dspfincludecmd = self.dspfincludecmd
-        options = self.options
-        params = self.parameters
-        dcsourcestr = self.dcsourcestr
-        inputsignals = self.inputsignals
-        misccmd = self.misccmd
-        simcmd = self.simcmdstr
-        plotcmd = self.plotcmd
-        self.contents = (headertxt + "\n" +
-                        libcmd + "\n" +\
-                        includecmd + "\n" +
-                        dspfincludecmd + "\n" +
-                        options + "\n" +\
-                        params + "\n" +
-                        subinst + "\n\n" +\
-                        misccmd + "\n" +
-                        dcsourcestr + "\n" +\
-                        inputsignals + "\n" +\
-                        simcmd + "\n" +\
-                        plotcmd + "\n" +\
-                        self.parent.syntaxdict["lastline"])
+        self.contents = (self.header + "\n" +
+                        self.libcmd + "\n" +
+                        self.includecmd + "\n" +
+                        self.dspfincludecmd + "\n" +
+                        self.options + "\n" +
+                        self.parameters + "\n" +
+                        self.subinst + "\n\n" +
+                        self.misccmd + "\n" +
+                        self.dcsourcestr + "\n" +
+                        self.inputsignals + "\n" +
+                        self.simcmdstr + "\n" +
+                        self.plotcmd + "\n" +
+                        self.parent.syntaxdict["lastline"]+"\n")
+
 if __name__=="__main__":
     pass
