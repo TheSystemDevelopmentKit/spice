@@ -31,11 +31,14 @@ from spice.spice_iofile import spice_iofile as spice_iofile
 from spice.spice_dcsource import spice_dcsource as spice_dcsource
 from spice.spice_simcmd import spice_simcmd as spice_simcmd
 from spice.spice_module import spice_module as spice_module
+from spice.ngspice.ngspice_lang import ngspice_lang
 from spice.ngspice.ngspice import ngspice
+from spice.eldo.eldo_lang import eldo_lang
 from spice.eldo.eldo import eldo
+from spice.spectre.spectre_lang import spectre_lang
 from spice.spectre.spectre import spectre
 
-class spice(thesdk,metaclass=abc.ABCMeta):
+class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
     """Adding this class as a superclass enforces the definitions 
     for Spice simulations in the subclasses.
     
@@ -71,18 +74,18 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         return self._si_prefix_mult
    
     @property
-    def simulatormodule(self): 
+    def langmodule(self): 
         """The simulator specific operation is defined with an instance of 
         simulator specific class. Properties and methods return values from that class.
         """
         if not hasattr(self,'_simulatormodule'):
             if self.model == 'ngspice':
-                self._simulatormodule=ngspice()
+                self._langmodule=ngspice_lang()
             if self.model == 'eldo':
-                self._simulatormodule=eldo()
+                self._langmodule=eldo_lang()
             if self.model == 'spectre':
-                self._simulatormodule=spectre()
-        return self._simulatormodule
+                self._langmodule=spectre_lang()
+        return self._langmodule
    
 
     @property
@@ -93,11 +96,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         Spectre, Eldo, and Ngspice.
         """
         if not hasattr(self,'_syntaxdict'):
-            self._syntaxdict = self.simulatormodule.syntaxdict
+            self._syntaxdict = self.langmodule.syntaxdict
         return self._syntaxdict
     @syntaxdict.setter
     def syntaxdict(self,value):
-        self._simulatormodule.syntaxdict=value
+        self._langmodule.syntaxdict=value
 
     @property
     def preserve_spicefiles(self):  
@@ -347,21 +350,6 @@ class spice(thesdk,metaclass=abc.ABCMeta):
     def nproc(self,value):
         self._nproc=value
 
-    @property
-    def errpreset(self):
-        """ String
-        
-        Global accuracy parameter for Spectre simulations. Options include
-        'liberal', 'moderate' and 'conservative', in order of rising accuracy.
-        """
-        if hasattr(self,'_errpreset'):
-            return self._errpreset
-        else:
-            self._errpreset='moderate'
-        return self._errpreset
-    @errpreset.setter
-    def errpreset(self,value):
-        self._errpreset=value
 
     # DSPF filenames
     @property
@@ -576,7 +564,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             Netlist has to contain the top-level design as a subcircuit definition!
         """
         if not hasattr(self, '_spicesrc'):
-            self._spicesrc=self.spicesrcpath + '/' + self.name + self.simulatormodule.cmdfile_ext
+            self._spicesrc=self.spicesrcpath + '/' + self.name + self.langmodule.cmdfile_ext
 
             if not os.path.exists(self._spicesrc):
                 self.print_log(type='W',msg='No source circuit found in %s.' % self._spicesrc)
@@ -593,7 +581,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicetbsrc'):
-            self._spicetbsrc=self.spicesimpath + '/tb_' + self.name + self.simulatormodule.cmdfile_ext
+            self._spicetbsrc=self.spicesimpath + '/tb_' + self.name + self.langmodule.cmdfile_ext
         return self._spicetbsrc
 
     @property
@@ -604,7 +592,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicesubcktsrc'):
-            self._spicesubcktsrc=self.spicesimpath + '/subckt_' + self.name + self.simulatormodule.cmdfile_ext
+            self._spicesubcktsrc=self.spicesimpath + '/subckt_' + self.name + self.langmodule.cmdfile_ext
         return self._spicesubcktsrc
 
     @property
@@ -615,25 +603,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         Automatically generated.
         """
         if not hasattr(self,'_spicecmd'):
-            if self.nproc:
-                nprocflag = "%s%d" % (self.simulatormodule.nprocflag,self.nproc)
-                self.print_log(type='I',msg='Enabling multithreading \'%s\'.' % nprocflag)
-            else:
-                nprocflag = ""
-            # How is this defined and where. Comes out of the blue
-            if self.tb.postlayout:
-                plflag = '+postlayout=upa'
-                self.print_log(type='I',msg='Enabling post-layout optimization \'%s\'.' % plflag)
-            else:
-                plflag = ''
             if self.model=='eldo':
-                spicesimcmd = "%s %s " % (self.simulatormodule.simulatorcmd, nprocflag)
+                self._spicecmd = self.eldo_spicecmd
             elif self.model=='spectre':
-                spicesimcmd = ("spectre -64 +lqtimeout=0 ++aps=%s %s %s -outdir %s " 
-                        % (self.errpreset,plflag,nprocflag,self.spicesimpath))
+                self._spicecmd = self.spectre_spicecmd
             elif self.model=='ngspice':
-                spicesimcmd = self.simulatormodule.simulatorcmd + ' '
-            self._spicecmd = self.spice_submission+spicesimcmd+self.spicetbsrc
+                self._spicecmd = self.ngspice_spicecmd
         return self._spicecmd
     @spicecmd.setter
     def spicecmd(self,value):
@@ -648,7 +623,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         This shouldn't be set manually.
         """
         if not hasattr(self,'_spicedbpath'):
-            self._spicedbpath=self.spicesimpath+'/tb_'+self.name+self.simulatormodule.resultfile_ext
+            self._spicedbpath=self.spicesimpath+'/tb_'+self.name+self.langmodule.resultfile_ext
         return self._spicedbpath
     @spicedbpath.setter
     def spicedbpath(self, value):

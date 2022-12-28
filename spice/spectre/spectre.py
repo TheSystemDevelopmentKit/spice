@@ -13,112 +13,45 @@ from thesdk import *
 import numpy as np
 
 class spectre(thesdk,metaclass=abc.ABCMeta):
-    """This class is used as instance in simulatormodule property of 
-    spice class.
-    
-    """
-    def __init__(self):
-        pass
+    @property
+    def errpreset(self):
+        """ String
+        
+        Global accuracy parameter for Spectre simulations. Options include
+        'liberal', 'moderate' and 'conservative', in order of rising accuracy.
+        """
+        if hasattr(self,'_errpreset'):
+            return self._errpreset
+        else:
+            self._errpreset='moderate'
+        return self._errpreset
+    @errpreset.setter
+    def errpreset(self,value):
+        self._errpreset=value
 
     @property
-    def syntaxdict(self):
-        self.print_log(type='O', msg='Syntaxdict is obsoleted. Access properties directly')
-        self._syntaxdict = {
-                "cmdfile_ext" : self.cmdfile_ext,
-                "resultfile_ext" : self.resultfile_ext,
-                "commentchar" : self.commentchar,
-                "commentline" : self.commentline,
-                "nprocflag" : self.nprocflag,
-                "simulatorcmd" : self.simulatorcmd, 
-                "dcsource_declaration" : self.dcsource_declaration,
-                "parameter" : self.parameter,
-                "option" : self.option,
-                "include" : self.include,
-                "dspfinclude" : self.dspfinclude,
-                "subckt" : self.subckt,
-                "lastline" : self.lastline,
-                "eventoutdelim" : self.eventoutdelim, # Two spaces
-                "csvskip" : self.csvskip
-                }
-        return self._syntaxdict
-    @syntaxdict.setter
-    def syntaxdict(self,value):
-        self._syntaxdict=value
-    @property
-    def cmdfile_ext(self):
-        """Extension of the command file : str
-        """
-        return '.scs'
-    @property
-    def resultfile_ext(self):
-        """Extension of the result file : str
-        """
-        return '.raw'
-    @property
-    def commentchar(self):
-        """Comment character of the simulator : str
-        """
-        return '//'
-    @property
-    def commentline(self):
-        """Comment line for the simulator : str
-        """
-        return '///////////////////////\n'
-    @property
-    def nprocflag(self):
-        """String for defining multithread execution : str
-        """
-        return '+mt='
-    @property
-    def simulatorcmd(self):
-        """Simulator execution command : str
-        """
-        return 'spectre'
-    @property
-    def dcsource_declaration(self):
-        """DC source declaration : str
-        """
-        #self.print_log(type='F', msg='DC source declaration not defined for ngspice')
-        return 'vsource type=dc dc='
-    @property
-    def parameter(self):
-        """Netlist parameter definition string : str
-        """
-        return 'parameters '
-    @property
-    def option(self):
-        """Netlist option definition string : str
-        """
-        return 'options '
-    @property
-    def include(self):
-        """Netlist include string : str
-        """
-        return 'include '
-    @property
-    def dspfinclude(self):
-        """Netlist dspf-file include string : str
-        """
-        return 'dspf_include '
-    @property
-    def subckt(self):
-        """Subcircuit include string : str
-        """
-        return 'subckt '
-    @property
-    def lastline(self):
-        """Last line of the simulator command file : str
-        """
-        return '///'
-    @property
-    def eventoutdelim(self):
-        """Delimiter for the events : str
-        """
-        return ',' #Two spaces
-    @property
-    def csvskip(self):
-        """Needs documentation. Lines skipped in result file : int
-        """
-        return 0
+    def spectre_spicecmd(self):
+        """String
 
+        Simulation command string to be executed on the command line.
+        Automatically generated.
+        """
+        if not hasattr(self,'_spectre_spicecmd'):
+            if self.nproc:
+                nprocflag = "%s%d" % (self.langmodule.nprocflag,self.nproc)
+                self.print_log(type='I',msg='Enabling multithreading \'%s\'.' % nprocflag)
+            else:
+                nprocflag = ""
+
+            if self.tb.postlayout:
+                plflag=self.langmodule.postlayout_flag
+                self.print_log(type='I',msg='Enabling post-layout optimization \'%s\'.' % plflag)
+            else:
+                plflag = ''
+
+            spicesimcmd = (self.langmodule.simulatorcmd + "++aps=%s %s %s -outdir %s " 
+                    % (self.errpreset,plflag,nprocflag,self.spicesimpath))
+            self._spectre_spicecmd = self.spice_submission+spicesimcmd+self.spicetbsrc
+
+        return self._spectre_spicecmd
 
