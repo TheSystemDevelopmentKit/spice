@@ -114,7 +114,7 @@ class testbench(testbench_common):
         if not hasattr(self,'_parameters'):
             self._parameters = "%s Parameters\n" % self.parent.syntaxdict["commentchar"]
             for parname,parval in self.parent.spiceparameters.items():
-                self._parameters += self.parent.syntaxdict["parameter"] + str(parname) + "=" + str(parval) + "\n"
+                self._parameters += self.parent.syntaxdict["parameter"] + ' ' + str(parname) + "=" + str(parval) + "\n"
         return self._parameters
     @parameters.setter
     def parameters(self,value):
