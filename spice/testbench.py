@@ -29,9 +29,6 @@ class testbench(spice_module):
     This class is utilized by the main spice class.
 
     """
-    @property
-    def _classfile(self):
-        return os.path.dirname(os.path.realpath(__file__)) + "/"+__name__
 
     def __init__(self, parent=None, **kwargs):
         if parent==None:
@@ -65,6 +62,19 @@ class testbench(spice_module):
     @file.setter
     def file(self,value):
             self._file=value
+
+    @property
+    def header(self):
+        """The header of the testbench
+
+        """
+        if not hasattr(self,'_header'):
+            date_object = datetime.now()
+            self._header = self.parent.syntaxdict["commentline"] +\
+                    "%s Testbench for %s\n" % (self.parent.syntaxdict["commentchar"],self.parent.name) +\
+                    "%s Generated on %s \n" % (self.parent.syntaxdict["commentchar"],date_object) +\
+                    self.parent.syntaxdict["commentline"]
+            return self._header
 
     # Generating spice options string
     @property
@@ -921,11 +931,7 @@ class testbench(spice_module):
         """
         Internally called function to generate testbench contents.
         """
-        date_object = datetime.now()
-        headertxt = self.parent.syntaxdict["commentline"] +\
-                    "%s Testbench for %s\n" % (self.parent.syntaxdict["commentchar"],self.parent.name) +\
-                    "%s Generated on %s \n" % (self.parent.syntaxdict["commentchar"],date_object) +\
-                    self.parent.syntaxdict["commentline"]
+        headertxt = self.header
         libcmd = self.libcmd
         includecmd = self.includecmd
         subinst = self.subinst
