@@ -45,7 +45,7 @@ class eldo_testbench(testbench_common):
             self._options = "%s Options\n" % self.parent.syntaxdict["commentchar"]
             for optname,optval in self.parent.spiceoptions.items():
                 if optval != "":
-                    self._options += self.parent.syntaxdict["option"] + ' ' optname + "=" + optval + "\n"
+                    self._options += self.parent.syntaxdict["option"] + ' ' + optname + "=" + optval + "\n"
                 else:
                     self._options += ".option " + optname + "\n"
         return self._options
