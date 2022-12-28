@@ -49,7 +49,7 @@ class spectre(thesdk,metaclass=abc.ABCMeta):
             else:
                 plflag = ''
 
-            spicesimcmd = (self.langmodule.simulatorcmd + "++aps=%s %s %s -outdir %s " 
+            spicesimcmd = (self.langmodule.simulatorcmd + " ++aps=%s %s %s -outdir %s " 
                     % (self.errpreset,plflag,nprocflag,self.spicesimpath))
             self._spectre_spicecmd = self.spice_submission+spicesimcmd+self.spicetbsrc
 
