@@ -15,10 +15,15 @@ import numpy as np
 class eldo_lang(thesdk,metaclass=abc.ABCMeta):
     """This class is used as instance in simulatormodule property of 
     spice class.
+
+    Parameters
+    ----------
+
+    parent : instance of Thesdk entity
     
     """
-    def __init__(self):
-        pass
+    def __init__(self,parent = None):
+        self.parent=parent
 
     @property
     def syntaxdict(self):
@@ -122,8 +127,18 @@ class eldo_lang(thesdk,metaclass=abc.ABCMeta):
         return 2
 
     @property
-    def postlayout_flag(self):
-        """Needs documatntation.
-        """
-        return ''
+    def plflag(self):
+        '''
+        Postlayout simulation accuracy/RC reduction flag.
+        
+        '''
+        self.print_log(type='W', msg='Postlayout flag unsupported for %s' %(self.parent.model))
+        if not hasattr(self, '_plflag'):
+            self._plflag=''
+        return self._plflag
+
+    @plflag.setter
+    def plflag(self, val):
+        self.print_log(type='W', msg='Postlayout flag unsupported for Eldo')
+
 

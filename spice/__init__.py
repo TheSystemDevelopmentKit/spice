@@ -81,11 +81,11 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
         """
         if not hasattr(self,'_langmodule'):
             if self.model == 'ngspice':
-                self._langmodule=ngspice_lang()
+                self._langmodule=ngspice_lang(parent=self)
             if self.model == 'eldo':
-                self._langmodule=eldo_lang()
+                self._langmodule=eldo_lang(parent=self)
             if self.model == 'spectre':
-                self._langmodule=spectre_lang()
+                self._langmodule=spectre_lang(parent=self)
         return self._langmodule
    
 
@@ -338,9 +338,12 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
     def nproc(self):
         """ Integer
         
-        Requested maximum number of threads for multithreaded simulations. For
-        Eldo, maps to command line parameter '-nproc'. For Spectre, maps to
-        command line parameter '+mt'.
+        Requested maximum number of threads for multithreaded simulations.
+
+        Eldo : maps to command line parameter '-nproc'
+
+        Spectre :  maps to command line parameter '+mt'.
+        Ngspice :  maps to 'set num_threads=' line in testbench.
         """
         if hasattr(self,'_nproc'):
             return self._nproc
@@ -385,14 +388,15 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
 
         Dictionary to store event type output from the simulations. This should
         speed up reading the results.
+
+        NOTE: Eldo seems to force output names to uppercase, let's
+        uppercase everything here to avoid key mismatches. (This should be changed).
         """
         if not hasattr(self, '_iofile_eventdict'):
             self._iofile_eventdict=dict()
             for name, val in self.iofile_bundle.Members.items():
                 if (val.dir.lower()=='out' or val.dir.lower()=='output') and val.iotype=='event':
                     for key in val.ionames:
-                        # Eldo seems to force output names to uppercase, let's
-                        # uppercase everything here to avoid key mismatches
                         self._iofile_eventdict[key.upper()] = None
         return self._iofile_eventdict
     @iofile_eventdict.setter
@@ -406,6 +410,8 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
         A thesdk.Bundle containing `spice_dcsource` objects. The `spice_dcsource`
         objects are automatically added to this Bundle, nothing should be
         manually added.
+
+        This is to automate biasing and operation conditions of the circuit.
         """
         if not hasattr(self,'_dcsource_bundle'):
             self._dcsource_bundle=Bundle()
@@ -484,13 +490,13 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
         .. note:: 
             Obsolete! Moved to `spice_simcmd` as a keyword argument.
         """
-        self.print_log(type='O', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
+        self.print_log(type='O', msg='Plotlist has been relocated as an argument to spice_simcmd!') 
         if not hasattr(self,'_plotlist'):
             self._plotlist=[]
         return self._plotlist 
     @plotlist.setter
     def plotlist(self,value): 
-        self.print_log(type='O', msg='Plotlist has been relocated as a parameter to spice_simcmd!') 
+        self.print_log(type='O', msg='Plotlist has been relocated as an argument to spice_simcmd!') 
         self._plotlist=value
 
     @property
@@ -501,13 +507,13 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
         pasted to their own lines (no linebreaks needed), and the syntax is
         unchanged.
 
-        For example, setting initial voltages from testbench (Eldo)::
-
+        Example
+        -------
+        Setting initial voltages from testbench (Eldo)::
             for i in range(nodes):
                 self.spicemisc.append('.ic NODE<%d> 0' % i)
 
-        The same example can be done in Spectre with::
-
+        The same example for Spectre::
             self.spicemisc.append('simulator lang=spice')
             for i in range(nodes):
                 self.spicemisc.append('.ic NODE<%d> 0' % i)
@@ -601,23 +607,13 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
     def plflag(self):
         '''
         Postlayout simulation accuracy/RC reduction flag.
-        See: https://community.cadence.com/cadence_blogs_8/b/cic/posts/spectre-optimizing-spectre-aps-performance 
         '''
         if not hasattr(self, '_plflag'):
-            self._plflag="upa"
+            self._plflag=self.langmodule.plflag
         return self._plflag
-
     @plflag.setter
     def plflag(self, val):
-        if self.model=='spectre':
-            if val in ["upa", "hpa"]:
-                self._plflag=val
-            else:
-                self.print_log(type='W', msg='Unsupported postlayout flag: %s' % val)
-        else:
-            # This should be checked, can the other flags given to e.g. ELDO (previously upa was 
-            # passed to all simulators)
-            self.print_log(type='W', msg='Simulator %s supports only postlayout flag: %s' (self.model, val))
+        self.langmodule.plflag = val
             
 
 

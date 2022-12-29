@@ -15,10 +15,15 @@ import numpy as np
 class spectre_lang(thesdk,metaclass=abc.ABCMeta):
     """This class is used as instance in simulatormodule property of 
     spice class.
+
+    Parameters
+    ----------
+
+    parent : instance of Thesdk entity
     
     """
-    def __init__(self):
-        pass
+    def __init__(self,parent = None):
+        self.parent=parent
 
     @property
     def syntaxdict(self):
@@ -122,8 +127,19 @@ class spectre_lang(thesdk,metaclass=abc.ABCMeta):
         return 0
 
     @property
-    def postlayout_flag(self):
-        """Needs documentation.
-        """
-        return '+postlayout=upa' # This is most likely for spectre
+    def plflag(self):
+        '''
+        Postlayout simulation accuracy/RC reduction flag.
+        See: https://community.cadence.com/cadence_blogs_8/b/cic/posts/spectre-optimizing-spectre-aps-performance 
+        '''
+        if not hasattr(self, '_plflag'):
+            self._plflag="upa"
+        return self._plflag
+
+    @plflag.setter
+    def plflag(self, val):
+        if val in ["upa", "hpa"]:
+            self._plflag=val
+        else:
+            self.print_log(type='W', msg='Unsupported postlayout flag: %s' % val)
 
