@@ -34,5 +34,9 @@ class ngspice(thesdk,metaclass=abc.ABCMeta):
             if self.tb.postlayout:
                 self.print_log(type='W',msg='Post-layout optimization not suported for Ngspice')
 
-            self._ngspice_spicecmd = self.spice_submission+self.langmodule.simulatorcmd+' '+self.spicetbsrc
+            print(self.interactive_spice)
+            if self.interactive_spice:
+                self._ngspice_spicecmd = self.spice_submission+self.langmodule.simulatorcmd+' '+self.spicetbsrc
+            else:
+                self._ngspice_spicecmd = self.spice_submission + self.langmodule.simulatorcmd + ' -b '+self.spicetbsrc
         return self._ngspice_spicecmd

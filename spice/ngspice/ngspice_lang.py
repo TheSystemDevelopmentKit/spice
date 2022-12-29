@@ -86,7 +86,7 @@ class ngspice_lang(thesdk,metaclass=abc.ABCMeta):
     def simulatorcmd(self):
         """Simulator execution command : str
         """
-        return 'ngspice -b'
+        return 'ngspice'
     @property
     def dcsource_declaration(self):
         """DC source declaration : str
