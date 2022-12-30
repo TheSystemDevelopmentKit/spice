@@ -9,6 +9,32 @@ Provides utilities to import spice-like modules to Python environment and
 generate testbenches for the various simulation cases.
 
 Initially written by Okko Järvinen, 2019
+
+
+Notes for developers
+--------------------
+
+There are now two ways to provide simulator dependent structures that are
+(most of the time) followed:
+
+    1. Simulator dependent *properties* are defined in packages 
+    <simulator>/<simulator>_lang.py that are used as `langmodule` instance
+    in this spice class inside *langmodule* property. Properties and 
+    attributed of instance of *this class* (i.e. all TheSyDeKick Entitites)
+    are made visible to langmodules through passing the *parent* as an 
+    argument in instance creation. Properties defined inside 
+    *langmodule* are accessed and set thourh corresponding properties of
+    this class.
+
+    2. Simulator dependent *methods* are defined in packages 
+    <simulator>/<simulator>.py with names <simulator>_<method> .
+    This class provides an interfacce method tho those methods,
+    selecting the correct method to be used with 'model' parameter.
+
+    As writing this on 30.12.2022, I think this separation does 
+    not make much sense, and I will converge to lanmodule type of 
+    implementation. -Marko Kosunen
+
 """
 import os
 import sys
@@ -641,8 +667,7 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
         """String
 
         Path to output waveform database. (<spicesimpath>/tb_<entityname>.<resultfile_ext>)
-        For now only for spectre.
-        This shouldn't be set manually.
+        (For now only for spectre. HOW? should work for Eldo too)
         """
         if not hasattr(self,'_spicedbpath'):
             self._spicedbpath=self.spicesimpath+'/tb_'+self.name+self.langmodule.resultfile_ext
