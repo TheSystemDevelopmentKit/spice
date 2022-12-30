@@ -287,9 +287,9 @@ class spice_module(thesdk):
                 else:
                     self.print_log(type='I', msg='Running instance constructor for postlayput simulation')
                     # This part is supposed to be the constructor copy-pasted, 
+                    # However it is not.
                     # only difference should be that its read from a file the file is self._subcktfile 
                     # To which the isntace is exported. This makes no sense.
-                    # However it is not.
                     # TODO: needs obvious refactoring
                     if self.parent.model=='eldo':
                         startmatch=re.compile(r"\.SUBCKT %s " % self.parent.name.upper(),re.IGNORECASE)
