@@ -77,9 +77,9 @@ class spice_module(thesdk):
     def subckt(self):
         """String
         
-        String containing the contents of the subckt_* -file. This attribute
-        parses the source netlist when called, and generates the contents to be
-        written to the subckt-file.
+        String containing the contents of the subcircuit definition ef the entity.
+        Extract the definitio form the source netlist. the source netlist when accessed. 
+        Can be written to the subckt_file with export_subckt method. 
         """
         if not hasattr(self,'_subckt'):
             if self.parent.model=='eldo':
@@ -272,11 +272,10 @@ class spice_module(thesdk):
         """String
         
         String containing the subcircuit instance to be placed in the
-        testbench. The instance is parsed from the previously generated
-        subckt_* -file.
+        testbench. Parsed from the subckt property
         """
         try:
-            if not hasattr(self,'_subinst'):
+            if not hasattr(self,'_instance'):
                 subckt = self.subckt.split('\n')
 
                 if not self.postlayout:
@@ -286,8 +285,10 @@ class spice_module(thesdk):
                     else:
                         self.subinst_constructor(subckt=subckt)
                 else:
+                    self.print_log(type='I', msg='Running instance constructor for postlayput simulation')
                     # This part is supposed to be the constructor copy-pasted, 
-                    # only difference should be that its read from a file
+                    # only difference should be that its read from a file the file is self._subcktfile 
+                    # To which the isntace is exported. This makes no sense.
                     # However it is not.
                     # TODO: needs obvious refactoring
                     if self.parent.model=='eldo':
