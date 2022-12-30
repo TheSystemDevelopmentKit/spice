@@ -70,9 +70,9 @@ class testbench_common(spice_module):
         """
         if not hasattr(self,'_header'):
             date_object = datetime.now()
-            self._header = self.parent.syntaxdict["commentline"] +\
-                    "%s Testbench for %s\n" % (self.parent.syntaxdict["commentchar"],self.parent.name) +\
-                    "%s Generated on %s \n" % (self.parent.syntaxdict["commentchar"],date_object) +\
-                    self.parent.syntaxdict["commentline"]
+            self._header = self.parent.spice_simulator.commentline +\
+                    "%s Testbench for %s\n" % (self.parent.spice_simulator.commentchar,self.parent.name) +\
+                    "%s Generated on %s \n" % (self.parent.spice_simulator.commentchar,date_object) +\
+                    self.parent.spice_simulator.commentline
             return self._header
 

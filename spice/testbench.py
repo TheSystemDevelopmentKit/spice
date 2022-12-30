@@ -46,18 +46,18 @@ class testbench(testbench_common):
         self.model=self.parent.model
 
     @property
-    def langmodule(self): 
+    def testbench_simulator(self): 
         """The simulator specific operation is defined with an instance of 
         simulator specific class. Properties and methods return values from that class.
         """
-        if not hasattr(self,'_tb_langmodule'):
+        if not hasattr(self,'_testbench_simulator'):
             if self.model == 'ngspice':
-                self._langmodule=ngspice_testbench(parent=self.parent)
+                self._testbench_simulator=ngspice_testbench(parent=self.parent)
             if self.model == 'eldo':
-                self._langmodule=eldo_testbench(parent=self.parent)
+                self._testbench_simulator=eldo_testbench(parent=self.parent)
             if self.model == 'spectre':
-                self._langmodule=spectre_testbench(parent=self.parent)
-        return self._langmodule
+                self._testbench_simulator=spectre_testbench(parent=self.parent)
+        return self._testbench_simulator
         
     @property
     def file(self):
@@ -79,10 +79,10 @@ class testbench(testbench_common):
         """
         if not hasattr(self,'_header'):
             date_object = datetime.now()
-            self._header = self.parent.syntaxdict["commentline"] +\
-                    "%s Testbench for %s\n" % (self.parent.syntaxdict["commentchar"],self.parent.name) +\
-                    "%s Generated on %s \n" % (self.parent.syntaxdict["commentchar"],date_object) +\
-                    self.parent.syntaxdict["commentline"]
+            self._header = self.parent.spice_simulator.commentline +\
+                    "%s Testbench for %s\n" % (self.parent.spice_simulator.commentchar,self.parent.name) +\
+                    "%s Generated on %s \n" % (self.parent.spice_simulator.commentchar,date_object) +\
+                    self.parent.spice_simulator.commentline
             return self._header
 
     # Generating spice options string
@@ -94,7 +94,7 @@ class testbench(testbench_common):
         parent entity.
         """
         if not hasattr(self,'_options'):
-            self._options = self.langmodule.options
+            self._options = self.testbench_simulator.options
         return self._options
     @options.setter
     def options(self,value):
@@ -112,9 +112,9 @@ class testbench(testbench_common):
         the parent entity.
         """
         if not hasattr(self,'_parameters'):
-            self._parameters = "%s Parameters\n" % self.parent.syntaxdict["commentchar"]
+            self._parameters = "%s Parameters\n" % self.parent.spice_simulator.commentchar
             for parname,parval in self.parent.spiceparameters.items():
-                self._parameters += self.parent.syntaxdict["parameter"] + ' ' + str(parname) + "=" + str(parval) + "\n"
+                self._parameters += self.parent.spice_simulator.parameter + ' ' + str(parname) + "=" + str(parval) + "\n"
         return self._parameters
     @parameters.setter
     def parameters(self,value):
@@ -205,8 +205,8 @@ class testbench(testbench_common):
         Subcircuit inclusion string pointing to generated subckt_* -file.
         """
         if not hasattr(self,'_includecmd'):
-            self._includecmd = "%s Subcircuit file\n"  % self.parent.syntaxdict["commentchar"]
-            self._includecmd += "%s \"%s\"\n" % (self.parent.syntaxdict["include"],self._subcktfile)
+            self._includecmd = "%s Subcircuit file\n"  % self.parent.spice_simulator.commentchar
+            self._includecmd += "%s \"%s\"\n" % (self.parent.spice_simulator.include,self._subcktfile)
         return self._includecmd
     @includecmd.setter
     def includecmd(self,value):
@@ -227,7 +227,7 @@ class testbench(testbench_common):
             if len(self.parent.dspf) > 0:
                 self.print_log(type='I',msg='Including exctracted parasitics from DSPF.')
                 self.postlayout = True
-                self._dspfincludecmd = "%s Extracted parasitics\n"  % self.parent.syntaxdict["commentchar"]
+                self._dspfincludecmd = "%s Extracted parasitics\n"  % self.parent.spice_simulator.commentchar
                 origcellmatch = re.compile(r"DESIGN")
                 for cellname in self.parent.dspf:
                     dspfpath = '%s/%s.pex.dspf' % (self.parent.spicesrcpath,cellname)
@@ -250,7 +250,7 @@ class testbench(testbench_common):
                                 for line in f:
                                     print(line.replace(self.origcellname,self.parent.name.upper()),end='')
                         self.print_log(type='I',msg='Including DSPF-file: %s' % dspfpath)
-                        self._dspfincludecmd += "%s \"%s\"\n" % (self.parent.syntaxdict["dspfinclude"],dspfpath)
+                        self._dspfincludecmd += "%s \"%s\"\n" % (self.parent.spice_simulator.dspfinclude,dspfpath)
                     except:
                         self.print_log(type='W',msg='DSPF-file not found: %s' % dspfpath)
                         self.print_log(type='W',msg=traceback.format_exc())
@@ -273,7 +273,7 @@ class testbench(testbench_common):
         the parent entity.
         """
         if not hasattr(self,'_misccmd'):
-            self._misccmd="%s Manual commands\n" % (self.parent.syntaxdict["commentchar"])
+            self._misccmd="%s Manual commands\n" % (self.parent.spice_simulator.commentchar)
             mcmd = self.parent.spicemisc
             for cmd in mcmd:
                 self._misccmd += cmd + "\n"
@@ -294,7 +294,7 @@ class testbench(testbench_common):
         in the parent entity.
         """
         if not hasattr(self,'_dcsourcestr'):
-            self._dcsourcestr = "%s DC sources\n" % self.parent.syntaxdict["commentchar"]
+            self._dcsourcestr = "%s DC sources\n" % self.parent.spice_simulator.commentchar
             for name, val in self.dcsources.Members.items():
                 value = val.value if val.paramname is None else val.paramname
                 supply = '%s%s' % (val.sourcetype.upper(),val.name.upper())
@@ -344,7 +344,7 @@ class testbench(testbench_common):
         in the parent entity.
         """
         if not hasattr(self,'_inputsignals'):
-            self._inputsignals = "%s Input signals\n" % self.parent.syntaxdict["commentchar"]
+            self._inputsignals = "%s Input signals\n" % self.parent.spice_simulator.commentchar
             for name, val in self.iofiles.Members.items():
                 # Input file becomes a source
                 if val.dir.lower()=='in' or val.dir.lower()=='input':
@@ -515,7 +515,7 @@ class testbench(testbench_common):
         instantiated in the parent entity.
         """
         if not hasattr(self,'_simcmdstr'):
-            self._simcmdstr = "%s Simulation commands\n" % self.parent.syntaxdict["commentchar"]
+            self._simcmdstr = "%s Simulation commands\n" % self.parent.spice_simulator.commentchar
             for sim, val in self.simcmds.Members.items():
                 if val.mc and self.parent.model=='spectre':
                     self._simcmdstr += 'mc montecarlo donominal=no variations=all %snumruns=1 {\n' \
@@ -683,7 +683,7 @@ class testbench(testbench_common):
             for name, val in self.simcmds.Members.items():
                 # Manual probes
                 if len(val.plotlist) > 0 and name.lower() != 'dc':
-                    self._plotcmd = "%s Manually probed signals\n" % self.parent.syntaxdict["commentchar"]
+                    self._plotcmd = "%s Manually probed signals\n" % self.parent.spice_simulator.commentchar
                     if self.parent.model == 'eldo': 
                         self._plotcmd += '.plot ' 
                     else:
@@ -694,7 +694,7 @@ class testbench(testbench_common):
                     self._plotcmd += "\n\n"
                 #DC probes
                 if len(val.plotlist) > 0 and name.lower() == 'dc':
-                    self._plotcmd = "%s DC operating points to be captured:\n" % self.parent.syntaxdict["commentchar"]
+                    self._plotcmd = "%s DC operating points to be captured:\n" % self.parent.spice_simulator.commentchar
                     if self.parent.model == 'eldo': 
                         self._plotcmd += '.plot ' 
                     else:
@@ -710,11 +710,11 @@ class testbench(testbench_common):
                     self._plotcmd += "\n\n"
 
                 if name.lower() == 'tran' or name.lower() == 'ac' :
-                    self._plotcmd += "%s Output signals\n" % self.parent.syntaxdict["commentchar"]
+                    self._plotcmd += "%s Output signals\n" % self.parent.spice_simulator.commentchar
                     if self.parent.model=='ngspice':
                         self._plotcmd += ".control\nset wr_singlescale\nset wr_vecnames\nset appendwrite\n"
                         if self.parent.nproc: 
-                            self._plotcmd +="%s%d\n" % (self.parent.syntaxdict["nprocflag"],self.parent.nproc)
+                            self._plotcmd +="%s%d\n" % (self.parent.spice_simulator.nprocflag,self.parent.nproc)
                         self._plotcmd += "run\n"
 
                     # Parsing output iofiles
@@ -948,6 +948,6 @@ class testbench(testbench_common):
                         self.inputsignals + "\n" +
                         self.simcmdstr + "\n" +
                         self.plotcmd + "\n" +
-                        self.parent.syntaxdict["lastline"]+"\n")
+                        self.parent.spice_simulator.lastline+"\n")
 if __name__=="__main__":
     pass

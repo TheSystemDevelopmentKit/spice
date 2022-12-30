@@ -95,7 +95,7 @@ class spice_module(thesdk):
                 endmatch=re.compile(r"\.ENDS",re.IGNORECASE)
             cellname = ''
             linecount = 0
-            self._subckt="%s Subcircuit definitions\n\n" % self.parent.syntaxdict["commentchar"]
+            self._subckt="%s Subcircuit definitions\n\n" % self.parent.spice_simulator.commentchar
             # Extract the module definition
             if os.path.isfile(self._dutfile):
                 try:
@@ -151,7 +151,7 @@ class spice_module(thesdk):
                                     cellname = words[1].lower()
                                     self.print_log(type='D',msg='Renaming design cell %s to %s.' % (cellname,self.parent.name))
                                 if words[1].lower() == cellname.lower():
-                                    self._subckt+="\n%s Subcircuit definition for %s module\n" % (self.parent.syntaxdict["commentchar"],self.parent.name)
+                                    self._subckt+="\n%s Subcircuit definition for %s module\n" % (self.parent.spice_simulator.commentchar,self.parent.name)
                                     words[1] = self.parent.name.upper()
                                     if cellname != self.parent.name:
                                         self.print_log(type='D',msg='Renaming design cell "%s" to "%s".' % (cellname,self.parent.name))
@@ -160,7 +160,7 @@ class spice_module(thesdk):
                             # Inside the subcircuit clause -> copy all lines except comments
                             if startfound:
                                 words = line.split()
-                                if len(words) > 0 and words[0] != self.parent.syntaxdict["commentchar"]:
+                                if len(words) > 0 and words[0] != self.parent.spice_simulator.commentchar:
                                     if words[0] == 'subckts': #todo: figure out what this spectre line does
                                         startfound=False
                                     else:
@@ -174,7 +174,7 @@ class spice_module(thesdk):
                             # Calibre places an include statement above the first subcircuit -> grab that
                             if len(self.parent.dspf) == 0 and self.postlayout and not startfound:
                                 words = line.split()
-                                if words[0].lower() == self.parent.syntaxdict["include"]:
+                                if words[0].lower() == self.parent.spice_simulator.include:
                                     self._subckt=self._subckt+line
                                     linecount += 1
                             # End of subcircuit found
@@ -205,15 +205,15 @@ class spice_module(thesdk):
 
         """
         subckt=kwargs.get('subckt')
-        startmatch=re.compile(r"%s %s " %(self.parent.syntaxdict["subckt"], self.parent.name.upper())
+        startmatch=re.compile(r"%s %s " %(self.parent.spice_simulator.subckt, self.parent.name.upper())
                 ,re.IGNORECASE)
 
         if len(subckt) <= 3:
             self.print_log(type='W',msg='No subcircuit found.')
-            self._subinst = "%s Empty subcircuit\n" % (self.parent.syntaxdict["commentchar"])
+            self._subinst = "%s Empty subcircuit\n" % (self.parent.spice_simulator.commentchar)
 
         else:
-            self._subinst = "%s Subcircuit instance\n" % (self.parent.syntaxdict["commentchar"])
+            self._subinst = "%s Subcircuit instance\n" % (self.parent.spice_simulator.commentchar)
             startfound = False
             endfound = False
             lastline = False
@@ -244,7 +244,7 @@ class spice_module(thesdk):
                             startfound = False
                 if startfound and not endfound:
                     words = line.split(" ")
-                    if words[0].lower() == self.parent.syntaxdict["subckt"]:
+                    if words[0].lower() == self.parent.spice_simulator.subckt:
                         if self.parent.model == 'eldo':
                             words[0] = "X%s%s" % (self.parent.name.upper(),'')  
                         elif self.parent.model == 'spectre':
@@ -277,7 +277,7 @@ class spice_module(thesdk):
                 if not self.postlayout:
                     if len(subckt) <= 3:
                             self.print_log(type='W',msg='No subcircuit found.')
-                            self._subinst = "%s Empty subcircuit\n" % (self.parent.syntaxdict["commentchar"])
+                            self._subinst = "%s Empty subcircuit\n" % (self.parent.spice_simulator.commentchar)
                     else:
                         self.subinst_constructor(subckt=subckt)
                 else:
@@ -291,7 +291,7 @@ class spice_module(thesdk):
                         startmatch=re.compile(r"\SUBCKT %s " % self.parent.name.upper(),re.IGNORECASE)
                     elif self.parent.model=='ngspice':
                         startmatch=re.compile(r"\.SUBCKT %s " % self.parent.name.upper(),re.IGNORECASE)
-                    self._subinst = "%s Subcircuit instance\n" % (self.parent.syntaxdict["commentchar"])
+                    self._subinst = "%s Subcircuit instance\n" % (self.parent.spice_simulator.commentchar)
                     startfound = False
                     endfound = False
                     lastline = False
@@ -315,7 +315,7 @@ class spice_module(thesdk):
                                         lastline = True
                             if startfound and not endfound:
                                 words = line.split(" ")
-                                if words[0].lower() == self.parent.syntaxdict["subckt"]:
+                                if words[0].lower() == self.parent.spice_simulator.subckt:
                                     words[0] = "X%s" % (self.parent.name.upper())
                                     words.pop(1)
                                     line = ' '.join(words)

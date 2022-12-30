@@ -42,7 +42,7 @@ class spectre_testbench(testbench_common):
         parent entity.
         """
         if not hasattr(self,'_options'):
-            self._options = "%s Options\n" % self.parent.syntaxdict["commentchar"]
+            self._options = "%s Options\n" % self.parent.spice_simulator.commentchar
             if self.postlayout and 'savefilter' not in self.parent.spiceoptions:
                 self.print_log(type='I', msg='Consider using option savefilter=rc for post-layout netlists to reduce output file size!')
             if self.postlayout and 'save' not in self.parent.spiceoptions:
@@ -52,7 +52,7 @@ class spectre_testbench(testbench_common):
                 self._options += "Option%d " % i # spectre options need unique names
                 i+=1
                 if optval != "":
-                    self._options += self.parent.syntaxdict["option"] + ' ' + optname + "=" + optval + "\n"
+                    self._options += self.parent.spice_simulator.option + ' ' + optname + "=" + optval + "\n"
                 else:
                     self._options += ".option " + optname + "\n"
 

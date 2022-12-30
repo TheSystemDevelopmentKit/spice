@@ -92,6 +92,7 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
     def spice_simulator(self): 
         """The simulator specific operation is defined with an instance of 
         simulator specific class. Properties and methods return values from that class.
+
         """
         if not hasattr(self,'_spice_simulator'):
             if self.model == 'ngspice':
