@@ -18,22 +18,16 @@ There are now two ways to provide simulator dependent structures that are
 (most of the time) followed:
 
     1. Simulator dependent *properties* are defined in packages 
-    <simulator>/<simulator>_lang.py that are used as `langmodule` instance
-    in this spice class inside *langmodule* property. Properties and 
+    <simulator>/<simulator>.py that are used as `spice_simulator` instance
+    in this spice class inside *spice_simulator* property. Properties and 
     attributed of instance of *this class* (i.e. all TheSyDeKick Entitites)
-    are made visible to langmodules through passing the *parent* as an 
+    are made visible to spice_simulators through passing the *self* as *parent* 
     argument in instance creation. Properties defined inside 
-    *langmodule* are accessed and set thourh corresponding properties of
+    *spice_simulator* are accessed and set through corresponding properties of
     this class.
 
-    2. Simulator dependent *methods* are defined in packages 
-    <simulator>/<simulator>.py with names <simulator>_<method> .
-    This class provides an interfacce method tho those methods,
-    selecting the correct method to be used with 'model' parameter.
-
-    As writing this on 30.12.2022, I think this separation does 
-    not make much sense, and I will converge to lanmodule type of 
-    implementation. -Marko Kosunen
+    2. This is an interface package, generic spice simulation 
+    related methods should be provided in *spice_methods* module.
 
 """
 import os
@@ -54,23 +48,17 @@ from numpy import genfromtxt
 import pandas as pd
 from functools import reduce
 from spice.testbench import testbench as stb
+from spice.spice_simcmd import spice_simcmd as spice_simcmd
 from spice.spice_iofile import spice_iofile as spice_iofile
 from spice.spice_dcsource import spice_dcsource as spice_dcsource
-from spice.spice_simcmd import spice_simcmd as spice_simcmd
 from spice.spice_module import spice_module as spice_module
-from spice.ngspice.ngspice_lang import ngspice_lang
+from spice.spice_methods import spice_methods
+# Simulator modules
 from spice.ngspice.ngspice import ngspice
-from spice.eldo.eldo_lang import eldo_lang
 from spice.eldo.eldo import eldo
-from spice.spectre.spectre_lang import spectre_lang
 from spice.spectre.spectre import spectre
 
-class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
-    """Adding this class as a superclass enforces the definitions 
-    for Spice simulations in the subclasses.
-    
-    """
-
+class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
     #These need to be converted to abstact properties
     def __init__(self):
         pass
@@ -101,18 +89,18 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
         return self._si_prefix_mult
    
     @property
-    def langmodule(self): 
+    def spice_simulator(self): 
         """The simulator specific operation is defined with an instance of 
         simulator specific class. Properties and methods return values from that class.
         """
-        if not hasattr(self,'_langmodule'):
+        if not hasattr(self,'_spice_simulator'):
             if self.model == 'ngspice':
-                self._langmodule=ngspice_lang(parent=self)
+                self._spice_simulator=ngspice(parent=self)
             if self.model == 'eldo':
-                self._langmodule=eldo_lang(parent=self)
+                self._spice_simulator=eldo_lang(parent=self)
             if self.model == 'spectre':
-                self._langmodule=spectre_lang(parent=self)
-        return self._langmodule
+                self._spice_simulator=spectre_lang(parent=self)
+        return self._spice_simulator
    
 
     @property
@@ -123,11 +111,11 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
         Spectre, Eldo, and Ngspice.
         """
         if not hasattr(self,'_syntaxdict'):
-            self._syntaxdict = self.langmodule.syntaxdict
+            self._syntaxdict = self.spice_simulator.syntaxdict
         return self._syntaxdict
     @syntaxdict.setter
     def syntaxdict(self,value):
-        self._langmodule.syntaxdict=value
+        self._spice_simulator.syntaxdict=value
 
     @property
     def preserve_spicefiles(self):  
@@ -185,6 +173,8 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
                     # Eldo needs some time to disconnect from the jwdb server
                     # Another dirty hack to check that the process is dead before cleaning
                     # TODO: figure out if this can be prevented
+                    # This is exceptionally here as eldo is the only deviation from the rule
+                    # strictly it should be eldos pecific module.
                     if self.model == 'eldo':
                         self.print_log(type='I',msg='Waiting for Eldo to exit...')
                         waittime = 0
@@ -499,7 +489,6 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
                         self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
 
             except:
-                print(self.has_lsf)
                 self.print_log(type='W',msg='Error while defining spice submission command. Running locally.')
                 self._spice_submission=''
         return self._spice_submission
@@ -507,23 +496,6 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
     def spice_submission(self,value):
         self._spice_submission=value
 
-    @property
-    def plotlist(self): 
-        """ List of str
-
-        List of net names to be saved in the waveform database.
-
-        .. note:: 
-            Obsolete! Moved to `spice_simcmd` as a keyword argument.
-        """
-        self.print_log(type='O', msg='Plotlist has been relocated as an argument to spice_simcmd!') 
-        if not hasattr(self,'_plotlist'):
-            self._plotlist=[]
-        return self._plotlist 
-    @plotlist.setter
-    def plotlist(self,value): 
-        self.print_log(type='O', msg='Plotlist has been relocated as an argument to spice_simcmd!') 
-        self._plotlist=value
 
     @property
     def spicemisc(self): 
@@ -597,7 +569,7 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
             Netlist has to contain the top-level design as a subcircuit definition!
         """
         if not hasattr(self, '_spicesrc'):
-            self._spicesrc=self.spicesrcpath + '/' + self.name + self.langmodule.cmdfile_ext
+            self._spicesrc=self.spicesrcpath + '/' + self.name + self.spice_simulator.cmdfile_ext
 
             if not os.path.exists(self._spicesrc):
                 self.print_log(type='W',msg='No source circuit found in %s.' % self._spicesrc)
@@ -614,7 +586,7 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicetbsrc'):
-            self._spicetbsrc=self.spicesimpath + '/tb_' + self.name + self.langmodule.cmdfile_ext
+            self._spicetbsrc=self.spicesimpath + '/tb_' + self.name + self.spice_simulator.cmdfile_ext
         return self._spicetbsrc
 
     @property
@@ -625,7 +597,7 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
         This shouldn't be set manually.
         """
         if not hasattr(self, '_spicesubcktsrc'):
-            self._spicesubcktsrc=self.spicesimpath + '/subckt_' + self.name + self.langmodule.cmdfile_ext
+            self._spicesubcktsrc=self.spicesimpath + '/subckt_' + self.name + self.spice_simulator.cmdfile_ext
         return self._spicesubcktsrc
 
     
@@ -635,14 +607,12 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
         Postlayout simulation accuracy/RC reduction flag.
         '''
         if not hasattr(self, '_plflag'):
-            self._plflag=self.langmodule.plflag
+            self._plflag=self.spice_simulator.plflag
         return self._plflag
     @plflag.setter
     def plflag(self, val):
-        self.langmodule.plflag = val
+        self.spice_simulator.plflag = val
             
-
-
     @property
     def spicecmd(self):
         """String
@@ -656,11 +626,12 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
             elif self.model=='spectre':
                 self._spicecmd = self.spectre_spicecmd
             elif self.model=='ngspice':
-                self._spicecmd = self.ngspice_spicecmd
+                self._spicecmd = self.spice_simulator.spicecmd
         return self._spicecmd
     @spicecmd.setter
     def spicecmd(self,value):
-        self._spicecmd=value
+        self.spice_simulator.spicecmd=value
+
 
     @property
     def spicedbpath(self):
@@ -670,12 +641,14 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
         (For now only for spectre. HOW? should work for Eldo too)
         """
         if not hasattr(self,'_spicedbpath'):
-            self._spicedbpath=self.spicesimpath+'/tb_'+self.name+self.langmodule.resultfile_ext
+            self._spicedbpath=self.spicesimpath+'/tb_'+self.name+self.spice_simulator.resultfile_ext
         return self._spicedbpath
     @spicedbpath.setter
     def spicedbpath(self, value):
         self._spicedbpath=value
-
+    
+    ### To be relocated
+    ### These are simuator related i.e. ezwave does not work for ngspice.
     @property
     def plotprogram(self):
         """ String
@@ -710,6 +683,7 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
     @plotprogcmd.setter
     def plotprogcmd(self, value):
         self._plotprogcmd=value
+    ### En to be relocated
 
     @property
     def save_database(self): 
@@ -726,36 +700,6 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
     def save_database(self,value): 
         self._save_database=value
 
-
-    @property
-    def strobe_indices(self):
-        """
-        Internally set list of indices corresponding to time,amplitude pairs
-        whose time value of is a multiple of the strobeperiod (see spice_simcmd).
-        """
-        if not hasattr(self,'_strobe_indices'):
-            self._strobe_indices=[]
-        return self._strobe_indices
-
-    @strobe_indices.setter
-    def strobe_indices(self,val):
-        if isinstance(val, list) or isinstance(val, np.ndarray):
-            self._strobe_indices=val
-        else:
-            self.print_log(type='W', msg='Cannot set strobe_indices to be of type: %s' % type(val))
-
-    @property
-    def is_strobed(self):
-        '''
-        Check if simulation was strobed or not
-        '''
-        if not hasattr(self, '_is_strobed'):
-            self._is_strobed=False
-            for simtype, simcmd in self.simcmd_bundle.Members.items():
-                if simtype=='tran':
-                    if simcmd.strobeperiod:
-                        self._is_strobed=True
-        return self._is_strobed
 
     @property
     def save_output_file(self):
@@ -817,79 +761,13 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
         """Automatically called function to call write() functions of each
         iofile with direction 'input'."""
         for name, val in self.iofile_bundle.Members.items():
-            if val.dir.lower()=='in' or val.dir.lower()=='input':
+            if val.dir.lower()=='in':
                 self.iofile_bundle.Members[name].write()
+            elif val.dir.lower()=='input':
+                self.print_log(type='F', 
+                    msg='Direction indicator for %s of should be \'in\' and you are the one to fix your code.' 
+                        %(self.iofile_bundle.Members[name]))
 
-    def filter_strobed(self, key,ioname):
-        """
-        Helper function to read in the strobed simulation results. Only for spectre.
-
-        TODO:
-        this is because the strobeoutput
-        parameter for some reason still outputs
-        all the data points, even when it is in mode
-        strobeonly
-        If solution is found to this later from simulator
-        remove this.
-        """
-        if len(self.strobe_indices)==0:
-            tvals=self.iofile_eventdict[ioname.upper()][:,0]
-            maxtime = np.max(tvals)
-            mintime = np.min(tvals)
-            for simulationcommand, simulationoption in self.simcmd_bundle.Members.items():
-                strobeperiod = simulationoption.strobeperiod
-                strobedelay = simulationoption.strobedelay
-                skipstart = simulationoption.skipstart
-            if not skipstart:
-                skipstart=0
-            if not strobedelay:
-                strobedelay=0
-            strobetimestamps = np.arange(mintime,maxtime,strobeperiod)+strobedelay+skipstart
-            self.strobe_indices=np.zeros(len(strobetimestamps)) # indexes to take the values
-            seg=min(300, len(strobetimestamps)) # length of a segment in the for loop (how many samples at a time)
-            idxmin=0
-            l=len(strobetimestamps)
-            nseg=l//seg # number of segments, rounded down (how many loops required)
-            idxmax=0
-            i = 0
-            for i in np.arange(1,nseg):
-                idxmax=(i-1)*seg+np.argmin(abs(tvals[(i-1)*seg:]-strobetimestamps[i*seg])) # find index of the received signal which corresponds to the largest value in reference
-                ind=idxmin+abs(strobetimestamps[seg*(i-1):seg*(i),None]-tvals[None,idxmin:idxmax]).argmin(axis=-1) # take index for the seg's values
-                idxmin=idxmax
-                self.strobe_indices[seg*(i-1):seg*i]=ind  
-            # again just in case that the loop does not overflow to take the final samples into account
-            idxmax=len(tvals)-1
-            ind=idxmin+abs(strobetimestamps[seg*(i):,None]-tvals[None,idxmin:idxmax]).argmin(axis=-1)
-            idxmin=idxmax
-            self.strobe_indices[seg*(i):]=ind
-            self.strobe_indices=self.strobe_indices.astype(int)
-            if self.iofile_bundle.Members[key].strobe:
-                new_array =self.iofile_eventdict[ioname.upper()][self.strobe_indices]
-                if len(strobetimestamps)!=len(new_array):
-                    self.print_log(type='W',
-                            msg='Oh no, something went wrong while reading the strobeperiod data')
-                    self.print_log(type='W',
-                            msg='Check data lenghts!')
-            else:
-                new_array =self.iofile_eventdict[ioname.upper()]
-        else: # We already know the strobe indices, use them!
-            if self.iofile_bundle.Members[key].strobe:
-                new_array =self.iofile_eventdict[ioname.upper()][self.strobe_indices]
-            else:
-                new_array =self.iofile_eventdict[ioname.upper()]
-        return new_array
-
-    def check_output_accuracy(self,key):
-        '''
-        Helper function to check output accuracy
-        '''
-        try:
-            tdiff = np.diff(self.iofile_eventdict[key.upper()][:,0])
-            if np.any(tdiff == 0.0):
-                    self.print_log(type='W', msg='Accuracy of output file is insufficient. Increase value of \'digits\' parameter and re-run simulation!')
-        except: # Requested output wasn't in output file, do nothing
-            self.print_log(type='W',msg='Couldn\'t check output file accuracy')
-            self.print_log(type='W',msg=traceback.format_exc())
 
     def read_spice_outputs(self):
         """Automatically called function to call read() functions of each
@@ -954,36 +832,7 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
         The plotting program command can be set with 'plotprogram'.
         Tested for spectre and eldo.
         '''
-        if self.model == 'ngspice':
-            self.print_log(type='W',msg='Interactive plotting not implemented for ngspice.')
-            return
-        # This waiting method assumes spectre output.
-        tries = 0
-        while tries < 100:
-            if os.path.exists(self.spicedbpath):
-                if self.model == 'spectre':
-                    # More than just the logfile exists
-                    if len(os.listdir(self.spicedbpath)) > 1:
-                        # Database file has something written to it
-                        filesize = []
-                        for f in os.listdir(self.spicedbpath):
-                            filesize.append(os.stat('%s/%s' % (self.spicedbpath,f)).st_size)
-                        if all(filesize) > 0:
-                            break
-                else:
-                    break
-            else:
-                time.sleep(2)
-                tries += 1
-        cmd=self.plotprogcmd
-        self.print_log(type='I', msg='Running external command: %s' % cmd)
-        try:
-            ret=os.system(cmd)
-            if ret != 0:
-                self.print_log(type='W', msg='%s returned with exit status %d.' % (self.plotprogram, ret))
-        except: 
-            self.print_log(type='W',msg='Something went wrong while launcing %s.' % self.plotprogram)
-            self.print_log(type='W',msg=traceback.format_exc())
+        self.spice_simulator.run_plotprogram()
 
     def extract_powers(self):
         """
@@ -1042,66 +891,6 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
         except:
             self.print_log(type='W',msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting power consumptions.')
-
-    def get_buswidth(self,signame):
-        """ Extract buswidth from signal name.
-        
-        Little-endian example::
-                
-            start,stop,width,busrange = get_buswidth('BUS<10:0>')
-            # start = 10
-            # stop = 0
-            # width = 11
-            # busrange = range(10,-1,-1)
-
-        Big-endian example::
-                
-            start,stop,width,busrange = get_buswidth('BUS<0:8>')
-            # start = 0
-            # stop = 8
-            # width = 9
-            # busrange = range(0,9)
-            
-        """
-        signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
-        if '' in signame:
-            signame.remove('')
-        if len(signame) == 1:
-            busstart = 0
-            busstop = 0
-        elif len(signame) == 2:
-            busstart = int(signame[1])
-            busstop = int(signame[1])
-        else:
-            busstart = int(signame[1])
-            busstop = int(signame[2])
-        if busstart > busstop:
-            buswidth = busstart-busstop+1
-            busrange = range(busstart,busstop-1,-1)
-        else:
-            buswidth = busstop-busstart+1
-            busrange = range(busstart,busstop+1)
-        return busstart,busstop,buswidth,busrange
-    
-    def si_string_to_float(self, strval):
-        """ Convert SI-formatted string to float
-            
-        E.g. self.si_string_to_float('3 mV') returns 3e-3.
-        """
-        parts = strval.split()
-        if len(parts) == 2:
-            val = float(parts[0])
-            if len(parts[1]) == 1: # No prefix
-                mult = 1
-            else:
-                try:
-                    mult = self.si_prefix_mult[parts[1][0]]
-                except KeyError: # Could not convert, just return the text value
-                    self.print_log(type='W', msg='Invalid SI-prefix %s, failed to convert.' % parts[1][0])
-                    return strval
-            return val*mult
-        else:
-            return strval # Was a text value
 
     def read_oppts(self):
         """ Internally called function to read the DC operating points of the circuit
@@ -1177,7 +966,7 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
         except:
             self.print_log(type='W', msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting DC operating points.')
-        
+
     def run_spice(self):
         """Externally called function to execute spice simulation."""
         if self.load_state != '': 
@@ -1189,8 +978,11 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
                 self.tb.simcmds = self.simcmd_bundle
                 self.read_spice_outputs()
                 self.connect_spice_outputs()
+                # Are these really something to be part of
+                # default execution
                 self.extract_powers()
                 self.read_oppts()
+                ###
                 self._write_state()
             else:
                 self._read_state()
@@ -1211,8 +1003,11 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
             self.execute_spice_sim()
             self.read_spice_outputs()
             self.connect_spice_outputs()
+            # Are these really something to be part of
+            # default execution
             self.extract_powers()
             self.read_oppts()
+            ###
             # Save entity state
             if self.save_state:
                 self._write_state()
@@ -1238,3 +1033,44 @@ class spice(ngspice,spectre,eldo,thesdk,metaclass=abc.ABCMeta):
             # Clean simulation results
             self.delete_iofile_bundle()
             self.delete_spicesimpath()
+
+    # Obsolete stuff
+    @property
+    def plotlist(self): 
+        """ List of str
+
+        List of net names to be saved in the waveform database.
+
+        .. note:: 
+            Obsolete! Moved to `spice_simcmd` as a keyword argument.
+        """
+        self.print_log(type='O', msg='Plotlist has been relocated as an argument to spice_simcmd!') 
+        if not hasattr(self,'_plotlist'):
+            self._plotlist=[]
+        return self._plotlist 
+    @plotlist.setter
+    def plotlist(self,value): 
+        self.print_log(type='O', msg='Plotlist has been relocated as an argument to spice_simcmd!') 
+        self._plotlist=value
+
+    @property
+    def errpreset(self):
+        """ String
+        
+        Global accuracy parameter for Spectre simulations. Options include
+        'liberal', 'moderate' and 'conservative', in order of rising accuracy.
+
+         Example
+         -------
+         self.spice_simulator.errpreset='conservative'
+
+        """
+        if not hasattr(self,'_errpreset'):
+            self._errpreset=self.spice_simulator.errpreset
+        self.print_log(type='O', msg='Errpreset is obsoleted as spectre specific command line argument')
+        self.print_log(type='O', msg='Alternative method for handling simulator specific command line arguments should be developed.')
+        return self.spice_simulator.errpreset
+    @errpreset.setter
+    def errpreset(self,value):
+        self.spice.spice_simulator.errpreset=value
+
