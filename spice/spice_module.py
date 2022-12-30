@@ -23,16 +23,27 @@ class spice_module(thesdk):
     the spice_testbench module.
 
     """
-    @property
-    def _classfile(self):
-        return os.path.dirname(os.path.realpath(__file__)) + "/"+__name__
 
     def __init__(self, **kwargs):
         # No need to propertize these yet
-        self.file=kwargs.get('file','')
+        self._file=kwargs.get('file','')
         self._name=kwargs.get('name','')
+        self.parent=kwargs.get('parent') # There should be no need for parent in this module
         if not self.file and not self._name:
             self.print_log(type='F', msg='Either name or file must be defined')
+
+    @property
+    def file(self):
+        """String
+        
+        Filepath to the testbench file (i.e. './spice/tb_entityname.scs').
+        """
+        if not hasattr(self,'_file'):
+            self._file=None
+        return self._file
+    @file.setter
+    def file(self,value):
+            self._file=value
     
     @property
     def name(self):
@@ -42,13 +53,6 @@ class spice_module(thesdk):
         if not self._name:
             self._name=os.path.splitext(os.path.basename(self.file))[0]
         return self._name
-
-    @property
-    def DEBUG(self):
-        """ This fixes DEBUG prints in spice_iofile, by propagating the DEBUG
-        flag of the parent entity.
-        """
-        return self.parent.DEBUG 
 
     @property
     def postlayout(self):
@@ -97,10 +101,10 @@ class spice_module(thesdk):
             linecount = 0
             self._subckt="%s Subcircuit definitions\n\n" % self.parent.spice_simulator.commentchar
             # Extract the module definition
-            if os.path.isfile(self._dutfile):
+            if os.path.isfile(self._file):
                 try:
-                    self.print_log(type='D',msg='Parsing source netlist %s' % self._dutfile)
-                    with open(self._dutfile) as infile:
+                    self.print_log(type='D',msg='Parsing source netlist %s' % self._file)
+                    with open(self._file) as infile:
                         wholefile=infile.readlines()
                         startfound=False
                         endfound=False
@@ -121,9 +125,9 @@ class spice_module(thesdk):
                                 # TODO: think about this
                                 if os.path.isfile(self._subcktfile):
                                     os.remove(self._subcktfile)
-                                    shutil.copyfile(self._dutfile,self._subcktfile)
+                                    shutil.copyfile(self._file,self._subcktfile)
                                 else:
-                                    shutil.copyfile(self._dutfile,self._subcktfile)
+                                    shutil.copyfile(self._file,self._subcktfile)
                                 for line in fileinput.input(self._subcktfile,inplace=1):
                                     startfound=False
                                     endfound=False
@@ -182,10 +186,11 @@ class spice_module(thesdk):
                                 startfound=False
                     self.print_log(type='D',msg='Source netlist parsing done (%d lines).' % linecount)
                 except:
-                    self.print_log(type='E',msg='Something went wrong while parsing %s.' % self._dutfile)
+                    self.print_log(type='E',msg='Something went wrong while parsing %s.' % self._file)
                     self.print_log(type='E',msg=traceback.format_exc())
             else:
-                self.print_log(type='W',msg='File %s not found.' % self._dutfile)
+                print(self._file)
+                self.print_log(type='W',msg='File %s not found.' % self._file)
         return self._subckt
     @subckt.setter
     def subckt(self,value):
@@ -332,6 +337,31 @@ class spice_module(thesdk):
     @subinst.deleter
     def subinst(self,value):
         self._subinst=None
+
+    def export_subckt(self,**kwargs):
+        """
+        Internally called function to write the parsed subcircuit definitions
+        to a file.
+
+        Parameters
+        ----------
+        file : str
+            Path to file where to write.
+        force : Bool, False
+            Force writing
+        """
+        file = kwargs.get('file')
+        force = kwargs.get('force', False)
+        if not os.path.isfile(file):
+            self.print_log(type='D',msg='Exporting spice subcircuit to %s' %(file))
+            with open(file, "w") as module_file:
+                module_file.write(self.subckt)
+        elif os.path.isfile(file) and not force:
+            self.print_log(type='F', msg=('Export target file %s exists.\n Force overwrite with force=True.' %(file)))
+        elif force:
+            self.print_log(type='I',msg='Forcing overwrite of spice subcircuit to %s.' %(file))
+            with open(file, "w") as module_file:
+                module_file.write(self.subckt)
 
 if __name__=="__main__":
     pass

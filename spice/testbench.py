@@ -15,6 +15,7 @@ from spice.testbench_common import testbench_common
 from spice.ngspice.ngspice_testbench import ngspice_testbench
 from spice.eldo.eldo_testbench import eldo_testbench
 from spice.spectre.spectre_testbench import spectre_testbench
+from spice.spice_module import spice_module
 import pdb
 
 import numpy as np
@@ -46,6 +47,13 @@ class testbench(testbench_common):
         self.model=self.parent.model
 
     @property
+    def DEBUG(self):
+        """ This fixes DEBUG prints in spice_iofile, by propagating the DEBUG
+        flag of the parent entity.
+        """
+        return self.parent.DEBUG 
+
+    @property
     def testbench_simulator(self): 
         """The simulator specific operation is defined with an instance of 
         simulator specific class. Properties and methods return values from that class.
@@ -58,50 +66,14 @@ class testbench(testbench_common):
             if self.model == 'spectre':
                 self._testbench_simulator=spectre_testbench(parent=self.parent)
         return self._testbench_simulator
-        
+       
     @property
-    def file(self):
-        """String
-        
-        Filepath to the testbench file (i.e. './spice/tb_entityname.scs').
+    def dut(self):
+        """ Desing under test : spice_module
         """
-        if not hasattr(self,'_file'):
-            self._file=None
-        return self._file
-    @file.setter
-    def file(self,value):
-            self._file=value
-
-    @property
-    def header(self):
-        """The header of the testbench
-
-        """
-        if not hasattr(self,'_header'):
-            date_object = datetime.now()
-            self._header = self.parent.spice_simulator.commentline +\
-                    "%s Testbench for %s\n" % (self.parent.spice_simulator.commentchar,self.parent.name) +\
-                    "%s Generated on %s \n" % (self.parent.spice_simulator.commentchar,date_object) +\
-                    self.parent.spice_simulator.commentline
-            return self._header
-
-    # Generating spice options string
-    @property
-    def options(self):
-        """String
-        
-        Spice options string parsed from self.spiceoptions -dictionary in the
-        parent entity.
-        """
-        if not hasattr(self,'_options'):
-            self._options = self.testbench_simulator.options
-        return self._options
-    @options.setter
-    def options(self,value):
-        self._options=value
-    @options.deleter
-    def options(self,value):
-        self._options=None
+        if not hasattr(self,'_dut'):
+            self._dut = spice_module(file=self._dutfile,parent=self.parent)
+        return self._dut
 
     # Generating eldo/spectre parameters string
     @property
@@ -206,7 +178,7 @@ class testbench(testbench_common):
         """
         if not hasattr(self,'_includecmd'):
             self._includecmd = "%s Subcircuit file\n"  % self.parent.spice_simulator.commentchar
-            self._includecmd += "%s \"%s\"\n" % (self.parent.spice_simulator.include,self._subcktfile)
+            self._includecmd += "%s \"%s\"\n" % (self.parent.spice_simulator.include,self._dutfile)
         return self._includecmd
     @includecmd.setter
     def includecmd(self,value):
@@ -897,7 +869,19 @@ class testbench(testbench_common):
     def export(self,**kwargs):
         """
         Internally called function to write the testbench to a file.
+
+        Parameters
+        ----------
+        force : Bool, False
+
         """
+        force=kwargs.get('force', False)
+
+        if len(self.parent.dspf) == 0 and self.postlayout:
+            self.print_log(type='I',msg='No dspf for postlayout simulation. Not exporting subcircuit.')
+        else:
+            self.dut.export_subckt(file=self._subcktfile, force=force)
+
         if not os.path.isfile(self.file):
             self.print_log(type='D',msg='Exporting spice testbench to %s' %(self.file))
             with open(self.file, "w") as module_file:
@@ -911,25 +895,6 @@ class testbench(testbench_common):
             with open(self.file, "w") as module_file:
                 module_file.write(self.contents)
 
-    def export_subckt(self,**kwargs):
-        """
-        Internally called function to write the parsed subcircuit definitions
-        to a file.
-        """
-        if len(self.parent.dspf) == 0 and self.postlayout:
-            return
-        if not os.path.isfile(self.parent.spicesubcktsrc):
-            self.print_log(type='D',msg='Exporting spice subcircuit to %s' %(self.parent.spicesubcktsrc))
-            with open(self.parent.spicesubcktsrc, "w") as module_file:
-                module_file.write(self.subckt)
-
-        elif os.path.isfile(self.parent.spicesubcktsrc) and not kwargs.get('force'):
-            self.print_log(type='F', msg=('Export target file %s exists.\n Force overwrite with force=True.' %(self.parent.spicesubcktsrc)))
-
-        elif kwargs.get('force'):
-            self.print_log(type='I',msg='Forcing overwrite of spice subcircuit to %s.' %(self.parent.spicesubcktsrc))
-            with open(self.parent.spicesubcktsrc, "w") as module_file:
-                module_file.write(self.subckt)
 
     def generate_contents(self):
         """
@@ -942,7 +907,7 @@ class testbench(testbench_common):
                         self.dspfincludecmd + "\n" +
                         self.options + "\n" +
                         self.parameters + "\n" +
-                        self.subinst + "\n\n" +
+                        self.dut.subinst + "\n\n" +
                         self.misccmd + "\n" +
                         self.dcsourcestr + "\n" +
                         self.inputsignals + "\n" +

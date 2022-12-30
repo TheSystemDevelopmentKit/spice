@@ -995,7 +995,7 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
             self.tb.simcmds = self.simcmd_bundle
             self.connect_spice_inputs()
             self.tb.generate_contents()
-            self.tb.export_subckt(force=True)
+            #self.tb.export_subckt(force=True)
             self.tb.export(force=True)
             self.write_spice_inputs()
             if self.interactive_spice:

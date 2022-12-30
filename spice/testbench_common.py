@@ -51,19 +51,6 @@ class testbench_common(spice_module):
         self.simcmds=Bundle()
         
     @property
-    def file(self):
-        """String
-        
-        Filepath to the testbench file (i.e. './spice/tb_entityname.scs').
-        """
-        if not hasattr(self,'_file'):
-            self._file=None
-        return self._file
-    @file.setter
-    def file(self,value):
-            self._file=value
-
-    @property
     def header(self):
         """The header of the testbench
 
@@ -75,4 +62,22 @@ class testbench_common(spice_module):
                     "%s Generated on %s \n" % (self.parent.spice_simulator.commentchar,date_object) +\
                     self.parent.spice_simulator.commentline
             return self._header
+
+    # Generating spice options string
+    @property
+    def options(self):
+        """String
+        
+        Spice options string parsed from self.spiceoptions -dictionary in the
+        parent entity.
+        """
+        if not hasattr(self,'_options'):
+            self._options = self.testbench_simulator.options
+        return self._options
+    @options.setter
+    def options(self,value):
+        self._options=value
+    @options.deleter
+    def options(self,value):
+        self._options=None
 
