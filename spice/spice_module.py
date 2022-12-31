@@ -194,74 +194,6 @@ class spice_module(thesdk):
     def subckt(self,value):
         self._subckt=None
 
-#    def subinst_constructor(self,**kwargs):
-#        """ Method that parses the subcircuit definition and 
-#        constructs a subcircuit instance out of it.
-#
-#        Parameters
-#        ----------
-#        **kwargs:  
-#                subckt : string
-#
-#        """
-#        subckt=kwargs.get('subckt')
-#        startmatch=re.compile(r"%s %s " %(self.parent.syntaxdict["subckt"], self.parent.name.upper())
-#                ,re.IGNORECASE)
-#
-#        if len(subckt) <= 3:
-#            self.print_log(type='W',msg='No subcircuit found.')
-#            self._subinst = "%s Empty subcircuit\n" % (self.parent.syntaxdict["commentchar"])
-#
-#        else:
-#            self._subinst = "%s Subcircuit instance\n" % (self.parent.syntaxdict["commentchar"])
-#            startfound = False
-#            endfound = False
-#            lastline = False
-#            for line in subckt:
-#                if self.parent.model == 'eldo':
-#                    if startmatch.search(line) != None:
-#                        startfound = True
-#                    elif startfound and len(line) > 0:
-#                        if line[0] != '+':
-#                            endfound = True
-#                            startfound = False
-#                elif self.parent.model == 'spectre':
-#                    if startmatch.search(line) != None:
-#                        startfound = True
-#                    if startfound and len(line) > 0:
-#                        if lastline:
-#                            endfound = True
-#                            startfound = False
-#                        if not line[-1] == '\\':
-#                            lastline = True
-#                # For consistency, even though identical to eldo
-#                elif self.parent.model == 'ngspice':
-#                    if startmatch.search(line) != None:
-#                        startfound = True
-#                    elif startfound and len(line) > 0:
-#                        if line[0] != '+':
-#                            endfound = True
-#                            startfound = False
-#                if startfound and not endfound:
-#                    words = line.split(" ")
-#                    if words[0].lower() == self.parent.syntaxdict["subckt"]:
-#                        if self.parent.model == 'eldo':
-#                            words[0] = "X%s%s" % (self.parent.name.upper(),'')  
-#                        elif self.parent.model == 'spectre':
-#                            words[0] = "X%s%s" % (self.parent.name.upper(), ' (')
-#                        elif self.parent.model == 'ngspice':
-#                            words[0] = "X%s%s" % (self.parent.name.upper(),'')  
-#                        words.pop(1)
-#                        line = ' '.join(words)
-#                    self._subinst += line + "%s\n" % ('\\' if lastline else '')
-#            if self.parent.model == 'eldo':
-#                self._subinst += ('+')  + self.parent.name.upper()
-#            elif self.parent.model == 'spectre':
-#                self._subinst += (') ' )  + self.parent.name.upper()
-#            elif self.parent.model == 'ngspice':
-#                self._subinst += ('+')  + self.parent.name.upper()
-        
-
     @property
     def subinst(self):
         """String
@@ -298,6 +230,16 @@ class spice_module(thesdk):
 
                         if startmatch.search(line) != None:
                             startfound = True
+                            #For spectre, for some reason we need to process this already on the first line
+                            if self.parent.model == 'spectre':
+                                if startfound and len(line) > 0:
+                                    if lastline:
+                                        endfound = True
+                                        startfound = False
+                                    # If the last character of the line is not backslash
+                                    # escaping newline we are already at the end
+                                    if not line[-1] == '\\':
+                                        lastline = True
                         elif startfound and len(line) > 0:
                             if self.parent.model == 'eldo':
                                 if line[0] != '+':
@@ -325,7 +267,7 @@ class spice_module(thesdk):
                                     words[0] = "X%s%s" % (self.parent.name.upper(),'')  
                                 words.pop(1)
                                 line = ' '.join(words)
-                            self._subinst += line + "%s\n" % ('\\' if lastline else '')
+                            self._subinst += line + "%s\n" % (' \\' if lastline else '')
                     if self.parent.model == 'eldo':
                         self._subinst += ('+')  + self.parent.name.upper()
                     elif self.parent.model == 'spectre':
