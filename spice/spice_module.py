@@ -270,15 +270,13 @@ class spice_module(thesdk):
         testbench. The instance is parsed from the previously generated
         subckt_* -file.
         """
-        if not hasattr(self,'_subinst'):
-            try:
+        try:
+            if not hasattr(self,'_subinst'):
+                subckt = self.subckt.split('\n')
                 if self.postlayout:
                     #This means that _subcktfile has already been written
                     with open(self._subcktfile) as infile:
                       subckt=infile.readlines()
-                else:
-                    subckt = self.subckt.split('\n')
-
                 startmatch=re.compile(r"%s %s " %(self.parent.syntaxdict["subckt"], self.parent.name.upper())
                         ,re.IGNORECASE)
 
@@ -291,22 +289,23 @@ class spice_module(thesdk):
                     startfound = False
                     endfound = False
                     lastline = False
-
                     for line in subckt:
                         if self.postlayout:
                             if self.parent.model == 'spectre':
                                 # Does this actually doe something?
                                 # Replaces newlines on line with space
                                 line = line.replace('\n','')
-
-                        if startmatch.search(line) != None:
-                            startfound = True
-
-                        if startfound and len(line) > 0:
-                            if self.parent.model == 'eldo' and line[0] != '+':
-                                endfound = True
-                                startfound = False
-                            elif self.parent.model == 'spectre':
+                        if self.parent.model == 'eldo':
+                            if startmatch.search(line) != None:
+                                startfound = True
+                            elif startfound and len(line) > 0:
+                                if line[0] != '+':
+                                    endfound = True
+                                    startfound = False
+                        elif self.parent.model == 'spectre':
+                            if startmatch.search(line) != None:
+                                startfound = True
+                            if startfound and len(line) > 0:
                                 if lastline:
                                     endfound = True
                                     startfound = False
@@ -339,11 +338,12 @@ class spice_module(thesdk):
                     elif self.parent.model == 'ngspice':
                         self._subinst += ('+')  + self.parent.name.upper()
 
-                    return self._subinst
-            except:
-                self.print_log(type='E',msg='Something went wrong while generating subcircuit instance.')
-                self.print_log(type='E',msg=traceback.format_exc())
-                pdb.set_trace()
+                return self._subinst
+        except:
+            self.print_log(type='E',msg='Something went wrong while generating subcircuit instance.')
+            self.print_log(type='E',msg=traceback.format_exc())
+            pdb.set_trace()
+
     @subinst.setter
     def subinst(self,value):
         self._subinst=value
