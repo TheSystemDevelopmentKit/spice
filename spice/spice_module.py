@@ -295,27 +295,22 @@ class spice_module(thesdk):
                                 # Does this actually doe something?
                                 # Replaces newlines on line with space
                                 line = line.replace('\n','')
-                        if self.parent.model == 'eldo':
-                            if startmatch.search(line) != None:
-                                startfound = True
-                            elif startfound and len(line) > 0:
+
+                        if startmatch.search(line) != None:
+                            startfound = True
+                        elif startfound and len(line) > 0:
+                            if self.parent.model == 'eldo':
                                 if line[0] != '+':
                                     endfound = True
                                     startfound = False
-                        elif self.parent.model == 'spectre':
-                            if startmatch.search(line) != None:
-                                startfound = True
-                            if startfound and len(line) > 0:
+                            elif self.parent.model == 'spectre':
                                 if lastline:
                                     endfound = True
                                     startfound = False
                                 if not line[-1] == '\\':
                                     lastline = True
-                        # For consistency, even though identical to eldo
-                        elif self.parent.model == 'ngspice':
-                            if startmatch.search(line) != None:
-                                startfound = True
-                            elif startfound and len(line) > 0:
+                            # For consistency, even though identical to eldo
+                            elif self.parent.model == 'ngspice':
                                 if line[0] != '+':
                                     endfound = True
                                     startfound = False
@@ -337,7 +332,6 @@ class spice_module(thesdk):
                         self._subinst += (') ' )  + self.parent.name.upper()
                     elif self.parent.model == 'ngspice':
                         self._subinst += ('+')  + self.parent.name.upper()
-
                 return self._subinst
         except:
             self.print_log(type='E',msg='Something went wrong while generating subcircuit instance.')
