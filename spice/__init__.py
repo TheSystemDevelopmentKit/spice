@@ -89,6 +89,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     "include" : '.include',
                     "dspfinclude" : '.include',
                     "subckt" : '.subckt',
+                    "subend" : '.ends',
                     "lastline" : '.end',
                     "eventoutdelim" : ' ',
                     "csvskip" : 2
@@ -107,6 +108,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     "include" : 'include ',
                     "dspfinclude" : 'dspf_include ',
                     "subckt" : 'subckt',
+                    "subend" : 'ends',
                     "lastline" : '///', #needed?
                     "eventoutdelim" : ',',
                     "csvskip" : 0
@@ -125,6 +127,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                     "include" : '.include',
                     "dspfinclude" : '.include',
                     "subckt" : '.subckt',
+                    "subend" : '.ends',
                     "lastline" : '.end',
                     "eventoutdelim" : '  ', # Two spaces
                     "csvskip" : 1

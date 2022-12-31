@@ -78,21 +78,24 @@ class spice_module(thesdk):
         written to the subckt-file.
         """
         if not hasattr(self,'_subckt'):
+            startmatch=re.compile(r"%s" %(self.parent.syntaxdict["subckt"]),re.IGNORECASE)
+            endmatch=re.compile(r"%s" %(self.parent.syntaxdict["subend"]),re.IGNORECASE)
+            
+            # TODO This should be improved. the topcell name is known already, and it matches the 
+            # subcircuit name. there is no reason to rely on some strings in some file that
+            # depends on what genertes the file
+            # These are used for post-layout only
+            # Works only for Calibre generated postlayout netlists.
             if self.parent.model=='eldo':
                 cellnamematch=re.compile(r"\*\*\* Design cell name:",re.IGNORECASE)
                 prognamematch=re.compile(r"\* Program",re.IGNORECASE)
-                startmatch=re.compile(r"\.SUBCKT",re.IGNORECASE)
-                endmatch=re.compile(r"\.ENDS",re.IGNORECASE)
             elif self.parent.model=='spectre':
                 cellnamematch=re.compile(r"\/\/ Design cell name:",re.IGNORECASE)
                 prognamematch=re.compile(r"\/\/ Program",re.IGNORECASE)
-                startmatch=re.compile(r"SUBCKT",re.IGNORECASE)
-                endmatch=re.compile(r"ENDS",re.IGNORECASE)
             elif self.parent.model=='ngspice':
                 cellnamematch=re.compile(r"\*\*\* Design cell name:",re.IGNORECASE)
                 prognamematch=re.compile(r"\* Program",re.IGNORECASE)
-                startmatch=re.compile(r"\.SUBCKT",re.IGNORECASE)
-                endmatch=re.compile(r"\.ENDS",re.IGNORECASE)
+
             cellname = ''
             linecount = 0
             self._subckt="%s Subcircuit definitions\n\n" % self.parent.syntaxdict["commentchar"]
