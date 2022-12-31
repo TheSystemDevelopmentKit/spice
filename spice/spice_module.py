@@ -133,7 +133,7 @@ class spice_module(thesdk):
                                         if cellname == '':
                                             cellname = words[1].lower()
                                         if words[1].lower() == cellname.lower():
-                                            words[1] = self.parent.name.upper()
+                                            words[1] = self.parent.name
                                             line = ' '.join(words) + "\n"
                                     self._subckt += line 
                                     sys.stdout.write(line)
@@ -152,7 +152,7 @@ class spice_module(thesdk):
                                     self.print_log(type='D',msg='Renaming design cell %s to %s.' % (cellname,self.parent.name))
                                 if words[1].lower() == cellname.lower():
                                     self._subckt+="\n%s Subcircuit definition for %s module\n" % (self.parent.syntaxdict["commentchar"],self.parent.name)
-                                    words[1] = self.parent.name.upper()
+                                    words[1] = self.parent.name
                                     if cellname != self.parent.name:
                                         self.print_log(type='D',msg='Renaming design cell "%s" to "%s".' % (cellname,self.parent.name))
                                     line = ' '.join(words) + "\n"
@@ -167,7 +167,7 @@ class spice_module(thesdk):
                                         # Top-level subcircuit ends here, renaming old name to entity name
                                         if len(words) > 0 and words[0].lower() == 'ends' \
                                                 and words[1].lower() == cellname.lower():
-                                            words[-1] = self.parent.name.upper()
+                                            words[-1] = self.parent.name
                                             line =  ' '.join(words) + '\n'
                                         self._subckt=self._subckt+line
                                         linecount += 1
@@ -260,20 +260,20 @@ class spice_module(thesdk):
                             words = line.split(" ")
                             if words[0].lower() == self.parent.syntaxdict["subckt"]:
                                 if self.parent.model == 'eldo':
-                                    words[0] = "X%s%s" % (self.parent.name.upper(),'')  
+                                    words[0] = "X%s%s" % (self.parent.name,'')  
                                 elif self.parent.model == 'spectre':
-                                    words[0] = "X%s%s" % (self.parent.name.upper(), ' (')
+                                    words[0] = "X%s%s" % (self.parent.name, ' (')
                                 elif self.parent.model == 'ngspice':
-                                    words[0] = "X%s%s" % (self.parent.name.upper(),'')  
+                                    words[0] = "X%s%s" % (self.parent.name,'')  
                                 words.pop(1)
                                 line = ' '.join(words)
                             self._subinst += line + "%s\n" % (' \\' if lastline else '')
                     if self.parent.model == 'eldo':
-                        self._subinst += ('+')  + self.parent.name.upper()
+                        self._subinst += ('+')  + self.parent.name
                     elif self.parent.model == 'spectre':
-                        self._subinst += (') ' )  + self.parent.name.upper()
+                        self._subinst += (') ' )  + self.parent.name
                     elif self.parent.model == 'ngspice':
-                        self._subinst += ('+')  + self.parent.name.upper()
+                        self._subinst += ('+')  + self.parent.name
                 return self._subinst
         except:
             self.print_log(type='E',msg='Something went wrong while generating subcircuit instance.')
