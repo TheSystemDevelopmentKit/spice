@@ -907,6 +907,12 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         strobeonly
         If solution is found to this later from simulator
         remove this.
+
+        Parameters:
+
+        key: spice_iofle bundle key (name of the io)
+        ioname: node name from which date is to be filtered
+
         """
         if len(self.strobe_indices)==0:
             tvals=self.iofile_eventdict[ioname.upper()][:,0]
@@ -997,7 +1003,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                                     # Parse the first member of bus
                                     if self.model == 'spectre':
                                         if self.is_strobed:
-                                            data=self.filter_strobed(key)
+                                            data=self.filter_strobed(val.name, key)
                                         else:
                                             data=self.iofile_eventdict[key.upper()]
                                     else:
@@ -1005,7 +1011,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                                 else:
                                     # Next members are concatenated to array
                                     if self.model == 'spectre' and self.is_strobed:
-                                        next=self.filter_strobed(key)
+                                        next=self.filter_strobed(val.name, key)
                                     else:
                                         next=self.iofile_eventdict[key.upper()]
                                     try:
