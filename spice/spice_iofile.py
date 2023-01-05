@@ -255,12 +255,12 @@ class spice_iofile(iofile):
                         outfile.write('io i\n')
                         outfile.write('vname %s\n' % self.ionames[i].replace('<','<[').replace('>',']>'))
                         outfile.write('tunit ns\n')
-                        outfile.write('period %g\n' % (1e9/float(self.rs)))
-                        outfile.write('trise %g\n' % (float(self.trise)*1e9))
-                        outfile.write('tfall %g\n' % (float(self.tfall)*1e9))
-                        outfile.write('tdelay %g\n' % (float(self.after)*1e9))
-                        outfile.write('vih %g\n' % self.vhi)
-                        outfile.write('vil %g\n\n' % self.vlo)
+                        outfile.write(f'period {1e9/float(self.rs)}\n')
+                        outfile.write(f'trise {float(self.trise)*1e9}\n')
+                        outfile.write(f'tfall {float(self.tfall)*1e9}\n')
+                        outfile.write(f'tdelay {float(self.after)*1e9}\n')
+                        outfile.write(f'vih {self.vhi}\n')
+                        outfile.write(f'vil {self.vlo}\n\n')
                         for j in range(len(vec)):
                             if self.ioformat == 'dec':
                                 # Input values are integer numbers (TODO: check if its unsigned)
