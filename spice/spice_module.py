@@ -73,9 +73,9 @@ class spice_module(thesdk):
     def subckt(self):
         """String
         
-        String containing the contents of the subckt_* -file. This attribute
-        parses the source netlist when called, and generates the contents to be
-        written to the subckt-file.
+        String containing the contents of the subcircuit definition of the entity.
+        Extract the definition form the source netlist. the source netlist when accessed. 
+        Can be written to the subckt_file with export_subckt method. 
         """
         if not hasattr(self,'_subckt'):
             startmatch=re.compile(r"%s" %(self.parent.syntaxdict["subckt"]),re.IGNORECASE)
@@ -115,11 +115,18 @@ class spice_module(thesdk):
                                 self.print_log(type='D',msg='Found top-level cell name "%s".' % cellname)
                                 self.origcellname = cellname
                             # First subcircuit not started, finding Calibre xRC written program name
+                            # What is so special about the calibre generated subcirsuit definition?
                             if not startfound and prognamematch.search(line) != None:
                                 self.print_log(type='D',msg='Post-layout netlist detected (%s).' % (' '.join(line.split()[2:])))
+                                self.postlayout = True
+                                # THIS IS THE PROBLEM PART
+                                # In pre layout, the file is NOT copied as it may contain something else
+                                # Than the subckt definitions (i.e simulator directives)
+                                # In post layout it MUST be copied because of what? Slow parsing?
+                                # I'll leave it for now. In any case, 'subinst' should not parse the file again. 
                                 # Parsing the post-layout netlist line by line is way too slow
                                 # Copying the file and editing it seems better
-                                self.postlayout = True
+
                                 # Right now this just ignores everything and overwrites the subcircuit file
                                 # TODO: think about this
                                 if os.path.isfile(self._subcktfile):
@@ -127,19 +134,25 @@ class spice_module(thesdk):
                                     shutil.copyfile(self._dutfile,self._subcktfile)
                                 else:
                                     shutil.copyfile(self._dutfile,self._subcktfile)
+                                # Edits the postlayout netlist file in place
                                 for line in fileinput.input(self._subcktfile,inplace=1):
                                     startfound=False
                                     endfound=False
                                     if not startfound and startmatch.search(line) != None:
                                         startfound=True
                                         words = line.split()
+                                        # There has been no match for cellname.
                                         if cellname == '':
                                             cellname = words[1].lower()
+                                        # If the cellname has been set above, it is set to slef.parent.name
+                                        # Are they different for some reason?
                                         if words[1].lower() == cellname.lower():
                                             words[1] = self.parent.name
                                             line = ' '.join(words) + "\n"
+                                    # self._subckt contains the subcircuit definition.
                                     self._subckt += line 
                                     sys.stdout.write(line)
+                                #Why would this happen?
                                 if cellname != self.parent.name:
                                     self.print_log(type='D',msg='Renaming design cell %s to %s.' % (cellname,self.parent.name))
                                 # Notice the return here
@@ -150,6 +163,8 @@ class spice_module(thesdk):
                                 words = line.split()
                                 # Either it's a postlayout netlist, or the cell name was not defined
                                 # in the header -> assuming first subcircuit is top-level circuit
+                                # This is confusing. Why we need to make this assumption. The top-level
+                                # Circuit IS the name of the entity.
                                 if cellname == '':
                                     cellname = words[1].lower()
                                     self.print_log(type='D',msg='Renaming design cell %s to %s.' % (cellname,self.parent.name))
@@ -202,16 +217,17 @@ class spice_module(thesdk):
         """String
         
         String containing the subcircuit instance to be placed in the
-        testbench. The instance is parsed from the previously generated
-        subckt_* -file.
+        testbench. Parsed from the subckt property
         """
         try:
             if not hasattr(self,'_subinst'):
                 subckt = self.subckt.split('\n')
-                if self.postlayout:
-                    #This means that _subcktfile has already been written
-                    with open(self._subcktfile) as infile:
-                      subckt=infile.readlines()
+                #if self.postlayout:
+                #    #This means that _subcktfile has already been written
+                #    # However, the self._subckt has been parsed from there already. 
+                #    with open(self._subcktfile) as infile:
+                #      # Here we parse the copied subcircuit file again? Makes no sense at all. 
+                #      subckt=infile.readlines()
                 startmatch=re.compile(r"%s %s " %(self.parent.syntaxdict["subckt"], self.parent.name.upper())
                         ,re.IGNORECASE)
 
@@ -225,11 +241,11 @@ class spice_module(thesdk):
                     endfound = False
                     lastline = False
                     for line in subckt:
-                        if self.postlayout:
-                            if self.parent.model == 'spectre':
-                                # Does this actually doe something?
-                                # Replaces newlines on line with space
-                                line = line.replace('\n','')
+                        #if self.postlayout:
+                        #    if self.parent.model == 'spectre':
+                        #        # Does this actually doe something?
+                        #        # Replaces newlines on line with space
+                        #        line = line.replace('\n','')
 
                         if startmatch.search(line) != None:
                             startfound = True
@@ -282,7 +298,6 @@ class spice_module(thesdk):
             self.print_log(type='E',msg='Something went wrong while generating subcircuit instance.')
             self.print_log(type='E',msg=traceback.format_exc())
             pdb.set_trace()
-
     @subinst.setter
     def subinst(self,value):
         self._subinst=value
