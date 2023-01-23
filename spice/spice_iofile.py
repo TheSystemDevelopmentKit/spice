@@ -299,7 +299,7 @@ class spice_iofile(iofile):
                 nrows=None
             arr=pd.read_csv(filepath,skiprows=start-1, nrows=nrows,
                     delim_whitespace=True, encoding='utf-8',engine='c',
-                    dtype=dtype).to_numpy()
+                    dtype='float').to_numpy()
         except:
             self.print_log(type='E',msg=traceback.format_exc())
             self.print_log(type='F',msg='Failed while reading files for %s.' % self.name)
