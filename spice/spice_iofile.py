@@ -301,7 +301,8 @@ class spice_iofile(iofile):
                 nrows=None
             arr=pd.read_csv(filepath,skiprows=start-1, nrows=nrows,
                     delim_whitespace=True, encoding='utf-8',engine='c',
-                    dtype='float').to_numpy()
+                    dtype='float',chunksize=1e6)
+            arr=pd.concat(arr).to_numpy()
         except:
             self.print_log(type='E',msg=traceback.format_exc())
             self.print_log(type='F',msg='Failed while reading files for %s.' % self.name)
@@ -322,10 +323,17 @@ class spice_iofile(iofile):
                     n += 1
                 stack[i] = (label, temp)
             queue.put(stack)
+            if queue!=None:
+                queue.put(stack)
+            else:
+                return stack
         except:
             self.print_log(type='E',msg=traceback.format_exc())
             self.print_log(type='E',msg='Failed reading event output %s' % label)
-            queue.put(stack)
+            if queue!=None:
+                queue.put(stack)
+            else:
+                return stack
 
     # Overloaded read from thesdk.iofile
     def read(self,**kwargs):
@@ -392,11 +400,21 @@ class spice_iofile(iofile):
                             else:
                                 stop=linenumbers[k+1]-6 # Previous data column ends 5 rows before start of next one
                             dtype=self.datatype if self.datatype=='complex' else 'float' # Default is int for thesdk_spicefile, let's infer from data
-                            queue = multiprocessing.Queue()
-                            queues.append(queue)
-                            proc = multiprocessing.Process(target=self.parse_io_from_file,args=(file,start,stop,dtype,labels[k],queue))
-                            procs.append(proc)
-                            proc.start() 
+                            nrows=stop-start
+                            if nrows<20e6:
+                                self.print_log(type='I',msg=f'Number of lines: {nrows}, reading with multiprocessing')
+                                queue = multiprocessing.Queue()
+                                queues.append(queue)
+                                proc = multiprocessing.Process(target=self.parse_io_from_file,args=(file,start,stop,dtype,labels[k],queue))
+                                procs.append(proc)
+                                proc.start() 
+                            else:
+                                self.print_log(type='I',msg=f'Number of lines: {nrows}, reading without multiprocessing')
+                                queue=None
+                                ret = self.parse_io_from_file(file,start,stop,dtype,labels[k],queue)
+                                for item in ret:
+                                    self.parent.iofile_eventdict[item[0].upper()]=item[1]
+                                self.print_log(type='I',msg=f'IO reading complete')
                         for i,p in enumerate(procs):
                             try:
                                 ret = queues[i].get()
