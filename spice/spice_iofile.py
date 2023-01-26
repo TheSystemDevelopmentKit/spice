@@ -322,7 +322,6 @@ class spice_iofile(iofile):
                     temp=np.vstack((arr[:,0], arr[:,n+1])).T
                     n += 1
                 stack[i] = (label, temp)
-            queue.put(stack)
             if queue!=None:
                 queue.put(stack)
             else:
