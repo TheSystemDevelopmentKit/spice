@@ -51,46 +51,26 @@ class spice_module(thesdk):
         return self.parent.DEBUG 
 
     @property
-    def postlayout(self):
-        """Boolean
-        
-        Flag for detected post-layout netlists. This will enable post-layout
-        optimizations in the simulator command options. 
-
-        """
-        if not hasattr(self,'_postlayout'):
-            self.print_log(type='F', 
-                           msg='Postlayout attribute accessed before defined. This parameter is no longer automatically extracted. You must set it.')
-            self._postlayout=False
-        return self._postlayout
-    @postlayout.setter
-    def postlayout(self,value):
-        self._postlayout=value
-    @postlayout.deleter
-    def postlayout(self,value):
-        self._postlayout=None
-
-    @property
     def subckt(self):
         """String
         
-        String containing the contents of the subcircuit definition of the entity.
-        Extract the definition form the source netlist. the source netlist when accessed. 
+        String containing the contents of the subcircuit definition file of the entity.
+        Extract the definitions form the source netlist. The source netlist when accessed. 
         Can be written to the subckt_file with export_subckt method. 
 
         """
         if not hasattr(self,'_subckt'):
             self._subckt="%s Subcircuit definitions\n\n" % self.parent.syntaxdict["commentchar"]
             # Extract the module definition
-            if os.path.isfile(self._dutfile):
+            if os.path.isfile(self.file):
                 try:
-                    self.print_log(type='D',msg='Parsing source netlist %s' % self._dutfile)
-                    self._subckt += subprocess.check_output('sed -n \'/\.*[sS][uU][bB][cC][kK][tT]/,/\.*[eE][nD][sS]/p\' %s' % self._dutfile, shell=True).decode('utf-8')
+                    self.print_log(type='D',msg='Parsing source netlist %s' % self.file)
+                    self._subckt += subprocess.check_output('sed -n \'/\.*[sS][uU][bB][cC][kK][tT]/,/\.*[eE][nD][sS]/p\' %s' % self.file, shell=True).decode('utf-8')
                 except:
-                    self.print_log(type='E',msg='Something went wrong while parsing %s.' % self._dutfile)
+                    self.print_log(type='E',msg='Something went wrong while parsing %s.' % self.file)
                     self.print_log(type='E',msg=traceback.format_exc())
             else:
-                self.print_log(type='W',msg='File %s not found.' % self._dutfile)
+                self.print_log(type='W',msg='File %s not found.' % self.file)
         return self._subckt
     @subckt.setter
     def subckt(self,value):
@@ -100,14 +80,14 @@ class spice_module(thesdk):
         self._subckt=None
 
     @property
-    def subinst(self):
+    def instance(self):
         """String
         
         String containing the subcircuit instance to be placed in the
         testbench. Parsed from the subckt property
         """
         try:
-            if not hasattr(self,'_subinst'):
+            if not hasattr(self,'_instance'):
                 subckt = self.subckt.split('\n')
                 startmatch=re.compile(r"%s %s " %(self.parent.syntaxdict["subckt"], self.parent.name)
                         ,re.IGNORECASE)
@@ -122,24 +102,8 @@ class spice_module(thesdk):
                     endfound = False
                     lastline = False
                     for line in subckt:
-                        if self.postlayout:
-                            if self.parent.model == 'spectre':
-                                # Does this actually doe something?
-                                # Replaces newlines on _line_ with space
-                                line = line.replace('\n','')
-
                         if startmatch.search(line) != None:
                             startfound = True
-                            #For spectre, for some reason we need to process this already on the first line
-                            #if self.parent.model == 'spectre':
-                            #    if startfound and len(line) > 0:
-                            #        if lastline:
-                            #            endfound = True
-                            #            startfound = False
-                            #        # If the last character of the line is not backslash
-                            #        # escaping newline we are already at the end
-                            #        if not line[-1] == '\\':
-                            #            lastline = True
                         elif startfound and len(line) > 0:
                             if self.parent.model == 'eldo':
                                 if line[0] != '+':
@@ -178,13 +142,13 @@ class spice_module(thesdk):
         except:
             self.print_log(type='E',msg='Something went wrong while generating subcircuit instance.')
             self.print_log(type='E',msg=traceback.format_exc())
-            pdb.set_trace()
-    @subinst.setter
+    @instance.setter
     def subinst(self,value):
         self._subinst=value
-    @subinst.deleter
+    @instance.deleter
     def subinst(self,value):
         self._subinst=None
+
 
 if __name__=="__main__":
     pass
