@@ -663,11 +663,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             if val in ["upa", "hpa"]:
                 self._plflag=val
             else:
-                self.print_log(type='W', msg='Unsupported postlayout flag: %s' % val)
+                self.print_log(type='W', msg='Unsupported postlayout flag: %s' %(val))
         else:
             # This should be checked, can the other flags given to e.g. ELDO (previously upa was 
             # passed to all simulators)
-            self.print_log(type='W', msg='Simulator %s supports only postlayout flag: %s' (self.model, val))
+            self.print_log(type='W', msg='Simulator %s supports only postlayout flag: %s' %(self.model, val))
             
 
 
