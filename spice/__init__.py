@@ -663,11 +663,11 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             if val in ["upa", "hpa"]:
                 self._plflag=val
             else:
-                self.print_log(type='W', msg='Unsupported postlayout flag: %s' % val)
+                self.print_log(type='W', msg='Unsupported postlayout flag: %s' %(val))
         else:
             # This should be checked, can the other flags given to e.g. ELDO (previously upa was 
             # passed to all simulators)
-            self.print_log(type='W', msg='Simulator %s supports only postlayout flag: %s' (self.model, val))
+            self.print_log(type='W', msg='Simulator %s supports only postlayout flag: %s' %(self.model, val))
             
     @property
     def postlayout(self):
@@ -940,6 +940,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
 
         """
         if len(self.strobe_indices)==0:
+            self.print_log(type='I',msg="Filtering out incorrect timestamps")
             tvals=self.iofile_eventdict[ioname.upper()][:,0]
             maxtime = np.max(tvals)
             mintime = np.min(tvals)
@@ -971,6 +972,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self.strobe_indices[seg*(i):]=ind
             self.strobe_indices=self.strobe_indices.astype(int)
             if self.iofile_bundle.Members[key].strobe:
+                self.print_log(type='I',msg="Correct strobe indices found")
                 new_array =self.iofile_eventdict[ioname.upper()][self.strobe_indices]
                 if len(strobetimestamps)!=len(new_array):
                     self.print_log(type='W',
