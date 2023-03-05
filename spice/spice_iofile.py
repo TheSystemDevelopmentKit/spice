@@ -186,6 +186,8 @@ class spice_iofile(iofile):
         # Keep unique filenames only for event-type outputs to keep load times at minimum
         if self.iotype=='event' and self.dir=='out':
             self._file=list(set(self._file))
+        if len(self._file) < 1:
+            self.print_log(type='W', msg='ionames property was empty for io with name %s' % self.name)
         return self._file
 
     @file.setter
@@ -299,7 +301,7 @@ class spice_iofile(iofile):
                 nrows=None
             arr=pd.read_csv(filepath,skiprows=start-1, nrows=nrows,
                     delim_whitespace=True, encoding='utf-8',engine='c',
-                    dtype=dtype).to_numpy()
+                    dtype='float').to_numpy()
         except:
             self.print_log(type='E',msg=traceback.format_exc())
             self.print_log(type='F',msg='Failed while reading files for %s.' % self.name)

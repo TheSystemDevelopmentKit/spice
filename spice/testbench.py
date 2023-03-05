@@ -160,7 +160,10 @@ class testbench(spice_module):
                         if len(files)>1:
                             if isinstance(corner,list) and len(files) == len(corner):
                                 for path,corn in zip(files,corner):
-                                    self._libcmd += 'include "%s" section=%s\n' % (path,corn)
+                                    if not isinstance(corn, list):
+                                        corn = [corn]
+                                    for c in corn:
+                                        self._libcmd += 'include "%s" section=%s\n' % (path,c)
                             else:
                                 self.print_log(type='W',msg='Multiple entries in SPECTRELIBFILE but spicecorner wasn\'t a list or contained different number of elements!')
                                 self._libcmd += 'include "%s" section=%s\n' % (files[0], corner)
