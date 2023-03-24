@@ -65,7 +65,7 @@ class spice_module(thesdk):
             if os.path.isfile(self.file):
                 try:
                     self.print_log(type='D',msg='Parsing source netlist %s' % self.file)
-                    self._subckt += subprocess.check_output('sed -n \'/\.*[sS][uU][bB][cC][kK][tT]/,/\.*[eE][nD][sS]/p\' %s' % self.file, shell=True).decode('utf-8')
+                    self._subckt += subprocess.check_output('sed -n \'/\.*[sS][uU][bB][cC][kK][tT]\s\s*/,/\.*[eE][nN[dD][sS]/p\' %s' % self.file, shell=True).decode('utf-8')
                 except:
                     self.print_log(type='E',msg='Something went wrong while parsing %s.' % self.file)
                     self.print_log(type='E',msg=traceback.format_exc())
@@ -104,6 +104,14 @@ class spice_module(thesdk):
                     for line in subckt:
                         if startmatch.search(line) != None:
                             startfound = True
+                            # For spectre we need to process the statline as potential endline
+                            if self.parent.model == 'spectre':
+                                if startfound and len(line) > 0:
+                                    if lastline:
+                                        endfound = True
+                                        startfound = False
+                                    if not line[-1] == '\\':
+                                        lastline = True
                         elif startfound and len(line) > 0:
                             if self.parent.model == 'eldo':
                                 if line[0] != '+':
