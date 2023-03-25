@@ -214,25 +214,25 @@ class testbench(testbench_common):
                                 if origcellmatch.search(line) != None:
                                     words = line.split()
                                     cellname = words[-1].replace('\"','')
-                                    if cellname == self.origcellname:
+                                    if cellname.lower() == self.parent.name.lower():
                                         self.print_log(type='I',msg='Found DSPF cell name matching to original top-level cell name.')
                                         rename = True
-
+                                        self._origcellname=cellname
                                     break
-                        if rename:
-                            self.print_log(type='I',msg='Renaming DSPF top cell name accordingly from "%s" to "%s".' % (cellname,self.parent.name))
-                            with fileinput.FileInput(dspfpath,inplace=True,backup='.bak') as f:
-                                for line in f:
-                                    print(line.replace(self.origcellname,self.parent.name.upper()),end='')
-                        self.print_log(type='I',msg='Including DSPF-file: %s' % dspfpath)
-                        self._dspfincludecmd += "%s \"%s\"\n" % (self.parent.spice_simulator.dspfinclude,dspfpath)
+                            if rename:
+                                self.print_log(type='I',msg='Renaming DSPF top cell name accordingly from "%s" to "%s".' % (cellname,self.parent.name))
+                                with fileinput.FileInput(dspfpath,inplace=True,backup='.bak') as f:
+                                    for line in f:
+                                        print(line.replace(self._origcellname,self.parent.name.upper()),end='')
+                            self.print_log(type='I',msg='Including DSPF-file: %s' % dspfpath)
+                            self._dspfincludecmd += "%s \"%s\"\n" % (self.parent.spice_simulator.dspfinclude,dspfpath)
                     except:
-                        self.print_log(type='W',msg='DSPF-file not found: %s' % dspfpath)
-                        self.print_log(type='W',msg=traceback.format_exc())
-            else:
-                self.postlayout = False
-                self._dspfincludecmd = ''
-        return self._dspfincludecmd
+                        self.print_log(type='F',msg='DSPF-file did not contain matching desing for %s' % self.parent.name)
+                        self.print_log(type='F',msg=traceback.format_exc())
+                else:
+                    self.postlayout = False
+                    self._dspfincludecmd = ''
+            return self._dspfincludecmd
     @dspfincludecmd.setter
     def dspfincludecmd(self,value):
         self._dspfincludecmd=value
