@@ -28,6 +28,7 @@ class spice_module(thesdk):
         # No need to propertize these yet
         self._file=kwargs.get('file','')
         self._name=kwargs.get('name','')
+        self.parent=kwargs.get('parent') # There should be no need for parent in this module
         if not self.file and not self._name:
             self.print_log(type='F', msg='Either name or file must be defined')
 
@@ -54,13 +55,6 @@ class spice_module(thesdk):
         return self._name
 
     @property
-    def DEBUG(self):
-        """ This fixes DEBUG prints in spice_iofile, by propagating the DEBUG
-        flag of the parent entity.
-        """
-        return self.parent.DEBUG 
-
-    @property
     def subckt(self):
         """String
         
@@ -70,7 +64,7 @@ class spice_module(thesdk):
 
         """
         if not hasattr(self,'_subckt'):
-            self._subckt="%s Subcircuit definitions\n\n" % self.parent.syntaxdict["commentchar"]
+            self._subckt="%s Subcircuit definitions\n\n" % self.parent.spice_simulator.commentchar
             # Extract the module definition
             if os.path.isfile(self.file):
                 try:
@@ -99,15 +93,15 @@ class spice_module(thesdk):
         try:
             if not hasattr(self,'_instance'):
                 subckt = self.subckt.split('\n')
-                startmatch=re.compile(r"%s %s " %(self.parent.syntaxdict["subckt"], self.parent.name)
+                startmatch=re.compile(r"%s %s " %(self.parent.spice_simulator.subckt, self.parent.name)
                         ,re.IGNORECASE)
 
                 if len(subckt) <= 3:
                     self.print_log(type='W',msg='No subcircuit found.')
-                    self._instance = "%s Empty subcircuit\n" % (self.parent.syntaxdict["commentchar"])
+                    self._instance = "%s Empty subcircuit\n" % (self.parent.spice_simulator.commentchar)
 
                 else:
-                    self._instance = "%s Subcircuit instance\n" % (self.parent.syntaxdict["commentchar"])
+                    self._instance = "%s Subcircuit instance\n" % (self.parent.spice_simulator.commentchar)
                     startfound = False
                     endfound = False
                     lastline = False
@@ -140,7 +134,7 @@ class spice_module(thesdk):
                                     startfound = False
                         if startfound and not endfound:
                             words = line.split(" ")
-                            if words[0].lower() == self.parent.syntaxdict["subckt"]:
+                            if words[0].lower() == self.parent.spice_simulator.subckt:
                                 if self.parent.model == 'eldo':
                                     words[0] = "X%s%s" % (self.parent.name,'')  
                                 elif self.parent.model == 'spectre':
@@ -167,6 +161,30 @@ class spice_module(thesdk):
     def instance(self,value):
         self._instance=None
 
+    def export_subckts(self,**kwargs):
+        """
+        Internally called function to write the parsed subcircuit definitions
+        to a file.
+
+        Parameters
+        ----------
+        file : str
+            Path to file where to write.
+        force : Bool, False
+            Force writing
+        """
+        file = kwargs.get('file')
+        force = kwargs.get('force', False)
+        if not os.path.isfile(file):
+            self.print_log(type='D',msg='Exporting spice subcircuit to %s' %(file))
+            with open(file, "w") as module_file:
+                module_file.write(self.subckt)
+        elif os.path.isfile(file) and not force:
+            self.print_log(type='F', msg=('Export target file %s exists.\n Force overwrite with force=True.' %(file)))
+        elif force:
+            self.print_log(type='I',msg='Forcing overwrite of spice subcircuit to %s.' %(file))
+            with open(file, "w") as module_file:
+                module_file.write(self.subckt)
 
 if __name__=="__main__":
     pass

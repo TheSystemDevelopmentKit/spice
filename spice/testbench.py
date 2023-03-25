@@ -11,9 +11,11 @@ import sys
 import subprocess
 import shlex
 import fileinput
-from abc import * 
 from thesdk import *
-from spice import *
+from spice.testbench_common import testbench_common
+from spice.ngspice.ngspice_testbench import ngspice_testbench
+from spice.eldo.eldo_testbench import eldo_testbench
+from spice.spectre.spectre_testbench import spectre_testbench
 from spice.spice_module import spice_module
 import pdb
 
@@ -23,68 +25,56 @@ from functools import reduce
 import textwrap
 from datetime import datetime
 
-class testbench(spice_module):
+class testbench(testbench_common):
     """
     This class generates all testbench contents.
     This class is utilized by the main spice class.
 
     """
-    @property
-    def _classfile(self):
-        return os.path.dirname(os.path.realpath(__file__)) + "/"+__name__
-
     def __init__(self, parent=None, **kwargs):
-        if parent==None:
-            self.print_log(type='F', msg="Parent of spice testbench not given.")
-        else:
-            self.parent=parent
-        try:  
-            # This attribute holds duration of longest input vector after reading input files
-            self._trantime=0
-        except:
-            self.print_log(type='F', msg="Spice Testbench file definition failed.")
-        
-        #The methods for these are derived from spice_module
-        self._name=''
-        self.iofiles=Bundle()
-        self.dcsources=Bundle()
-        self.simcmds=Bundle()
-        self.dut=spice_module(file=self.parent.spicesrc)
-        #This is mandatory until the refactoring is done
-        self.dut.parent=parent
-        
+        """ Executes init of testbench_common, thus having the same attributes and 
+        parameters.
 
-    # Generating spice options string
-    @property
-    def options(self):
-        """String
+        Parameters
+        ----------
+            **kwargs :
+               See module testbench_common
         
-        Spice options string parsed from self.spiceoptions -dictionary in the
-        parent entity.
         """
-        if not hasattr(self,'_options'):
-            self._options = "%s Options\n" % self.parent.syntaxdict["commentchar"]
-            i=0
-            if self.parent.model == 'spectre':
-                if self.parent.postlayout and 'savefilter' not in self.parent.spiceoptions:
-                    self.print_log(type='I', msg='Consider using option savefilter=rc for post-layout netlists to reduce output file size!')
-                if self.parent.postlayout and 'save' not in self.parent.spiceoptions:
-                    self.print_log(type='I', msg='Consider using option save=none and specifiying saves with plotlist for post-layout netlists to reduce output file size!')
-            for optname,optval in self.parent.spiceoptions.items():
-                if self.parent.model=='spectre':
-                    self._options += "Option%d " % i # spectre options need unique names
-                    i+=1
-                if optval != "":
-                    self._options += self.parent.syntaxdict["option"] + optname + "=" + optval + "\n"
-                else:
-                    self._options += ".option " + optname + "\n"
-        return self._options
-    @options.setter
-    def options(self,value):
-        self._options=value
-    @options.deleter
-    def options(self,value):
-        self._options=None
+
+        #This should be language specific.
+        super().__init__(parent=parent,**kwargs)
+        self.parent=parent
+        self.model=self.parent.model
+
+    @property
+    def DEBUG(self):
+        """ This fixes DEBUG prints in spice_iofile, by propagating the DEBUG
+        flag of the parent entity.
+        """
+        return self.parent.DEBUG 
+
+    @property
+    def testbench_simulator(self): 
+        """The simulator specific operation is defined with an instance of 
+        simulator specific class. Properties and methods return values from that class.
+        """
+        if not hasattr(self,'_testbench_simulator'):
+            if self.model == 'ngspice':
+                self._testbench_simulator=ngspice_testbench(parent=self.parent)
+            if self.model == 'eldo':
+                self._testbench_simulator=eldo_testbench(parent=self.parent)
+            if self.model == 'spectre':
+                self._testbench_simulator=spectre_testbench(parent=self.parent)
+        return self._testbench_simulator
+       
+    @property
+    def dut(self):
+        """ Design under test : spice_module
+        """
+        if not hasattr(self,'_dut'):
+            self._dut = spice_module(file=self._dutfile,parent=self.parent)
+        return self._dut
 
     # Generating eldo/spectre parameters string
     @property
@@ -95,9 +85,9 @@ class testbench(spice_module):
         the parent entity.
         """
         if not hasattr(self,'_parameters'):
-            self._parameters = "%s Parameters\n" % self.parent.syntaxdict["commentchar"]
+            self._parameters = "%s Parameters\n" % self.parent.spice_simulator.commentchar
             for parname,parval in self.parent.spiceparameters.items():
-                self._parameters += self.parent.syntaxdict["parameter"] + str(parname) + "=" + str(parval) + "\n"
+                self._parameters += self.parent.spice_simulator.parameter + ' ' + str(parname) + "=" + str(parval) + "\n"
         return self._parameters
     @parameters.setter
     def parameters(self,value):
@@ -191,8 +181,8 @@ class testbench(spice_module):
         Subcircuit inclusion string pointing to generated subckt_* -file.
         """
         if not hasattr(self,'_includecmd'):
-            self._includecmd = "%s Subcircuit file\n"  % self.parent.syntaxdict["commentchar"]
-            self._includecmd += "%s \"%s\"\n" % (self.parent.syntaxdict["include"],self.parent.spicesubcktsrc)
+            self._includecmd = "%s Subcircuit file\n"  % self.parent.spice_simulator.commentchar
+            self._includecmd += "%s \"%s\"\n" % (self.parent.spice_simulator.include,self._subcktfile)
         return self._includecmd
     @includecmd.setter
     def includecmd(self,value):
@@ -201,7 +191,6 @@ class testbench(spice_module):
     def includecmd(self,value):
         self._includecmd=None
 
-    # DSPF include commands
     # DSPF include commands
     @property
     def dspfincludecmd(self):
@@ -213,7 +202,7 @@ class testbench(spice_module):
         if not hasattr(self,'_dspfincludecmd'):
             if len(self.parent.dspf) > 0:
                 self.print_log(type='I',msg='Including exctracted parasitics from DSPF.')
-                self._dspfincludecmd = "%s Extracted parasitics\n"  % self.parent.syntaxdict['commentchar']
+                self._dspfincludecmd = "%s Extracted parasitics\n"  % self.parent.spice_simulator.commentchar
                 origcellmatch = re.compile(r"DESIGN")
                 for cellname in self.parent.dspf:
                     dspfpath = '%s/%s.pex.dspf' % (self.parent.spicesrcpath,cellname)
@@ -236,7 +225,7 @@ class testbench(spice_module):
                                     for line in f:
                                         print(line.replace(self._origcellname,self.parent.name),end='')
                             self.print_log(type='I',msg='Including DSPF-file: %s' % dspfpath)
-                            self._dspfincludecmd += "%s \"%s\"\n" % (self.parent.syntaxdict['dspfinclude'],dspfpath)
+                            self._dspfincludecmd += "%s \"%s\"\n" % (self.parent.spice_simulator.dspfinclude,dspfpath)
                     except:
                         self.print_log(type='F',msg='DSPF-file did not contain matching design for %s' % self.parent.name)
                         self.print_log(type='F',msg=traceback.format_exc())
@@ -259,7 +248,7 @@ class testbench(spice_module):
         the parent entity.
         """
         if not hasattr(self,'_misccmd'):
-            self._misccmd="%s Manual commands\n" % (self.parent.syntaxdict["commentchar"])
+            self._misccmd="%s Manual commands\n" % (self.parent.spice_simulator.commentchar)
             mcmd = self.parent.spicemisc
             for cmd in mcmd:
                 self._misccmd += cmd + "\n"
@@ -280,7 +269,7 @@ class testbench(spice_module):
         in the parent entity.
         """
         if not hasattr(self,'_dcsourcestr'):
-            self._dcsourcestr = "%s DC sources\n" % self.parent.syntaxdict["commentchar"]
+            self._dcsourcestr = "%s DC sources\n" % self.parent.spice_simulator.commentchar
             for name, val in self.dcsources.Members.items():
                 value = val.value if val.paramname is None else val.paramname
                 supply = '%s%s' % (val.sourcetype.upper(),val.name.upper())
@@ -330,7 +319,7 @@ class testbench(spice_module):
         in the parent entity.
         """
         if not hasattr(self,'_inputsignals'):
-            self._inputsignals = "%s Input signals\n" % self.parent.syntaxdict["commentchar"]
+            self._inputsignals = "%s Input signals\n" % self.parent.spice_simulator.commentchar
             for name, val in self.iofiles.Members.items():
                 # Input file becomes a source
                 if val.dir.lower()=='in' or val.dir.lower()=='input':
@@ -501,7 +490,7 @@ class testbench(spice_module):
         instantiated in the parent entity.
         """
         if not hasattr(self,'_simcmdstr'):
-            self._simcmdstr = "%s Simulation commands\n" % self.parent.syntaxdict["commentchar"]
+            self._simcmdstr = "%s Simulation commands\n" % self.parent.spice_simulator.commentchar
             for sim, val in self.simcmds.Members.items():
                 if val.mc and self.parent.model=='spectre':
                     self._simcmdstr += 'mc montecarlo donominal=no variations=all %snumruns=1 {\n' \
@@ -669,7 +658,7 @@ class testbench(spice_module):
             for name, val in self.simcmds.Members.items():
                 # Manual probes
                 if len(val.plotlist) > 0 and name.lower() != 'dc':
-                    self._plotcmd = "%s Manually probed signals\n" % self.parent.syntaxdict["commentchar"]
+                    self._plotcmd = "%s Manually probed signals\n" % self.parent.spice_simulator.commentchar
                     if self.parent.model == 'eldo': 
                         self._plotcmd += '.plot ' 
                     else:
@@ -680,7 +669,7 @@ class testbench(spice_module):
                     self._plotcmd += "\n\n"
                 #DC probes
                 if len(val.plotlist) > 0 and name.lower() == 'dc':
-                    self._plotcmd = "%s DC operating points to be captured:\n" % self.parent.syntaxdict["commentchar"]
+                    self._plotcmd = "%s DC operating points to be captured:\n" % self.parent.spice_simulator.commentchar
                     if self.parent.model == 'eldo': 
                         self._plotcmd += '.plot ' 
                     else:
@@ -696,11 +685,11 @@ class testbench(spice_module):
                     self._plotcmd += "\n\n"
 
                 if name.lower() == 'tran' or name.lower() == 'ac' :
-                    self._plotcmd += "%s Output signals\n" % self.parent.syntaxdict["commentchar"]
+                    self._plotcmd += "%s Output signals\n" % self.parent.spice_simulator.commentchar
                     if self.parent.model=='ngspice':
                         self._plotcmd += ".control\nset wr_singlescale\nset wr_vecnames\nset appendwrite\n"
                         if self.parent.nproc: 
-                            self._plotcmd +="%s%d\n" % (self.parent.syntaxdict["nprocflag"],self.parent.nproc)
+                            self._plotcmd +="%s%d\n" % (self.parent.spice_simulator.nprocflag,self.parent.nproc)
                         self._plotcmd += "run\n"
 
                     # Parsing output iofiles
@@ -880,74 +869,52 @@ class testbench(spice_module):
     def plotcmd(self,value):
         self._plotcmd=None
 
-    def export_subckts(self,**kwargs):
+    def export(self,**kwargs):
         """
-        Function to write the parsed DUT subcircuit definitions
-        to a tempory file defined by self.parent.spicesubcktsrc.
-        """
-        if not os.path.isfile(self.parent.spicesubcktsrc):
-            self.print_log(type='D',msg='Exporting spice subcircuit to %s' %(self.parent.spicesubcktsrc))
-            with open(self.parent.spicesubcktsrc, "w") as module_file:
-                module_file.write(self.dut.subckt)
+        Internally called function to write the testbench to a file.
 
-        elif os.path.isfile(self.parent.spicesubcktsrc) and not kwargs.get('force'):
-            self.print_log(type='F', msg=('Export target file %s exists.\n Force overwrite with force=True.' %(self.parent.spicesubcktsrc)))
+        Parameters
+        ----------
+        force : Bool, False
+
+        """
+        force=kwargs.get('force', False)
+
+        if len(self.parent.dspf) == 0 and self.postlayout:
+            self.print_log(type='I',msg='No dspf for postlayout simulation. Not exporting subcircuit.')
+        else:
+            self.dut.export_subckts(file=self._subcktfile, force=force)
+
+        if not os.path.isfile(self.file):
+            self.print_log(type='D',msg='Exporting spice testbench to %s' %(self.file))
+            with open(self.file, "w") as module_file:
+                module_file.write(self.contents)
+
+        elif os.path.isfile(self.file) and not kwargs.get('force'):
+            self.print_log(type='F', msg=('Export target file %s exists.\n Force overwrite with force=True.' %(self.file)))
 
         elif kwargs.get('force'):
-            self.print_log(type='I',msg='Forcing overwrite of spice subcircuit to %s.' %(self.parent.spicesubcktsrc))
-            with open(self.parent.spicesubcktsrc, "w") as module_file:
-                module_file.write(self.dut.subckt)
+            self.print_log(type='I',msg='Forcing overwrite of spice testbench to %s.' %(self.file))
+            with open(self.file, "w") as module_file:
+                module_file.write(self.contents)
 
     def generate_contents(self):
         """
         Internally called function to generate testbench contents.
         """
-        date_object = datetime.now()
-        headertxt = self.parent.syntaxdict["commentline"] +\
-                    "%s Testbench for %s\n" % (self.parent.syntaxdict["commentchar"],self.parent.name) +\
-                    "%s Generated on %s \n" % (self.parent.syntaxdict["commentchar"],date_object) +\
-                    self.parent.syntaxdict["commentline"]
-        libcmd = self.libcmd
-        includecmd = self.includecmd
-        subinst = self.dut.instance
-        dspfincludecmd = self.dspfincludecmd
-        options = self.options
-        params = self.parameters
-        dcsourcestr = self.dcsourcestr
-        inputsignals = self.inputsignals
-        misccmd = self.misccmd
-        simcmd = self.simcmdstr
-        plotcmd = self.plotcmd
-        self.contents = (headertxt + "\n" +
-                        libcmd + "\n" +\
-                        includecmd + "\n" +
-                        dspfincludecmd + "\n" +
-                        options + "\n" +\
-                        params + "\n" +
-                        subinst + "\n\n" +\
-                        misccmd + "\n" +
-                        dcsourcestr + "\n" +\
-                        inputsignals + "\n" +\
-                        simcmd + "\n" +\
-                        plotcmd + "\n" +\
-                        self.parent.syntaxdict["lastline"])
 
-    def export(self,**kwargs):
-        """
-        Write the testbench to a file defined by self.parent.spicetbsrc.
-
-        """
-        if not os.path.isfile(self.parent.spicetbsrc):
-            self.print_log(type='D',msg='Exporting spice testbench to %s' %(self.parent.spicetbsrc))
-            with open(self.parent.spicetbsrc, "w") as module_file:
-                module_file.write(self.contents)
-
-        elif os.path.isfile(self.parent.spicetbsrc) and not kwargs.get('force'):
-            self.print_log(type='F', msg=('Export target file %s exists.\n Force overwrite with force=True.' %(self.parent.spicetbsrc)))
-
-        elif kwargs.get('force'):
-            self.print_log(type='I',msg='Forcing overwrite of spice testbench to %s.' %(self.parent.spicetbsrc))
-            with open(self.parent.spicetbsrc, "w") as module_file:
-                module_file.write(self.contents)
+        self.contents = (self.header + "\n" +
+                        self.libcmd + "\n" +
+                        self.includecmd + "\n" +
+                        self.dspfincludecmd + "\n" +
+                        self.options + "\n" +
+                        self.parameters + "\n" +
+                        self.dut.instance + "\n\n" +
+                        self.misccmd + "\n" +
+                        self.dcsourcestr + "\n" +
+                        self.inputsignals + "\n" +
+                        self.simcmdstr + "\n" +
+                        self.plotcmd + "\n" +
+                        self.parent.spice_simulator.lastline+"\n")
 if __name__=="__main__":
     pass
