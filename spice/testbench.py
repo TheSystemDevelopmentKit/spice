@@ -39,9 +39,6 @@ class testbench(spice_module):
         else:
             self.parent=parent
         try:  
-            self._file=self.parent.spicetbsrc # Testbench
-            self._subcktfile=self.parent.spicesubcktsrc # Parsed subcircuit file
-            self._dutfile=self.parent.spicesrc # Source netlist file
             # This attribute holds duration of longest input vector after reading input files
             self._trantime=0
         except:
@@ -52,19 +49,10 @@ class testbench(spice_module):
         self.iofiles=Bundle()
         self.dcsources=Bundle()
         self.simcmds=Bundle()
+        self.dut=spice_module(file=self.parent.spicesrc)
+        #This is mandatory until the refactoring is done
+        self.dut.parent=parent
         
-    @property
-    def file(self):
-        """String
-        
-        Filepath to the testbench file (i.e. './spice/tb_entityname.scs').
-        """
-        if not hasattr(self,'_file'):
-            self._file=None
-        return self._file
-    @file.setter
-    def file(self,value):
-            self._file=value
 
     # Generating spice options string
     @property
@@ -78,9 +66,9 @@ class testbench(spice_module):
             self._options = "%s Options\n" % self.parent.syntaxdict["commentchar"]
             i=0
             if self.parent.model == 'spectre':
-                if self.postlayout and 'savefilter' not in self.parent.spiceoptions:
+                if self.parent.postlayout and 'savefilter' not in self.parent.spiceoptions:
                     self.print_log(type='I', msg='Consider using option savefilter=rc for post-layout netlists to reduce output file size!')
-                if self.postlayout and 'save' not in self.parent.spiceoptions:
+                if self.parent.postlayout and 'save' not in self.parent.spiceoptions:
                     self.print_log(type='I', msg='Consider using option save=none and specifiying saves with plotlist for post-layout netlists to reduce output file size!')
             for optname,optval in self.parent.spiceoptions.items():
                 if self.parent.model=='spectre':
@@ -204,7 +192,7 @@ class testbench(spice_module):
         """
         if not hasattr(self,'_includecmd'):
             self._includecmd = "%s Subcircuit file\n"  % self.parent.syntaxdict["commentchar"]
-            self._includecmd += "%s \"%s\"\n" % (self.parent.syntaxdict["include"],self._subcktfile)
+            self._includecmd += "%s \"%s\"\n" % (self.parent.syntaxdict["include"],self.parent.spicesubcktsrc)
         return self._includecmd
     @includecmd.setter
     def includecmd(self,value):
@@ -224,7 +212,6 @@ class testbench(spice_module):
         if not hasattr(self,'_dspfincludecmd'):
             if len(self.parent.dspf) > 0:
                 self.print_log(type='I',msg='Including exctracted parasitics from DSPF.')
-                self.postlayout = True
                 self._dspfincludecmd = "%s Extracted parasitics\n"  % self.parent.syntaxdict["commentchar"]
                 origcellmatch = re.compile(r"DESIGN")
                 for cellname in self.parent.dspf:
@@ -892,34 +879,15 @@ class testbench(spice_module):
     def plotcmd(self,value):
         self._plotcmd=None
 
-    def export(self,**kwargs):
+    def export_subckts(self,**kwargs):
         """
-        Internally called function to write the testbench to a file.
+        Function to write the parsed DUT subcircuit definitions
+        to a tempory file defined by self.parent.spicesubcktsrc.
         """
-        if not os.path.isfile(self.file):
-            self.print_log(type='D',msg='Exporting spice testbench to %s' %(self.file))
-            with open(self.file, "w") as module_file:
-                module_file.write(self.contents)
-
-        elif os.path.isfile(self.file) and not kwargs.get('force'):
-            self.print_log(type='F', msg=('Export target file %s exists.\n Force overwrite with force=True.' %(self.file)))
-
-        elif kwargs.get('force'):
-            self.print_log(type='I',msg='Forcing overwrite of spice testbench to %s.' %(self.file))
-            with open(self.file, "w") as module_file:
-                module_file.write(self.contents)
-
-    def export_subckt(self,**kwargs):
-        """
-        Internally called function to write the parsed subcircuit definitions
-        to a file.
-        """
-        if len(self.parent.dspf) == 0 and self.postlayout:
-            return
         if not os.path.isfile(self.parent.spicesubcktsrc):
             self.print_log(type='D',msg='Exporting spice subcircuit to %s' %(self.parent.spicesubcktsrc))
             with open(self.parent.spicesubcktsrc, "w") as module_file:
-                module_file.write(self.subckt)
+                module_file.write(self.dut.subckt)
 
         elif os.path.isfile(self.parent.spicesubcktsrc) and not kwargs.get('force'):
             self.print_log(type='F', msg=('Export target file %s exists.\n Force overwrite with force=True.' %(self.parent.spicesubcktsrc)))
@@ -927,7 +895,7 @@ class testbench(spice_module):
         elif kwargs.get('force'):
             self.print_log(type='I',msg='Forcing overwrite of spice subcircuit to %s.' %(self.parent.spicesubcktsrc))
             with open(self.parent.spicesubcktsrc, "w") as module_file:
-                module_file.write(self.subckt)
+                module_file.write(self.dut.subckt)
 
     def generate_contents(self):
         """
@@ -940,7 +908,7 @@ class testbench(spice_module):
                     self.parent.syntaxdict["commentline"]
         libcmd = self.libcmd
         includecmd = self.includecmd
-        subinst = self.subinst
+        subinst = self.dut.instance
         dspfincludecmd = self.dspfincludecmd
         options = self.options
         params = self.parameters
@@ -962,5 +930,23 @@ class testbench(spice_module):
                         simcmd + "\n" +\
                         plotcmd + "\n" +\
                         self.parent.syntaxdict["lastline"])
+
+    def export(self,**kwargs):
+        """
+        Write the testbench to a file defined by self.parent.spicetbsrc.
+
+        """
+        if not os.path.isfile(self.parent.spicetbsrc):
+            self.print_log(type='D',msg='Exporting spice testbench to %s' %(self.parent.spicetbsrc))
+            with open(self.parent.spicetbsrc, "w") as module_file:
+                module_file.write(self.contents)
+
+        elif os.path.isfile(self.parent.spicetbsrc) and not kwargs.get('force'):
+            self.print_log(type='F', msg=('Export target file %s exists.\n Force overwrite with force=True.' %(self.parent.spicetbsrc)))
+
+        elif kwargs.get('force'):
+            self.print_log(type='I',msg='Forcing overwrite of spice testbench to %s.' %(self.parent.spicetbsrc))
+            with open(self.parent.spicetbsrc, "w") as module_file:
+                module_file.write(self.contents)
 if __name__=="__main__":
     pass

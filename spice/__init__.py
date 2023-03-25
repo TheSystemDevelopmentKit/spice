@@ -669,6 +669,30 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             # passed to all simulators)
             self.print_log(type='W', msg='Simulator %s supports only postlayout flag: %s' %(self.model, val))
             
+    @property
+    def postlayout(self):
+        """Boolean
+        
+        Enables post-layout optimizations in the simulator command options. 
+
+        """
+        if not hasattr(self,'_postlayout'):
+            if len(self.dspf) > 0:
+                self.print_log(type='I', msg = 'Setting postlayout to True due to given dspf-files')
+                self._postlayout = True
+            else:
+                self.print_log(type='O', 
+                               msg='In release v1.9, automatic postlayout simulation detection from netlist has been removed. This warning will be removed in comming releases.')
+                self.print_log(type='W', 
+                               msg='Postlayout attribute accessed before defined. Defaulting to False.')
+                self._postlayout=False
+        return self._postlayout
+    @postlayout.setter
+    def postlayout(self,value):
+        self._postlayout=value
+    @postlayout.deleter
+    def postlayout(self,value):
+        self._postlayout=None
 
 
     @property
@@ -684,7 +708,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
                 self.print_log(type='I',msg='Enabling multithreading \'%s\'.' % nprocflag)
             else:
                 nprocflag = ""
-            if self.tb.postlayout:
+            if self.postlayout:
                 plflag = '+postlayout=%s' % (self.plflag)
                 self.print_log(type='I',msg='Enabling post-layout optimization \'%s\'.' % plflag)
             else:
@@ -1264,7 +1288,7 @@ class spice(thesdk,metaclass=abc.ABCMeta):
         except:
             self.print_log(type='W', msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting DC operating points.')
-        
+       
     def run_spice(self):
         """Externally called function to execute spice simulation."""
         if self.load_state != '': 
@@ -1289,7 +1313,10 @@ class spice(thesdk,metaclass=abc.ABCMeta):
             self.tb.simcmds = self.simcmd_bundle
             self.connect_spice_inputs()
             self.tb.generate_contents()
-            self.tb.export_subckt(force=True)
+            if len(self.dspf) == 0 and self.postlayout:
+                pass
+            else:
+                self.tb.export_subckts(force=True)
             self.tb.export(force=True)
             self.write_spice_inputs()
             if self.interactive_spice:
