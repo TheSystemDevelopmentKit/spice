@@ -75,7 +75,7 @@ class spice_module(thesdk):
             if os.path.isfile(self.file):
                 try:
                     self.print_log(type='D',msg='Parsing source netlist %s' % self.file)
-                    self._subckt += subprocess.check_output('sed -n \'/\.*[sS][uU][bB][cC][kK][tT]\s\s*/,/\.*[eE][nN[dD][sS]/p\' %s' % self.file, shell=True).decode('utf-8')
+                    self._subckt += subprocess.check_output('sed -n \'/\.*[sS][uU][bB][cC][kK][tT]\s\s*/,/\.*[eE][nN][dD][sS]/p\' %s' % self.file, shell=True).decode('utf-8')
                 except:
                     self.print_log(type='E',msg='Something went wrong while parsing %s.' % self.file)
                     self.print_log(type='E',msg=traceback.format_exc())
