@@ -23,16 +23,26 @@ class spice_module(thesdk):
     the spice_testbench module.
 
     """
-    @property
-    def _classfile(self):
-        return os.path.dirname(os.path.realpath(__file__)) + "/"+__name__
 
     def __init__(self, **kwargs):
         # No need to propertize these yet
-        self.file=kwargs.get('file','')
+        self._file=kwargs.get('file','')
         self._name=kwargs.get('name','')
         if not self.file and not self._name:
             self.print_log(type='F', msg='Either name or file must be defined')
+
+    @property
+    def file(self):
+        """String
+        
+        Filepath to the entity's spice netlist source file (i.e. './spice/entityname.scs').
+        """
+        if not hasattr(self,'_file'):
+            self._file=None
+        return self._file
+    @file.setter
+    def file(self,value):
+            self._file=value
     
     @property
     def name(self):
@@ -94,10 +104,10 @@ class spice_module(thesdk):
 
                 if len(subckt) <= 3:
                     self.print_log(type='W',msg='No subcircuit found.')
-                    self._subinst = "%s Empty subcircuit\n" % (self.parent.syntaxdict["commentchar"])
+                    self._instance = "%s Empty subcircuit\n" % (self.parent.syntaxdict["commentchar"])
 
                 else:
-                    self._subinst = "%s Subcircuit instance\n" % (self.parent.syntaxdict["commentchar"])
+                    self._instance = "%s Subcircuit instance\n" % (self.parent.syntaxdict["commentchar"])
                     startfound = False
                     endfound = False
                     lastline = False
@@ -139,23 +149,23 @@ class spice_module(thesdk):
                                     words[0] = "X%s%s" % (self.parent.name,'')  
                                 words.pop(1)
                                 line = ' '.join(words)
-                            self._subinst += line + "%s\n" % (' \\' if lastline else '')
+                            self._instance += line + "%s\n" % (' \\' if lastline else '')
                     if self.parent.model == 'eldo':
-                        self._subinst += ('+')  + self.parent.name
+                        self._instance += ('+')  + self.parent.name
                     elif self.parent.model == 'spectre':
-                        self._subinst += (') ' )  + self.parent.name
+                        self._instance += (') ' )  + self.parent.name
                     elif self.parent.model == 'ngspice':
-                        self._subinst += ('+')  + self.parent.name
-                return self._subinst
+                        self._instance += ('+')  + self.parent.name
+                return self._instance
         except:
             self.print_log(type='E',msg='Something went wrong while generating subcircuit instance.')
             self.print_log(type='E',msg=traceback.format_exc())
     @instance.setter
-    def subinst(self,value):
-        self._subinst=value
+    def instance(self,value):
+        self._instance=value
     @instance.deleter
-    def subinst(self,value):
-        self._subinst=None
+    def instance(self,value):
+        self._instance=None
 
 
 if __name__=="__main__":
