@@ -229,9 +229,8 @@ class testbench(testbench_common):
                     except:
                         self.print_log(type='F',msg='DSPF-file did not contain matching design for %s' % self.parent.name)
                         self.print_log(type='F',msg=traceback.format_exc())
-                else:
-                    self.postlayout = False
-                    self._dspfincludecmd = ''
+            else:
+                self._dspfincludecmd = ''
             return self._dspfincludecmd
     @dspfincludecmd.setter
     def dspfincludecmd(self,value):
@@ -880,7 +879,7 @@ class testbench(testbench_common):
         """
         force=kwargs.get('force', False)
 
-        if len(self.parent.dspf) == 0 and self.postlayout:
+        if len(self.parent.dspf) == 0 and self.parent.postlayout:
             self.print_log(type='I',msg='No dspf for postlayout simulation. Not exporting subcircuit.')
         else:
             self.dut.export_subckts(file=self._subcktfile, force=force)

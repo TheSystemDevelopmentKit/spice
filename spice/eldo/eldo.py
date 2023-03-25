@@ -164,7 +164,7 @@ class eldo(thesdk,metaclass=abc.ABCMeta):
             else:
                 nprocflag = ""
 
-            if self.parent.tb.postlayout:
+            if self.parent.postlayout:
                 self.print_log(type='W',msg='Post-layout optimization not suported for Eldo')
 
             spicesimcmd = "%s %s " % (self.simulatorcmd, nprocflag)

@@ -173,7 +173,7 @@ class ngspice(thesdk,metaclass=abc.ABCMeta):
                 nprocflag = ""
 
             # How is this defined and where. Comes out of the blue
-            if self.parent.tb.postlayout:
+            if self.parent.postlayout:
                 self.print_log(type='W',msg='Post-layout optimization not suported for Ngspice')
 
             if self.parent.interactive_spice:
