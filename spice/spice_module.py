@@ -64,7 +64,7 @@ class spice_module(thesdk):
 
         """
         if not hasattr(self,'_subckt'):
-            self._subckt="%s Subcircuit definitions\n\n" % self.parent.syntaxdict["commentchar"]
+            self._subckt="%s Subcircuit definitions\n\n" % self.parent.spice_simulator.commentchar
             # Extract the module definition
             if os.path.isfile(self.file):
                 try:
@@ -93,15 +93,15 @@ class spice_module(thesdk):
         try:
             if not hasattr(self,'_instance'):
                 subckt = self.subckt.split('\n')
-                startmatch=re.compile(r"%s %s " %(self.parent.syntaxdict["subckt"], self.parent.name)
+                startmatch=re.compile(r"%s %s " %(self.parent.spice_simulator.subckt, self.parent.name)
                         ,re.IGNORECASE)
 
                 if len(subckt) <= 3:
                     self.print_log(type='W',msg='No subcircuit found.')
-                    self._instance = "%s Empty subcircuit\n" % (self.parent.syntaxdict["commentchar"])
+                    self._instance = "%s Empty subcircuit\n" % (self.parent.spice_simulator.commentchar)
 
                 else:
-                    self._instance = "%s Subcircuit instance\n" % (self.parent.syntaxdict["commentchar"])
+                    self._instance = "%s Subcircuit instance\n" % (self.parent.spice_simulator.commentchar)
                     startfound = False
                     endfound = False
                     lastline = False
@@ -134,7 +134,7 @@ class spice_module(thesdk):
                                     startfound = False
                         if startfound and not endfound:
                             words = line.split(" ")
-                            if words[0].lower() == self.parent.syntaxdict["subckt"]:
+                            if words[0].lower() == self.parent.spice_simulator.subckt:
                                 if self.parent.model == 'eldo':
                                     words[0] = "X%s%s" % (self.parent.name,'')  
                                 elif self.parent.model == 'spectre':

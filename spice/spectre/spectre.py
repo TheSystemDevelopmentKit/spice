@@ -142,13 +142,13 @@ class spectre(thesdk,metaclass=abc.ABCMeta):
         See: https://community.cadence.com/cadence_blogs_8/b/cic/posts/spectre-optimizing-spectre-aps-performance 
         '''
         if not hasattr(self, '_plflag'):
-            self._plflag="upa"
+            self._plflag="+postlayout=upa"
         return self._plflag
 
     @plflag.setter
     def plflag(self, val):
         if val in ["upa", "hpa"]:
-            self._plflag=val
+            self._plflag="+postlayout" %(val)
         else:
             self.print_log(type='W', msg='Unsupported postlayout flag: %s' % val)
 
@@ -188,14 +188,14 @@ class spectre(thesdk,metaclass=abc.ABCMeta):
             else:
                 nprocflag = ""
 
-            if self.parent.tb.postlayout:
+            if self.parent.postlayout:
                 plflag=self.plflag
                 self.print_log(type='I',msg='Enabling post-layout optimization \'%s\'.' % plflag)
             else:
                 plflag = ''
 
-            spicesimcmd = (self.simulatorcmd + " ++aps=%s %s %s -outdir %s " 
-                    % (self.errpreset,plflag,nprocflag,self.parent.spicesimpath))
+            spicesimcmd = (self.simulatorcmd + " %s %s -outdir %s " 
+                    % (plflag,nprocflag,self.parent.spicesimpath))
             self._spicecmd = self.parent.spice_submission+spicesimcmd+self.parent.spicetbsrc
 
         return self._spicecmd

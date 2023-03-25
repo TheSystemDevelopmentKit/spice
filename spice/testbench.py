@@ -223,11 +223,11 @@ class testbench(testbench_common):
                                 self.print_log(type='I',msg='Renaming DSPF top cell name accordingly from "%s" to "%s".' % (cellname,self.parent.name))
                                 with fileinput.FileInput(dspfpath,inplace=True,backup='.bak') as f:
                                     for line in f:
-                                        print(line.replace(self._origcellname,self.parent.name.upper()),end='')
+                                        print(line.replace(self._origcellname,self.parent.name),end='')
                             self.print_log(type='I',msg='Including DSPF-file: %s' % dspfpath)
                             self._dspfincludecmd += "%s \"%s\"\n" % (self.parent.spice_simulator.dspfinclude,dspfpath)
                     except:
-                        self.print_log(type='F',msg='DSPF-file did not contain matching desing for %s' % self.parent.name)
+                        self.print_log(type='F',msg='DSPF-file did not contain matching design for %s' % self.parent.name)
                         self.print_log(type='F',msg=traceback.format_exc())
                 else:
                     self.postlayout = False
@@ -239,6 +239,7 @@ class testbench(testbench_common):
     @dspfincludecmd.deleter
     def dspfincludecmd(self,value):
         self._dspfincludecmd=None
+
 
     @property
     def misccmd(self):
