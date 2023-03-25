@@ -69,7 +69,7 @@ class testbench(testbench_common):
        
     @property
     def dut(self):
-        """ Desing under test : spice_module
+        """ Design under test : spice_module
         """
         if not hasattr(self,'_dut'):
             self._dut = spice_module(file=self._dutfile,parent=self.parent)
@@ -178,7 +178,7 @@ class testbench(testbench_common):
         """
         if not hasattr(self,'_includecmd'):
             self._includecmd = "%s Subcircuit file\n"  % self.parent.spice_simulator.commentchar
-            self._includecmd += "%s \"%s\"\n" % (self.parent.spice_simulator.include,self._dutfile)
+            self._includecmd += "%s \"%s\"\n" % (self.parent.spice_simulator.include,self._subcktfile)
         return self._includecmd
     @includecmd.setter
     def includecmd(self,value):
@@ -880,7 +880,7 @@ class testbench(testbench_common):
         if len(self.parent.dspf) == 0 and self.postlayout:
             self.print_log(type='I',msg='No dspf for postlayout simulation. Not exporting subcircuit.')
         else:
-            self.dut.export_subckt(file=self._subcktfile, force=force)
+            self.dut.export_subckts(file=self._subcktfile, force=force)
 
         if not os.path.isfile(self.file):
             self.print_log(type='D',msg='Exporting spice testbench to %s' %(self.file))
@@ -907,7 +907,7 @@ class testbench(testbench_common):
                         self.dspfincludecmd + "\n" +
                         self.options + "\n" +
                         self.parameters + "\n" +
-                        self.dut.subinst + "\n\n" +
+                        self.dut.instance + "\n\n" +
                         self.misccmd + "\n" +
                         self.dcsourcestr + "\n" +
                         self.inputsignals + "\n" +

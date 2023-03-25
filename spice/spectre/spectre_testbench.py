@@ -43,9 +43,9 @@ class spectre_testbench(testbench_common):
         """
         if not hasattr(self,'_options'):
             self._options = "%s Options\n" % self.parent.spice_simulator.commentchar
-            if self.postlayout and 'savefilter' not in self.parent.spiceoptions:
+            if self.parent.postlayout and 'savefilter' not in self.parent.spiceoptions:
                 self.print_log(type='I', msg='Consider using option savefilter=rc for post-layout netlists to reduce output file size!')
-            if self.postlayout and 'save' not in self.parent.spiceoptions:
+            if self.parent.postlayout and 'save' not in self.parent.spiceoptions:
                 self.print_log(type='I', msg='Consider using option save=none and specifiying saves with plotlist for post-layout netlists to reduce output file size!')
             i=0
             for optname,optval in self.parent.spiceoptions.items():

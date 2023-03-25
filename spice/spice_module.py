@@ -55,31 +55,6 @@ class spice_module(thesdk):
         return self._name
 
     @property
-    def postlayout(self):
-        """Boolean
-        
-        Enables post-layout optimizations in the simulator command options. 
-
-        """
-        if not hasattr(self,'_postlayout'):
-            if len(self.dspf) > 0:
-                self.print_log(type='I', msg = 'Setting postlayout to True due to given dspf-files')
-                self._postlayout = True
-            else:
-                self.print_log(type='O', 
-                               msg='In release v1.9, automatic postlayout simulation detection from netlist has been removed. This warning will be removed in comming releases.')
-                self.print_log(type='W', 
-                               msg='Postlayout attribute accessed before defined. Defaulting to False.')
-                self._postlayout=False
-        return self._postlayout
-    @postlayout.setter
-    def postlayout(self,value):
-        self._postlayout=value
-    @postlayout.deleter
-    def postlayout(self,value):
-        self._postlayout=None
-
-    @property
     def subckt(self):
         """String
         
@@ -94,7 +69,7 @@ class spice_module(thesdk):
             if os.path.isfile(self.file):
                 try:
                     self.print_log(type='D',msg='Parsing source netlist %s' % self.file)
-                    self._subckt += subprocess.check_output('sed -n \'/\.*[sS][uU][bB][cC][kK][tT]\s\s*/,/\.*[eE][nN[dD][sS]/p\' %s' % self.file, shell=True).decode('utf-8')
+                    self._subckt += subprocess.check_output('sed -n \'/\.*[sS][uU][bB][cC][kK][tT]\s\s*/,/\.*[eE][nN][dD][sS]/p\' %s' % self.file, shell=True).decode('utf-8')
                 except:
                     self.print_log(type='E',msg='Something went wrong while parsing %s.' % self.file)
                     self.print_log(type='E',msg=traceback.format_exc())
@@ -186,7 +161,7 @@ class spice_module(thesdk):
     def instance(self,value):
         self._instance=None
 
-    def export_subckt(self,**kwargs):
+    def export_subckts(self,**kwargs):
         """
         Internally called function to write the parsed subcircuit definitions
         to a file.

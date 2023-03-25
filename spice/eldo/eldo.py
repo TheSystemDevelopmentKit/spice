@@ -157,8 +157,8 @@ class eldo(thesdk,metaclass=abc.ABCMeta):
         Simulation command string to be executed on the command line.
         Automatically generated.
         """
-        if not hasattr(self,'_eldo_spicecmd'):
-            if self.nproc:
+        if not hasattr(self,'_spicecmd'):
+            if self.parent.nproc:
                 nprocflag = "%s%d" % (self.nprocflag,self.parent.nproc)
                 self.print_log(type='I',msg='Enabling multithreading \'%s\'.' % nprocflag)
             else:
@@ -168,7 +168,7 @@ class eldo(thesdk,metaclass=abc.ABCMeta):
                 self.print_log(type='W',msg='Post-layout optimization not suported for Eldo')
 
             spicesimcmd = "%s %s " % (self.simulatorcmd, nprocflag)
-            self._eldo_spicecmd = self.parent.spice_submission+spicesimcmd+self.parent.spicetbsrc
+            self._spicecmd = self.parent.spice_submission+spicesimcmd+self.parent.spicetbsrc
 
         return self._spicecmd
 

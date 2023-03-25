@@ -57,6 +57,7 @@ from spice.spice_methods import spice_methods
 from spice.ngspice.ngspice import ngspice
 from spice.eldo.eldo import eldo
 from spice.spectre.spectre import spectre
+from spice.spectre.spectre import spectre
 
 class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
     #These need to be converted to abstact properties
@@ -98,9 +99,9 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
             if self.model == 'ngspice':
                 self._spice_simulator=ngspice(parent=self)
             if self.model == 'eldo':
-                self._spice_simulator=eldo_lang(parent=self)
+                self._spice_simulator=eldo(parent=self)
             if self.model == 'spectre':
-                self._spice_simulator=spectre_lang(parent=self)
+                self._spice_simulator=spectre(parent=self)
         return self._spice_simulator
    
 
@@ -400,6 +401,31 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
         self._dspf=value
 
     @property
+    def postlayout(self):
+        """Boolean
+        
+        Enables post-layout optimizations in the simulator command options. 
+
+        """
+        if not hasattr(self,'_postlayout'):
+            if len(self.dspf) > 0:
+                self.print_log(type='I', msg = 'Setting postlayout to True due to given dspf-files')
+                self._postlayout = True
+            else:
+                self.print_log(type='O', 
+                               msg='In release v1.9, automatic postlayout simulation detection from netlist has been removed. This warning will be removed in comming releases.')
+                self.print_log(type='W', 
+                               msg='Postlayout attribute accessed before defined. Defaulting to False.')
+                self._postlayout=False
+        return self._postlayout
+    @postlayout.setter
+    def postlayout(self,value):
+        self._postlayout=value
+    @postlayout.deleter
+    def postlayout(self,value):
+        self._postlayout=None
+
+    @property
     def iofile_eventdict(self):
         """ Dictionary
 
@@ -623,11 +649,6 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
         Automatically generated.
         """
         if not hasattr(self,'_spicecmd'):
-            if self.model=='eldo':
-                self._spicecmd = self.eldo_spicecmd
-            elif self.model=='spectre':
-                self._spicecmd = self.spectre_spicecmd
-            elif self.model=='ngspice':
                 self._spicecmd = self.spice_simulator.spicecmd
         return self._spicecmd
     @spicecmd.setter
@@ -1000,10 +1021,6 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
             self.tb.simcmds = self.simcmd_bundle
             self.connect_spice_inputs()
             self.tb.generate_contents()
-            if len(self.dspf) == 0 and self.postlayout:
-                pass
-            else:
-                self.tb.export_subckts(force=True)
             self.tb.export(force=True)
             self.write_spice_inputs()
             if self.interactive_spice:
@@ -1081,5 +1098,5 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
         return self.spice_simulator.errpreset
     @errpreset.setter
     def errpreset(self,value):
-        self.spice.spice_simulator.errpreset=value
+        self.spice_simulator.errpreset=value
 

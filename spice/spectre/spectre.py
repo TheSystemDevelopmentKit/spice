@@ -175,13 +175,13 @@ class spectre(thesdk,metaclass=abc.ABCMeta):
         self._errpreset=value
 
     @property
-    def spectre_spicecmd(self):
+    def spicecmd(self):
         """String
 
         Simulation command string to be executed on the command line.
         Automatically generated.
         """
-        if not hasattr(self,'_spectre_spicecmd'):
+        if not hasattr(self,'_spicecmd'):
             if self.parent.nproc:
                 nprocflag = "%s%d" % (self.nprocflag,self.parent.nproc)
                 self.print_log(type='I',msg='Enabling multithreading \'%s\'.' % nprocflag)
@@ -196,9 +196,9 @@ class spectre(thesdk,metaclass=abc.ABCMeta):
 
             spicesimcmd = (self.simulatorcmd + " ++aps=%s %s %s -outdir %s " 
                     % (self.errpreset,plflag,nprocflag,self.parent.spicesimpath))
-            self._spectre_spicecmd = self.parent.spice_submission+spicesimcmd+self.parent.spicetbsrc
+            self._spicecmd = self.parent.spice_submission+spicesimcmd+self.parent.spicetbsrc
 
-        return self._spectre_spicecmd
+        return self._spicecmd
 
     def run_plotprogram(self):
         ''' Starting a parallel process for waveform viewer program.
