@@ -11,6 +11,7 @@ import sys
 import subprocess
 import shlex
 import fileinput
+from thesdk import *
 from spice.testbench_common import testbench_common
 from spice.ngspice.ngspice_testbench import ngspice_testbench
 from spice.eldo.eldo_testbench import eldo_testbench
@@ -137,7 +138,10 @@ class testbench(testbench_common):
                         if len(files)>1:
                             if isinstance(corner,list) and len(files) == len(corner):
                                 for path,corn in zip(files,corner):
-                                    self._libcmd += 'include "%s" section=%s\n' % (path,corn)
+                                    if not isinstance(corn, list):
+                                        corn = [corn]
+                                    for c in corn:
+                                        self._libcmd += 'include "%s" section=%s\n' % (path,c)
                             else:
                                 self.print_log(type='W',msg='Multiple entries in SPECTRELIBFILE but spicecorner wasn\'t a list or contained different number of elements!')
                                 self._libcmd += 'include "%s" section=%s\n' % (files[0], corner)
@@ -198,7 +202,6 @@ class testbench(testbench_common):
         if not hasattr(self,'_dspfincludecmd'):
             if len(self.parent.dspf) > 0:
                 self.print_log(type='I',msg='Including exctracted parasitics from DSPF.')
-                self.postlayout = True
                 self._dspfincludecmd = "%s Extracted parasitics\n"  % self.parent.spice_simulator.commentchar
                 origcellmatch = re.compile(r"DESIGN")
                 for cellname in self.parent.dspf:
