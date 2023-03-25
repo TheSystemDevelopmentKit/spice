@@ -237,8 +237,8 @@ class testbench(spice_module):
                         self.print_log(type='I',msg='Including DSPF-file: %s' % dspfpath)
                         self._dspfincludecmd += "%s \"%s\"\n" % (self.parent.syntaxdict["dspfinclude"],dspfpath)
                     except:
-                        self.print_log(type='W',msg='DSPF-file not found: %s' % dspfpath)
-                        self.print_log(type='W',msg=traceback.format_exc())
+                        self.print_log(type='F',msg='DSPF-file not found: %s' % dspfpath)
+                        self.print_log(type='F',msg=traceback.format_exc())
             else:
                 self.postlayout = False
                 self._dspfincludecmd = ''
