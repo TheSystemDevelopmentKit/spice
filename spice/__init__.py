@@ -175,7 +175,7 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
                     # Another dirty hack to check that the process is dead before cleaning
                     # TODO: figure out if this can be prevented
                     # This is exceptionally here as eldo is the only deviation from the rule
-                    # strictly it should be eldos pecific module.
+                    # strictly it should be eldo's pecific module.
                     if self.model == 'eldo':
                         self.print_log(type='I',msg='Waiting for Eldo to exit...')
                         waittime = 0
@@ -606,6 +606,7 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
     def plflag(self):
         '''
         Postlayout simulation accuracy/RC reduction flag.
+
         '''
         if not hasattr(self, '_plflag'):
             self._plflag=self.spice_simulator.plflag
@@ -684,7 +685,7 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
     @plotprogcmd.setter
     def plotprogcmd(self, value):
         self._plotprogcmd=value
-    ### En to be relocated
+    ### End to be relocated
 
     @property
     def save_database(self): 
@@ -820,6 +821,10 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
                         self.iofile_bundle.Members[name].Data=data
                 else:
                     self.iofile_bundle.Members[name].read()
+            elif val.dir.lower()=='output':
+                self.print_log(type='F', 
+                    msg='Direction indicator for %s of should be \'out\' and you are the one to fix your code.' 
+                        %(self.iofile_bundle.Members[name]))
     
     def execute_spice_sim(self):
         """Automatically called function to execute spice simulation."""
@@ -995,7 +1000,10 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
             self.tb.simcmds = self.simcmd_bundle
             self.connect_spice_inputs()
             self.tb.generate_contents()
-            #self.tb.export_subckt(force=True)
+            if len(self.dspf) == 0 and self.postlayout:
+                pass
+            else:
+                self.tb.export_subckts(force=True)
             self.tb.export(force=True)
             self.write_spice_inputs()
             if self.interactive_spice:

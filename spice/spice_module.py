@@ -36,7 +36,7 @@ class spice_module(thesdk):
     def file(self):
         """String
         
-        Filepath to the testbench file (i.e. './spice/tb_entityname.scs').
+        Filepath to the entity's spice netlist source file (i.e. './spice/entityname.scs').
         """
         if not hasattr(self,'_file'):
             self._file=None
@@ -58,13 +58,19 @@ class spice_module(thesdk):
     def postlayout(self):
         """Boolean
         
-        Flag for detected post-layout netlists. This will enable post-layout
-        optimizations in the simulator command options. Automatically detected
-        from given netlist for Calibre extracted netlists, or when 'dspf'
-        attribute is defined.
+        Enables post-layout optimizations in the simulator command options. 
+
         """
         if not hasattr(self,'_postlayout'):
-            self._postlayout=False
+            if len(self.dspf) > 0:
+                self.print_log(type='I', msg = 'Setting postlayout to True due to given dspf-files')
+                self._postlayout = True
+            else:
+                self.print_log(type='O', 
+                               msg='In release v1.9, automatic postlayout simulation detection from netlist has been removed. This warning will be removed in comming releases.')
+                self.print_log(type='W', 
+                               msg='Postlayout attribute accessed before defined. Defaulting to False.')
+                self._postlayout=False
         return self._postlayout
     @postlayout.setter
     def postlayout(self,value):
@@ -77,120 +83,23 @@ class spice_module(thesdk):
     def subckt(self):
         """String
         
-        String containing the contents of the subcircuit definition ef the entity.
-        Extract the definitio form the source netlist. the source netlist when accessed. 
+        String containing the contents of the subcircuit definition file of the entity.
+        Extract the definitions form the source netlist. The source netlist when accessed. 
         Can be written to the subckt_file with export_subckt method. 
+
         """
         if not hasattr(self,'_subckt'):
-            if self.parent.model=='eldo':
-                cellnamematch=re.compile(r"\*\*\* Design cell name:",re.IGNORECASE)
-                prognamematch=re.compile(r"\* Program",re.IGNORECASE)
-                startmatch=re.compile(r"\.SUBCKT",re.IGNORECASE)
-                endmatch=re.compile(r"\.ENDS",re.IGNORECASE)
-            elif self.parent.model=='spectre':
-                cellnamematch=re.compile(r"\/\/ Design cell name:",re.IGNORECASE)
-                prognamematch=re.compile(r"\/\/ Program",re.IGNORECASE)
-                startmatch=re.compile(r"SUBCKT",re.IGNORECASE)
-                endmatch=re.compile(r"ENDS",re.IGNORECASE)
-            elif self.parent.model=='ngspice':
-                cellnamematch=re.compile(r"\*\*\* Design cell name:",re.IGNORECASE)
-                prognamematch=re.compile(r"\* Program",re.IGNORECASE)
-                startmatch=re.compile(r"\.SUBCKT",re.IGNORECASE)
-                endmatch=re.compile(r"\.ENDS",re.IGNORECASE)
-            cellname = ''
-            linecount = 0
-            self._subckt="%s Subcircuit definitions\n\n" % self.parent.spice_simulator.commentchar
+            self._subckt="%s Subcircuit definitions\n\n" % self.parent.syntaxdict["commentchar"]
             # Extract the module definition
-            if os.path.isfile(self._file):
+            if os.path.isfile(self.file):
                 try:
-                    self.print_log(type='D',msg='Parsing source netlist %s' % self._file)
-                    with open(self._file) as infile:
-                        wholefile=infile.readlines()
-                        startfound=False
-                        endfound=False
-                        for line in wholefile:
-                            # First subcircuit not started, finding ADEL written cell name
-                            if not startfound and cellnamematch.search(line) != None:
-                                words = line.split()
-                                cellname = words[-1]
-                                self.print_log(type='D',msg='Found top-level cell name "%s".' % cellname)
-                                self.origcellname = cellname
-                            # First subcircuit not started, finding Calibre xRC written program name
-                            if not startfound and prognamematch.search(line) != None:
-                                self.print_log(type='D',msg='Post-layout netlist detected (%s).' % (' '.join(line.split()[2:])))
-                                # Parsing the post-layout netlist line by line is way too slow
-                                # Copying the file and editing it seems better
-                                self.postlayout = True
-                                # Right now this just ignores everything and overwrites the subcircuit file
-                                # TODO: think about this
-                                if os.path.isfile(self._subcktfile):
-                                    os.remove(self._subcktfile)
-                                    shutil.copyfile(self._file,self._subcktfile)
-                                else:
-                                    shutil.copyfile(self._file,self._subcktfile)
-                                for line in fileinput.input(self._subcktfile,inplace=1):
-                                    startfound=False
-                                    endfound=False
-                                    if not startfound and startmatch.search(line) != None:
-                                        startfound=True
-                                        words = line.split()
-                                        if cellname == '':
-                                            cellname = words[1].lower()
-                                        if words[1].lower() == cellname.lower():
-                                            words[1] = self.parent.name.upper()
-                                            line = ' '.join(words) + "\n"
-                                    self._subckt += line 
-                                    sys.stdout.write(line)
-                                if cellname != self.parent.name:
-                                    self.print_log(type='D',msg='Renaming design cell %s to %s.' % (cellname,self.parent.name))
-                                # Notice the return here
-                                return self._subckt
-                            # First subcircuit not started, starts on this line though
-                            if not startfound and startmatch.search(line) != None:
-                                startfound=True
-                                words = line.split()
-                                # Either it's a postlayout netlist, or the cell name was not defined
-                                # in the header -> assuming first subcircuit is top-level circuit
-                                if cellname == '':
-                                    cellname = words[1].lower()
-                                    self.print_log(type='D',msg='Renaming design cell %s to %s.' % (cellname,self.parent.name))
-                                if words[1].lower() == cellname.lower():
-                                    self._subckt+="\n%s Subcircuit definition for %s module\n" % (self.parent.spice_simulator.commentchar,self.parent.name)
-                                    words[1] = self.parent.name.upper()
-                                    if cellname != self.parent.name:
-                                        self.print_log(type='D',msg='Renaming design cell "%s" to "%s".' % (cellname,self.parent.name))
-                                    line = ' '.join(words) + "\n"
-                                    linecount += 1
-                            # Inside the subcircuit clause -> copy all lines except comments
-                            if startfound:
-                                words = line.split()
-                                if len(words) > 0 and words[0] != self.parent.spice_simulator.commentchar:
-                                    if words[0] == 'subckts': #todo: figure out what this spectre line does
-                                        startfound=False
-                                    else:
-                                        # Top-level subcircuit ends here, renaming old name to entity name
-                                        if len(words) > 0 and words[0].lower() == 'ends' \
-                                                and words[1].lower() == cellname.lower():
-                                            words[-1] = self.parent.name.upper()
-                                            line =  ' '.join(words) + '\n'
-                                        self._subckt=self._subckt+line
-                                        linecount += 1
-                            # Calibre places an include statement above the first subcircuit -> grab that
-                            if len(self.parent.dspf) == 0 and self.postlayout and not startfound:
-                                words = line.split()
-                                if words[0].lower() == self.parent.spice_simulator.include:
-                                    self._subckt=self._subckt+line
-                                    linecount += 1
-                            # End of subcircuit found
-                            if startfound and endmatch.search(line) != None:
-                                startfound=False
-                    self.print_log(type='D',msg='Source netlist parsing done (%d lines).' % linecount)
+                    self.print_log(type='D',msg='Parsing source netlist %s' % self.file)
+                    self._subckt += subprocess.check_output('sed -n \'/\.*[sS][uU][bB][cC][kK][tT]\s\s*/,/\.*[eE][nN[dD][sS]/p\' %s' % self.file, shell=True).decode('utf-8')
                 except:
-                    self.print_log(type='E',msg='Something went wrong while parsing %s.' % self._file)
+                    self.print_log(type='E',msg='Something went wrong while parsing %s.' % self.file)
                     self.print_log(type='E',msg=traceback.format_exc())
             else:
-                print(self._file)
-                self.print_log(type='W',msg='File %s not found.' % self._file)
+                self.print_log(type='W',msg='File %s not found.' % self.file)
         return self._subckt
     @subckt.setter
     def subckt(self,value):
@@ -199,76 +108,8 @@ class spice_module(thesdk):
     def subckt(self,value):
         self._subckt=None
 
-    def subinst_constructor(self,**kwargs):
-        """ Method that parses the subcircuit definition and 
-        constructs a subcircuit instance out of it.
-
-        Parameters
-        ----------
-        **kwargs:  
-                subckt : string
-
-        """
-        subckt=kwargs.get('subckt')
-        startmatch=re.compile(r"%s %s " %(self.parent.spice_simulator.subckt, self.parent.name.upper())
-                ,re.IGNORECASE)
-
-        if len(subckt) <= 3:
-            self.print_log(type='W',msg='No subcircuit found.')
-            self._subinst = "%s Empty subcircuit\n" % (self.parent.spice_simulator.commentchar)
-
-        else:
-            self._subinst = "%s Subcircuit instance\n" % (self.parent.spice_simulator.commentchar)
-            startfound = False
-            endfound = False
-            lastline = False
-            for line in subckt:
-                if self.parent.model == 'eldo':
-                    if startmatch.search(line) != None:
-                        startfound = True
-                    elif startfound and len(line) > 0:
-                        if line[0] != '+':
-                            endfound = True
-                            startfound = False
-                elif self.parent.model == 'spectre':
-                    if startmatch.search(line) != None:
-                        startfound = True
-                    if startfound and len(line) > 0:
-                        if lastline:
-                            endfound = True
-                            startfound = False
-                        if not line[-1] == '\\':
-                            lastline = True
-                # For consistency, even though identical to eldo
-                elif self.parent.model == 'ngspice':
-                    if startmatch.search(line) != None:
-                        startfound = True
-                    elif startfound and len(line) > 0:
-                        if line[0] != '+':
-                            endfound = True
-                            startfound = False
-                if startfound and not endfound:
-                    words = line.split(" ")
-                    if words[0].lower() == self.parent.spice_simulator.subckt:
-                        if self.parent.model == 'eldo':
-                            words[0] = "X%s%s" % (self.parent.name.upper(),'')  
-                        elif self.parent.model == 'spectre':
-                            words[0] = "X%s%s" % (self.parent.name.upper(), ' (')
-                        elif self.parent.model == 'ngspice':
-                            words[0] = "X%s%s" % (self.parent.name.upper(),'')  
-                        words.pop(1)
-                        line = ' '.join(words)
-                    self._subinst += line + "%s\n" % ('\\' if lastline else '')
-            if self.parent.model == 'eldo':
-                self._subinst += ('+')  + self.parent.name.upper()
-            elif self.parent.model == 'spectre':
-                self._subinst += (') ' )  + self.parent.name.upper()
-            elif self.parent.model == 'ngspice':
-                self._subinst += ('+')  + self.parent.name.upper()
-        
-
     @property
-    def subinst(self):
+    def instance(self):
         """String
         
         String containing the subcircuit instance to be placed in the
@@ -277,67 +118,73 @@ class spice_module(thesdk):
         try:
             if not hasattr(self,'_instance'):
                 subckt = self.subckt.split('\n')
+                startmatch=re.compile(r"%s %s " %(self.parent.syntaxdict["subckt"], self.parent.name)
+                        ,re.IGNORECASE)
 
-                if not self.postlayout:
-                    if len(subckt) <= 3:
-                            self.print_log(type='W',msg='No subcircuit found.')
-                            self._subinst = "%s Empty subcircuit\n" % (self.parent.spice_simulator.commentchar)
-                    else:
-                        self.subinst_constructor(subckt=subckt)
+                if len(subckt) <= 3:
+                    self.print_log(type='W',msg='No subcircuit found.')
+                    self._instance = "%s Empty subcircuit\n" % (self.parent.syntaxdict["commentchar"])
+
                 else:
-                    self.print_log(type='I', msg='Running instance constructor for postlayput simulation')
-                    # This part is supposed to be the constructor copy-pasted, 
-                    # However it is not.
-                    # only difference should be that its read from a file the file is self._subcktfile 
-                    # To which the isntace is exported. This makes no sense.
-                    # TODO: needs obvious refactoring
-                    if self.parent.model=='eldo':
-                        startmatch=re.compile(r"\.SUBCKT %s " % self.parent.name.upper(),re.IGNORECASE)
-                    elif self.parent.model=='spectre':
-                        startmatch=re.compile(r"\SUBCKT %s " % self.parent.name.upper(),re.IGNORECASE)
-                    elif self.parent.model=='ngspice':
-                        startmatch=re.compile(r"\.SUBCKT %s " % self.parent.name.upper(),re.IGNORECASE)
-                    self._subinst = "%s Subcircuit instance\n" % (self.parent.spice_simulator.commentchar)
+                    self._instance = "%s Subcircuit instance\n" % (self.parent.syntaxdict["commentchar"])
                     startfound = False
                     endfound = False
                     lastline = False
-                    with open(self._subcktfile) as infile:
-                        subckt=infile.readlines()
-
-                        for line in subckt:
+                    for line in subckt:
+                        if startmatch.search(line) != None:
+                            startfound = True
+                            # For spectre we need to process the statline as potential endline
                             if self.parent.model == 'spectre':
-                                line = line.replace('\n','')
-                            if startmatch.search(line) != None:
-                                startfound = True
-                            if startfound and len(line) > 0:
-                                if self.parent.model == 'eldo' and line[0] != '+':
-                                    endfound = True
-                                    startfound = False
-                                elif self.parent.model == 'spectre':
+                                if startfound and len(line) > 0:
                                     if lastline:
                                         endfound = True
                                         startfound = False
                                     if not line[-1] == '\\':
                                         lastline = True
-                            if startfound and not endfound:
-                                words = line.split(" ")
-                                if words[0].lower() == self.parent.spice_simulator.subckt:
-                                    words[0] = "X%s" % (self.parent.name.upper())
-                                    words.pop(1)
-                                    line = ' '.join(words)
-                                self._subinst += line + "%s\n" % ('\\' if lastline else '')
-                        self._subinst += '+' if self.parent.model == 'eldo' else ''  + self.parent.name.upper()
-            return self._subinst
+                        elif startfound and len(line) > 0:
+                            if self.parent.model == 'eldo':
+                                if line[0] != '+':
+                                    endfound = True
+                                    startfound = False
+                            elif self.parent.model == 'spectre':
+                                if lastline:
+                                    endfound = True
+                                    startfound = False
+                                if not line[-1] == '\\':
+                                    lastline = True
+                            # For consistency, even though identical to eldo
+                            elif self.parent.model == 'ngspice':
+                                if line[0] != '+':
+                                    endfound = True
+                                    startfound = False
+                        if startfound and not endfound:
+                            words = line.split(" ")
+                            if words[0].lower() == self.parent.syntaxdict["subckt"]:
+                                if self.parent.model == 'eldo':
+                                    words[0] = "X%s%s" % (self.parent.name,'')  
+                                elif self.parent.model == 'spectre':
+                                    words[0] = "X%s%s" % (self.parent.name, ' (')
+                                elif self.parent.model == 'ngspice':
+                                    words[0] = "X%s%s" % (self.parent.name,'')  
+                                words.pop(1)
+                                line = ' '.join(words)
+                            self._instance += line + "%s\n" % (' \\' if lastline else '')
+                    if self.parent.model == 'eldo':
+                        self._instance += ('+')  + self.parent.name
+                    elif self.parent.model == 'spectre':
+                        self._instance += (') ' )  + self.parent.name
+                    elif self.parent.model == 'ngspice':
+                        self._instance += ('+')  + self.parent.name
+                return self._instance
         except:
             self.print_log(type='E',msg='Something went wrong while generating subcircuit instance.')
             self.print_log(type='E',msg=traceback.format_exc())
-            pdb.set_trace()
-    @subinst.setter
-    def subinst(self,value):
-        self._subinst=value
-    @subinst.deleter
-    def subinst(self,value):
-        self._subinst=None
+    @instance.setter
+    def instance(self,value):
+        self._instance=value
+    @instance.deleter
+    def instance(self,value):
+        self._instance=None
 
     def export_subckt(self,**kwargs):
         """
