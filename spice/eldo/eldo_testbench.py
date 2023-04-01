@@ -92,3 +92,33 @@ class eldo_testbench(testbench_common):
     def libcmd(self,value):
         self._libcmd=None
 
+    @property
+    def dcsourcestr(self):
+        """String
+        
+        DC source definitions parsed from spice_dcsource objects instantiated
+        in the parent entity.
+        """
+        if not hasattr(self,'_dcsourcestr'):
+            self._dcsourcestr = "%s DC sources\n" % self.parent.spice_simulator.commentchar
+            for name, val in self.dcsources.Members.items():
+                value = val.value if val.paramname is None else val.paramname
+                supply = '%s%s' % (val.sourcetype.upper(),val.name.upper())
+                if val.ramp == 0:
+                    self._dcsourcestr += "%s %s %s %s %s\n" % \
+                            (supply,val.pos,val.neg,value, \
+                            'NONOISE' if not val.noise else '')
+                else:
+                    self._dcsourcestr += "%s %s %s %s %s\n" % \
+                            (supply,val.pos,val.neg, \
+                            'pulse(0 %g 0 %g)' % (value,abs(val.ramp)), \
+                            'NONOISE' if not val.noise else '')
+        return self._dcsourcestr
+
+    @dcsourcestr.setter
+    def dcsourcestr(self,value):
+        self._dcsourcestr=value
+    @dcsourcestr.deleter
+    def dcsourcestr(self,value):
+        self._dcsourcestr=None
+

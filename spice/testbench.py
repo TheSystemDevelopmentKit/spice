@@ -206,62 +206,16 @@ class testbench(testbench_common):
         self._misccmd=None
 
     @property
-    def dcsources(self):
-        """bundle :  bundle of DC sources inherited from parent
-        """
-        if not hasattr(self,'_dcsources'):
-            self._dcsources = self.parent.dcsource_bundle
-        return self._dcsources
-
-    # Generating spice dcsources string
-    @property
     def dcsourcestr(self):
-        """String
-        
-        DC source definitions parsed from spice_dcsource objects instantiated
+        """str : DC source definitions parsed from spice_dcsource objects instantiated
         in the parent entity.
         """
-        if not hasattr(self,'_dcsourcestr'):
-            self._dcsourcestr = "%s DC sources\n" % self.parent.spice_simulator.commentchar
-            for name, val in self.dcsources.Members.items():
-                value = val.value if val.paramname is None else val.paramname
-                supply = '%s%s' % (val.sourcetype.upper(),val.name.upper())
-                if self.parent.model == 'eldo':
-                    if val.ramp == 0:
-                        self._dcsourcestr += "%s %s %s %s %s\n" % \
-                                (supply,val.pos,val.neg,value, \
-                                'NONOISE' if not val.noise else '')
-                    else:
-                        self._dcsourcestr += "%s %s %s %s %s\n" % \
-                                (supply,val.pos,val.neg, \
-                                'pulse(0 %g 0 %g)' % (value,abs(val.ramp)), \
-                                'NONOISE' if not val.noise else '')
-                elif self.parent.model == 'spectre':
-                    if val.ramp == 0:
-                        self._dcsourcestr += "%s %s %s %s%s\n" % \
-                                (supply,self.esc_bus(val.pos),self.esc_bus(val.neg),\
-                                ('%ssource dc=' % val.sourcetype.lower()),value)
-                    else:
-                        self._dcsourcestr += "%s %s %s %s type=pulse val0=0 val1=%s rise=%g\n" % \
-                                (supply,self.esc_bus(val.pos),self.esc_bus(val.neg),\
-                                ('%ssource' % val.sourcetype.lower()),value,val.ramp)
-                elif self.parent.model == 'ngspice':
-                    if val.ramp == 0:
-                        self._dcsourcestr += "%s %s %s %s %s\n" % \
-                                (supply,val.pos,val.neg,value, \
-                                'NONOISE' if not val.noise else '')
-                    else:
-                        self._dcsourcestr += "%s %s %s %s %s\n" % \
-                                (supply,val.pos,val.neg, \
-                                'pulse(0 %g 0 %g)' % (value,abs(val.ramp)), \
-                                'NONOISE' if not val.noise else '')
-        return self._dcsourcestr
+
+        return self.testbench_simulator.dcsourcestr
+
     @dcsourcestr.setter
     def dcsourcestr(self,value):
-        self._dcsourcestr=value
-    @dcsourcestr.deleter
-    def dcsourcestr(self,value):
-        self._dcsourcestr=None
+        self.testbench_simulator.dcsourcestr = value
 
     # Generating inputsignals string
     @property

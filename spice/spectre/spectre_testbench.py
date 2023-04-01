@@ -110,3 +110,23 @@ class spectre_testbench(testbench_common):
     def libcmd(self,value):
         self._libcmd=None
 
+    @property
+    def dcsourcestr(self):
+        """str : DC source definitions parsed from spice_dcsource objects instantiated
+        in the parent entity.
+        """
+        if not hasattr(self,'_dcsourcestr'):
+            self._dcsourcestr = "%s DC sources\n" % self.parent.spice_simulator.commentchar
+            for name, val in self.dcsources.Members.items():
+                value = val.value if val.paramname is None else val.paramname
+                supply = '%s%s' % (val.sourcetype.upper(),val.name.upper())
+                if val.ramp == 0:
+                    self._dcsourcestr += "%s %s %s %s%s\n" % \
+                            (supply,self.esc_bus(val.pos),self.esc_bus(val.neg),\
+                            ('%ssource dc=' % val.sourcetype.lower()),value)
+                else:
+                    self._dcsourcestr += "%s %s %s %s type=pulse val0=0 val1=%s rise=%g\n" % \
+                            (supply,self.esc_bus(val.pos),self.esc_bus(val.neg),\
+                            ('%ssource' % val.sourcetype.lower()),value,val.ramp)
+        return self._dcsourcestr
+
