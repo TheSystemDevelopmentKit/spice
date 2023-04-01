@@ -999,7 +999,7 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
     def spice_tb(self):
         """Testbench instance
 
-        You can set the attributes of the testbench adn dut below it before you execute run_spice.
+        You can set the attributes of the testbench and dut below it before you execute run_spice.
         if 
 
         Example:
@@ -1023,9 +1023,6 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
         if self.load_state != '': 
             # Loading a previously stored state
             if self.load_output_file:
-                #self.spice_tb.iofiles = self.iofile_bundle
-                #self.spice_tb.dcsources = self.dcsource_bundle
-                #self.spice_tb.simcmds = self.simcmd_bundle
                 self.read_spice_outputs()
                 self.connect_spice_outputs()
                 # Are these really something to be part of
@@ -1038,9 +1035,6 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
                 self._read_state()
         else:
             # Normal execution of full simulation
-            #self.spice_tb.iofiles = self.iofile_bundle
-            #self.spice_tb.dcsources = self.dcsource_bundle
-            #self.spice_tb.simcmds = self.simcmd_bundle
             self.connect_spice_inputs()
             self.spice_tb.generate_contents()
             self.spice_tb.export(force=True)
