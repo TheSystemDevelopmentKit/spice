@@ -885,7 +885,7 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
         self.extracts.Members['currents'] = {}
         self.extracts.Members['curr_tran'] = {}
         try:
-            for name, val in self.tb.dcsources.Members.items():
+            for name, val in self.spice_tb.dcsources.Members.items():
                 # Read transient power consumption of the extracted source
                 if val.extract and val.sourcetype.lower() == 'v':
                     sourcename = '%s%s' % (val.sourcetype.upper(),val.name.upper())
@@ -995,28 +995,36 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
             self.print_log(type='W',msg='Something went wrong while extracting DC operating points.')
 
     @property
-    def tb(self):
+    def spice_tb(self):
         """Testbench instance
 
         You can set the attributes of the testbench adn dut below it before you execute run_spice.
         if 
 
         Example:
-            self.tb.dut.custom_subckt_name='custom_inverter'
+            self.spice_tb.dut.custom_subckt_name='custom_inverter'
             self.run_spice()
         """
-        if not hasattr(self,'_tb'):
-            self._tb = stb(self)
-        return self._tb
+        if not hasattr(self,'_spice_tb'):
+            if hasattr(self,'_tb'):
+                self.print_log(type='O', 
+                        msg='Propagating self.tb to self.spice_tb property. You should use spice_tb for spice simulations.')
+                self._spice_tb = self.tb
+            else:
+                self._spice_tb = stb(self)
+        return self._spice_tb
+    @spice_tb.setter
+    def spice_tb(self, value):
+            self._spice_tb = value
 
     def run_spice(self):
         """Externally called function to execute spice simulation."""
         if self.load_state != '': 
             # Loading a previously stored state
             if self.load_output_file:
-                self.tb.iofiles = self.iofile_bundle
-                self.tb.dcsources = self.dcsource_bundle
-                self.tb.simcmds = self.simcmd_bundle
+                self.spice_tb.iofiles = self.iofile_bundle
+                self.spice_tb.dcsources = self.dcsource_bundle
+                self.spice_tb.simcmds = self.simcmd_bundle
                 self.read_spice_outputs()
                 self.connect_spice_outputs()
                 # Are these really something to be part of
@@ -1029,12 +1037,12 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
                 self._read_state()
         else:
             # Normal execution of full simulation
-            self.tb.iofiles = self.iofile_bundle
-            self.tb.dcsources = self.dcsource_bundle
-            self.tb.simcmds = self.simcmd_bundle
+            self.spice_tb.iofiles = self.iofile_bundle
+            self.spice_tb.dcsources = self.dcsource_bundle
+            self.spice_tb.simcmds = self.simcmd_bundle
             self.connect_spice_inputs()
-            self.tb.generate_contents()
-            self.tb.export(force=True)
+            self.spice_tb.generate_contents()
+            self.spice_tb.export(force=True)
             self.write_spice_inputs()
             if self.interactive_spice:
                 plotthread = threading.Thread(target=self.run_plotprogram,name='plotting')
