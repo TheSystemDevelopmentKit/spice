@@ -11,6 +11,7 @@ import sys
 import subprocess
 import shlex
 import fileinput
+from thesdk import *
 from spice.testbench_common import testbench_common
 import pdb
 
@@ -55,4 +56,39 @@ class eldo_testbench(testbench_common):
     @options.deleter
     def options(self,value):
         self._options=None
+
+    @property
+    def libcmd(self):
+        """str : Library inclusion string. Parsed from self.spicecorner -dictionary in
+        the parent entity, as well as 'ELDOLIBFILE' or 'SPECTRELIBFILE' global
+        variables in TheSDK.config.
+        """
+        if not hasattr(self,'_libcmd'):
+            libfile = ""
+            corner = "top_tt"
+            temp = "27"
+            for optname,optval in self.parent.spicecorner.items():
+                if optname == "temp":
+                    temp = optval
+                if optname == "corner":
+                    corner = optval
+            try:
+                libfile = thesdk.GLOBALS['ELDOLIBFILE']
+                if libfile == '':
+                    raise ValueError
+                else:
+                    self._libcmd = "*** Eldo device models\n"
+                    self._libcmd += ".lib " + libfile + " " + corner + "\n"
+            except:
+                self.print_log(type='W',msg='Global TheSDK variable ELDOLIBFILE not set.')
+                self._libcmd = "*** Eldo device models (undefined)\n"
+                self._libcmd += "*.lib " + libfile + " " + corner + "\n"
+            self._libcmd += ".temp " + str(temp) + "\n"
+        return self._libcmd
+    @libcmd.setter
+    def libcmd(self,value):
+        self._libcmd=value
+    @libcmd.deleter
+    def libcmd(self,value):
+        self._libcmd=None
 

@@ -11,6 +11,8 @@ import sys
 import subprocess
 import shlex
 import fileinput
+
+from thesdk import *
 from spice.testbench_common import testbench_common
 import pdb
 
@@ -60,4 +62,51 @@ class spectre_testbench(testbench_common):
     @options.setter
     def options(self,value):
         self._options=value
+
+    @property
+    def libcmd(self):
+        """str : Library inclusion string. Parsed from self.spicecorner -dictionary in
+        the parent entity, as well as 'ELDOLIBFILE' or 'SPECTRELIBFILE' global
+        variables in TheSDK.config.
+        """
+        if not hasattr(self,'_libcmd'):
+            libfile = ""
+            corner = "top_tt"
+            temp = "27"
+            for optname,optval in self.parent.spicecorner.items():
+                if optname == "temp":
+                    temp = optval
+                if optname == "corner":
+                    corner = optval
+            try:
+                libfile = thesdk.GLOBALS['SPECTRELIBFILE']
+                if libfile == '':
+                    raise ValueError
+                else:
+                    self._libcmd = "// Spectre device models\n"
+                    files = libfile.split(',')
+                    if len(files)>1:
+                        if isinstance(corner,list) and len(files) == len(corner):
+                            for path,corn in zip(files,corner):
+                                if not isinstance(corn, list):
+                                    corn = [corn]
+                                for c in corn:
+                                    self._libcmd += 'include "%s" section=%s\n' % (path,c)
+                        else:
+                            self.print_log(type='W',msg='Multiple entries in SPECTRELIBFILE but spicecorner wasn\'t a list or contained different number of elements!')
+                            self._libcmd += 'include "%s" section=%s\n' % (files[0], corner)
+                    else:
+                        self._libcmd += 'include "%s" section=%s\n' % (files[0], corner)
+            except:
+                self.print_log(type='W',msg='Global TheSDK variable SPECTRELIBPATH not set.')
+                self._libcmd = "// Spectre device models (undefined)\n"
+                self._libcmd += "//include " + libfile + " " + corner + "\n"
+            self._libcmd += 'tempOption options temp=%s\n' % str(temp)
+        return self._libcmd
+    @libcmd.setter
+    def libcmd(self,value):
+        self._libcmd=value
+    @libcmd.deleter
+    def libcmd(self,value):
+        self._libcmd=None
 
