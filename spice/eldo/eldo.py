@@ -10,9 +10,10 @@ import os
 import sys
 from abc import * 
 from thesdk import *
+from spice.spice_common import *
 import numpy as np
 
-class eldo(thesdk,metaclass=abc.ABCMeta):
+class eldo(spice_common):
     """This class is used as instance in *spice_simulatormodule* property of 
     spice class. Contains simulator dependent definitions.
 
@@ -195,3 +196,31 @@ class eldo(thesdk,metaclass=abc.ABCMeta):
         except: 
             self.print_log(type='W',msg='Something went wrong while launcing %s.' % self.plotprogram)
             self.print_log(type='W',msg=traceback.format_exc())
+
+    def read_oppts(self):
+        """ Internally called function to read the DC operating points of the circuit
+            TODO: Implement for Eldo as well.
+        """
+        def sorter(val):
+            '''
+            Function for sorting the files in correct order
+            Files that are output from simulation are of form
+
+            SweepN-<integer>_SweepN+1-<integer>_ ... _oppoint.dc
+
+            Strategy: extract integer from filename and sort based on the integer.
+
+            '''
+
+            keys = val.split('_')[:-1]
+            return sum([int(key.split('-')[-1]) for key in keys])
+
+        try:
+            if 'dc' in self.parent.simcmd_bundle.Members.keys():
+                raise Exception('DC optpoint extraction not supported for Eldo.')
+            else: # DC analysis not in simcmds, oppts is empty
+                self.parent.extracts.Members.update({'oppts' : {}})
+        except:
+            self.print_log(type='W', msg=traceback.format_exc())
+            self.print_log(type='W',msg='Something went wrong while extracting DC operating points.')
+

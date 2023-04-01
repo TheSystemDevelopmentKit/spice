@@ -11,9 +11,10 @@ import os
 import sys
 from abc import * 
 from thesdk import *
+from spice.spice_common import *
 import numpy as np
 
-class ngspice(thesdk,metaclass=abc.ABCMeta):
+class ngspice(spice_common):
     """This class is used as instance in simulatormodule property of 
     spice class. Contains language dependent definitions.
 
@@ -189,5 +190,19 @@ class ngspice(thesdk,metaclass=abc.ABCMeta):
         '''
         self.print_log(type='W',msg='Interactive plotting not implemented for ngspice.')
         return 0
+
+    def read_oppts(self):
+        """ Internally called function to read the DC operating points of the circuit
+            TODO: Implement for Eldo as well.
+        """
+
+        try:
+            if 'dc' in self.parent.simcmd_bundle.Members.keys(): # Unsupported model
+                raise Exception('Unrecognized model %s.' % self.model)
+            else: # DC analysis not in simcmds, oppts is empty
+                self.parent.extracts.Members.update({'oppts' : {}})
+        except:
+            self.print_log(type='W', msg=traceback.format_exc())
+            self.print_log(type='W',msg='Something went wrong while extracting DC operating points.')
 
 

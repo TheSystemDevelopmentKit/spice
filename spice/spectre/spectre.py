@@ -10,9 +10,10 @@ import os
 import sys
 from abc import * 
 from thesdk import *
+from spice.spice_common import *
 import numpy as np
 
-class spectre(thesdk,metaclass=abc.ABCMeta):
+class spectre(spice_common):
     """This class is used as instance in spice_simulatormodule property of 
     spice class. Contains simulator dependent definitions.
 
@@ -226,4 +227,60 @@ class spectre(thesdk,metaclass=abc.ABCMeta):
         except: 
             self.print_log(type='W',msg='Something went wrong while launcing %s.' % self.parent.plotprogram)
             self.print_log(type='W',msg=traceback.format_exc())
+
+    def read_oppts(self):
+        """ Internally called function to read the DC operating points of the circuit
+            TODO: Implement for Eldo as well.
+        """
+
+        try:
+            if 'dc' in self.parent.simcmd_bundle.Members.keys():
+                self.parent.extracts.Members.update({'oppts' : {}})
+                # Get dc simulation file name
+                for name, val in self.simcmd_bundle.Members.items():
+                    if name == 'dc':
+                        fname=''
+                        if len(val.sweep) != 0:
+                            for i in range(0, len(val.sweep)):
+                                fname += 'Sweep%d-[0-9]*_' % i
+                            fname+='oppoint.dc'
+                        else:
+                            fname = 'oppoint*.dc'
+                        break
+                # For distributed runs
+                if self.parent.distributed_run:
+                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.name, '[0-9]*', fname)
+                    files = sorted(glob.glob(path),key=self.sorter)
+                else:
+                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.name, fname)
+                    files = glob.glob(path)
+                valbegin = 'VALUE\n'
+                eof = 'END\n'
+                parsevals = False
+                for file in files:
+                    with open(file, 'r') as f:
+                        for line in f:
+                            if line == valbegin: # Scan file until unit descriptions end and values start
+                                parsevals = True
+                            elif line != eof and parsevals: # Scan values from output until EOF
+                                line = line.replace('\"', '')
+                                parts = line.split()
+                                if len(parts) >= 3:
+                                    if ':' in parts[0]: # This line contains op point parameter (e.g. vgs)
+                                        dev, param = parts[0].split(':')
+                                    elif ':' not in parts[0] and parts[1] == 'V': # This is a node voltage
+                                        dev = parts[0]
+                                        param = parts[1]
+                                    val = float(parts[2])
+                                    if dev not in self.parent.extracts.Members['oppts']: # Found new device
+                                        self.parent.extracts.Members['oppts'].update({dev : {}}) 
+                                    if param not in self.parent.extracts.Members['oppts'][dev]: # Found new parameter for device
+                                        self.parent.extracts.Members['oppts'][dev].update({param : [val]})
+                                    else: # Parameter already existed, just append value. This can occur in e.g. sweeps
+                                        self.parent.extracts.Members['oppts'][dev][param].append(val)
+                            elif line == eof:
+                                parsevals = False
+        except:
+            self.print_log(type='W', msg=traceback.format_exc())
+            self.print_log(type='W',msg='Something went wrong while extracting DC operating points.')
 
