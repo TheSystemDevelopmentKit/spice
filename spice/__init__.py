@@ -479,12 +479,11 @@ class spice(spice_common):
 
         A thesdk.Bundle containing extracted quantities.
         """
-        if not hasattr(self,'_extracts'):
-            self._extracts=Bundle()
-        return self._extracts
+
+        return self.spice_simulator.extracts
     @extracts.setter
     def extracts(self,value):
-        self._extracts=value
+        self.spice_simulator.extracts = value
 
     @property 
     def spice_submission(self):
