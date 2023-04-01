@@ -65,9 +65,9 @@ class spice_module(thesdk):
         Example:
             Most common use case of module is a dut in a testbench. There you 
             can set this parameter before execution as
-            ``self.spice_tb.dut.custom_subckt_name = 'some_name'
-             self.run_spice()
-            ``
+
+            | self.spice_tb.dut.custom_subckt_name = 'some_name'
+            | self.run_spice()
 
         """
         if not hasattr(self,'_custom_subckt_name'):
