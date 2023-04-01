@@ -681,12 +681,11 @@ class spice(spice_common):
     @plotprogram.setter
     def plotprogram(self, value):
         self._plotprogram=value
+    ### End to be relocated
 
     @property
     def plotprogcmd(self):
-        """ String
-
-        Sets the command to be run for interactive simulations.
+        """ str : Command to be run for interactive simulations.
         """
         if not hasattr(self, '_plotprogcmd'):
             if self.plotprogram == 'ezwave':
@@ -702,7 +701,6 @@ class spice(spice_common):
     @plotprogcmd.setter
     def plotprogcmd(self, value):
         self._plotprogcmd=value
-    ### End to be relocated
 
     @property
     def save_database(self): 

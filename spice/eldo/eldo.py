@@ -182,19 +182,19 @@ class eldo(spice_common):
         # Wait for database to appear.
         tries = 0
         while tries < 100:
-            if os.path.exists(self.spicedbpath):
+            if os.path.exists(self.parent.spicedbpath):
                 break
             else:
                 time.sleep(2)
                 tries += 1
-        cmd=self.plotprogcmd
+        cmd=self.parent.plotprogcmd
         self.print_log(type='I', msg='Running external command: %s' % cmd)
         try:
             ret=os.system(cmd)
             if ret != 0:
-                self.print_log(type='W', msg='%s returned with exit status %d.' % (self.plotprogram, ret))
+                self.print_log(type='W', msg='%s returned with exit status %d.' % (self.parent.plotprogram, ret))
         except: 
-            self.print_log(type='W',msg='Something went wrong while launcing %s.' % self.plotprogram)
+            self.print_log(type='W',msg='Something went wrong while launcing %s.' % self.parent.plotprogram)
             self.print_log(type='W',msg=traceback.format_exc())
 
     def read_oppts(self):
