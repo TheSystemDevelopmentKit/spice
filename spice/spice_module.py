@@ -61,12 +61,13 @@ class spice_module(thesdk):
         Custom name of the subcircuit to look from from the netlist file during parsing for 
         'subckt' property. Enables using compatible (in term sof IOs paremeters) netlists defined 
         for designs of different name.
-
+ 
         Example:
-            Set this parameter before execution 
-            `self.tb.dut.custom_subckt_neme = 'some_name'
+            Most common use case of module is a dut in a testbench. There you 
+            can set this parameter before execution as
+            ``self.spice_tb.dut.custom_subckt_name = 'some_name'
              self.run_spice()
-            `
+            ``
 
         """
         if not hasattr(self,'_custom_subckt_name'):
