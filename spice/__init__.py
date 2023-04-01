@@ -993,12 +993,27 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
         except:
             self.print_log(type='W', msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting DC operating points.')
+
+    @property
+    def tb(self):
+        """Testbench instance
+
+        You can set the attributes of the testbench adn dut below it before you execute run_spice.
+        if 
+
+        Example:
+            self.tb.dut.custom_subckt_name='custom_inverter'
+            self.run_spice()
+        """
+        if not hasattr(self,'_tb'):
+            self._tb = stb(self)
+        return self._tb
+
     def run_spice(self):
         """Externally called function to execute spice simulation."""
         if self.load_state != '': 
             # Loading a previously stored state
             if self.load_output_file:
-                self.tb = stb(self)
                 self.tb.iofiles = self.iofile_bundle
                 self.tb.dcsources = self.dcsource_bundle
                 self.tb.simcmds = self.simcmd_bundle
@@ -1014,7 +1029,6 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
                 self._read_state()
         else:
             # Normal execution of full simulation
-            self.tb = stb(self)
             self.tb.iofiles = self.iofile_bundle
             self.tb.dcsources = self.dcsource_bundle
             self.tb.simcmds = self.simcmd_bundle

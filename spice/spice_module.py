@@ -55,6 +55,29 @@ class spice_module(thesdk):
         return self._name
 
     @property
+    def custom_subckt_name(self):
+        """String
+
+        Custom name of the subcircuit to look from from the netlist file during parsing for 
+        'subckt' property. Enables using compatible (in term sof IOs paremeters) netlists defined 
+        for designs of different name.
+
+        Example:
+            Set this parameter before execution 
+            `self.tb.dut.custom_subckt_neme = 'some_name'
+             self.run_spice()
+            `
+
+        """
+        if not hasattr(self,'_custom_subckt_name'):
+            self._custom_subckt_name = None
+        return self._custom_subckt_name
+
+    @custom_subckt_name.setter
+    def custom_subckt_name(self,value):
+        self._custom_subckt_name = value
+
+    @property
     def subckt(self):
         """String
         
@@ -69,7 +92,15 @@ class spice_module(thesdk):
             if os.path.isfile(self.file):
                 try:
                     self.print_log(type='D',msg='Parsing source netlist %s' % self.file)
-                    self._subckt += subprocess.check_output('sed -n \'/\.*[sS][uU][bB][cC][kK][tT]\s\s*/,/\.*[eE][nN][dD][sS]/p\' %s' % self.file, shell=True).decode('utf-8')
+                    if self.custom_subckt_name:
+                        #Replace subcircuit_custom_name with parent.name
+                        self._subckt += subprocess.check_output(
+                                'sed -n \'/\.*[sS][uU][bB][cC][kK][tT]\s\s*/,/\.*[eE][nN][dD][sS]/p\' %s | sed \'s/%s/%s/g\'' 
+                                % (self.file,self.custom_subckt_name,self.parent.name), shell=True).decode('utf-8')
+                    else:
+                        self._subckt += subprocess.check_output(
+                                'sed -n \'/\.*[sS][uU][bB][cC][kK][tT]\s\s*/,/\.*[eE][nN][dD][sS]/p\' %s' 
+                                % self.file, shell=True).decode('utf-8')
                 except:
                     self.print_log(type='E',msg='Something went wrong while parsing %s.' % self.file)
                     self.print_log(type='E',msg=traceback.format_exc())
