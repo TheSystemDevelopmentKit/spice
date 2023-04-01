@@ -215,3 +215,119 @@ class eldo_testbench(testbench_common):
     def simcmdstr(self,value):
         self._simcmdstr=None
 
+    @property
+    def plotcmd(self):
+        """str : All output IOs are mapped to plot or print statements in the testbench.
+        Also manual plot commands through `spice_simcmd.plotlist` are handled here.
+
+        """
+
+        if not hasattr(self,'_plotcmd'):
+            self._plotcmd = "" 
+            for name, val in self.simcmds.Members.items():
+                # Manual probes
+                if len(val.plotlist) > 0 and name.lower() != 'dc':
+                    self._plotcmd = "%s Manually probed signals\n" % self.parent.spice_simulator.commentchar
+                    self._plotcmd += '.plot ' 
+
+                    for i in val.plotlist:
+                        self._plotcmd += self.esc_bus(i) + " "
+                    self._plotcmd += "\n\n"
+                #DC probes
+                if len(val.plotlist) > 0 and name.lower() == 'dc':
+                    self._plotcmd = "%s DC operating points to be captured:\n" % self.parent.spice_simulator.commentchar
+                    self._plotcmd += '.plot ' 
+
+                    for i in val.plotlist:
+                        self._plotcmd += self.esc_bus(i, esc_colon=False) + " "
+                    if val.excludelist != []:
+                        self._plotcmd += 'exclude=[ '
+                        for i in val.excludelist:
+                            self._plotcmd += i + ' '
+                        self._plotcmd += ']'
+                    self._plotcmd += "\n\n"
+
+                if name.lower() == 'tran' or name.lower() == 'ac' :
+                    self._plotcmd += "%s Output signals\n" % self.parent.spice_simulator.commentchar
+
+                    # Parsing output iofiles
+                    savestr=''
+                    plotstr=''
+                    first=True
+                    for name, val in self.iofiles.Members.items():
+                        # Output iofile becomes a plot/print command
+                        if val.dir.lower()=='out' or val.dir.lower()=='output':
+                            if val.iotype=='event':
+                                for i in range(len(val.ionames)):
+                                    signame = self.esc_bus(val.ionames[i])
+                                    self._plotcmd += '.printfile %s(%s) file=%s\n' % (val.sourcetype,signame,val.file[i])
+                            elif val.iotype=='sample':
+                                for i in range(len(val.ionames)):
+                                    # Checking the given trigger(s)
+                                    if isinstance(val.trigger,list):
+                                        if len(val.trigger) == len(val.ionames):
+                                            trig = val.trigger[i]
+                                        else:
+                                            trig = val.trigger[0]
+                                            self.print_log(type='W',
+                                                    msg='%d triggers given for %d ionames. Using the first trigger for all ionames.' 
+                                                    % (len(val.trigger),len(val.ionames)))
+                                    else:
+                                        trig = val.trigger
+                                    # Extracting the bus width
+                                    signame = val.ionames[i]
+                                    busstart,busstop,buswidth,busrange = self.parent.get_buswidth(signame)
+                                    signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
+                                    # If not already, add the respective trigger signal voltage to iofile_eventdict
+                                    if trig not in self.parent.iofile_eventdict:
+                                        self.parent.iofile_eventdict[trig] = None
+                                        self._plotcmd += '.printfile %s(%s) file=%s\n' % (val.sourcetype,self.esc_bus(trig),val.file[i])
+                                    for j in busrange:
+                                        if buswidth == 1 and '<' not in val.ionames[i]:
+                                            bitname = signame[0]
+                                        else:
+                                            bitname = '%s<%d>' % (signame[0],j)
+                                        # If not already, add the bit voltage to iofile_eventdict
+                                        if bitname not in self.parent.iofile_eventdict:
+                                            self.parent.iofile_eventdict[bitname] = None
+                                            self._plotcmd += '.printfile %s(%s) file=%s\n' % (val.sourcetype,self.esc_bus(bitname),val.file[i])
+                            elif val.iotype=='time':
+                                # For time IOs, the node voltage is saved as
+                                # event and the time information is later
+                                # parsed in Python
+                                for i in range(len(val.ionames)):
+                                    signame = self.esc_bus(val.ionames[i])
+                                    # Check if this same node was already saved as event type
+                                    if val.ionames[i] not in self.parent.iofile_eventdict:
+                                        # Requested node was not saved as event
+                                        # -> add to eventdict + save to output database
+                                        self.parent.iofile_eventdict[val.ionames[i]] = None
+                                        self._plotcmd += '.printfile %s(%s) file=%s\n' % (val.sourcetype,signame,val.file[i])
+                            elif val.iotype=='vsample':
+                                self.print_log(type='O',msg='IO type \'vsample\' is obsolete. Please use type \'sample\' and set ioformat=\'volt\'.')
+                                self.print_log(type='F',msg='Please do it now :)')
+                            else:
+                                self.print_log(type='W',msg='Output filetype incorrectly defined.')
+
+                    # Parsing supply currents here as well (I think ngspice
+                    # plots need to be grouped like this)
+                    for name, val in self.dcsources.Members.items():
+                        if val.extract:
+                            supply = '%s%s' % (val.sourcetype.upper(),val.name.upper())
+                            if supply not in self.parent.iofile_eventdict:
+                                self.parent.iofile_eventdict[supply] = None
+                            # Plotting power and current waveforms for this supply
+                            self._plotcmd += '.plot POW(%s)\n' % supply
+                            self._plotcmd += '.plot I(%s)\n' % supply
+                            # Writing source current consumption to a file
+                            self._plotcmd += '.printfile I(%s) file=%s\n' % (supply,val.ext_file)
+                    # Output accumulated save and print statement to plotcmd
+        return self._plotcmd
+    @plotcmd.setter
+    def plotcmd(self,value):
+        self._plotcmd=value
+    @plotcmd.deleter
+    def plotcmd(self,value):
+        self._plotcmd=None
+
+
