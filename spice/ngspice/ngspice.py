@@ -198,7 +198,7 @@ class ngspice(spice_common):
 
         try:
             if 'dc' in self.parent.simcmd_bundle.Members.keys(): # Unsupported model
-                raise Exception('Unrecognized model %s.' % self.model)
+                raise Exception('Unrecognized model %s.' % self.parent.model)
             else: # DC analysis not in simcmds, oppts is empty
                 self.extracts.Members.update({'oppts' : {}})
         except:
