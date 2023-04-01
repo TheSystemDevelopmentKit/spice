@@ -158,16 +158,14 @@ class spectre(thesdk,metaclass=abc.ABCMeta):
         
         Global accuracy parameter for Spectre simulations. Options include
         'liberal', 'moderate' and 'conservative', in order of rising accuracy.
-         You can set this by accesssing spice langmodule
+        You can set this by accesssing spice langmodule
 
-         Example
-         -------
-         self.spice_langmodule.errpreset='conservative'
+        Example
+        -------
+        self.spice_langmodule.errpreset='conservative'
 
         """
-        if hasattr(self,'_errpreset'):
-            return self._errpreset
-        else:
+        if not hasattr(self,'_errpreset'):
             self._errpreset='moderate'
         return self._errpreset
     @errpreset.setter

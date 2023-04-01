@@ -56,8 +56,14 @@ class testbench(testbench_common):
 
     @property
     def testbench_simulator(self): 
-        """The simulator specific operation is defined with an instance of 
+        """ The simulator specific operation is defined with an instance of 
         simulator specific class. Properties and methods return values from that class.
+
+        :type: ngspice_testbench 
+        :type: eldo_testbench
+        :type: spectre_testbench
+
+
         """
         if not hasattr(self,'_testbench_simulator'):
             if self.model == 'ngspice':
@@ -70,7 +76,10 @@ class testbench(testbench_common):
        
     @property
     def dut(self):
-        """ Design under test : spice_module
+        """ Design under test
+        
+        :type: spice_module
+
         """
         if not hasattr(self,'_dut'):
             self._dut = spice_module(file=self._dutfile,parent=self.parent)

@@ -1,7 +1,7 @@
 """
-=================
-Ngspice Testbench
-=================
+==============
+Eldo Testbench
+==============
 
 Simulators sepecific testbench generation class for Ngspice.
 

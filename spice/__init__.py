@@ -66,9 +66,7 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
 
     @property
     def si_prefix_mult(self):
-        """ Dictionary
-        
-        Dictionary mapping SI-prefixes to multipliers.
+        """ Dict : Dictionary mapping SI-prefixes to multipliers.
         """
         if hasattr(self, '_si_prefix_mult'):
             return self._si_prefix_mult
@@ -94,6 +92,10 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
         """The simulator specific operation is defined with an instance of 
         simulator specific class. Properties and methods return values from that class.
 
+        :type: ngspice
+        :type: eldo
+        :type: spectre
+
         """
         if not hasattr(self,'_spice_simulator'):
             if self.model == 'ngspice':
@@ -107,9 +109,7 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
 
     @property
     def syntaxdict(self):
-        """ Dictionary
-        
-        Internally used dictionary for common syntax conversions between
+        """dict : Internally used dictionary for common syntax conversions between
         Spectre, Eldo, and Ngspice.
         """
         if not hasattr(self,'_syntaxdict'):
@@ -121,10 +121,10 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
 
     @property
     def preserve_spicefiles(self):  
-        """True | False (default)
-
-        If True, do not delete generated Spice files (testbench, subcircuit,
+        """bool : If True, do not delete generated Spice files (testbench, subcircuit,
         etc.) after simulations.  Useful for debugging.
+
+            (Default : False )
         
         """
         if not hasattr(self,'_preserve_spicefiles'):
@@ -402,9 +402,8 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
 
     @property
     def postlayout(self):
-        """Boolean
-        
-        Enables post-layout optimizations in the simulator command options. 
+        """bool : Enables post-layout optimizations in the simulator command options. 
+            (Default : False )
 
         """
         if not hasattr(self,'_postlayout'):
@@ -526,23 +525,25 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
 
     @property
     def spicemisc(self): 
-        """ List of str
-
-        List of manual commands to be pasted to the testbench. The strings are
+        """ [str] : List of manual commands to be pasted to the testbench. The strings are
         pasted to their own lines (no linebreaks needed), and the syntax is
         unchanged.
 
         Example
         -------
         Setting initial voltages from testbench (Eldo)::
+        
             for i in range(nodes):
+
                 self.spicemisc.append('.ic NODE<%d> 0' % i)
 
         The same example for Spectre::
+
             self.spicemisc.append('simulator lang=spice')
             for i in range(nodes):
                 self.spicemisc.append('.ic NODE<%d> 0' % i)
             self.spicemisc.append('simulator lang=spectre')
+        
         """
         if not hasattr(self, '_spicemisc'):
             self._spicemisc = []

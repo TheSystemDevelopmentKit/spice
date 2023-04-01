@@ -65,73 +65,74 @@ class ngspice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def cmdfile_ext(self):
-        """Extension of the command file : str
+        """str : Extension of the command file
         """
         return '.ngcir'
     @property
     def resultfile_ext(self):
-        """Extension of the result file : str
+        """str : Extension of the result file
         """
         return ''
     @property
     def commentchar(self):
-        """Comment character of the simulator : str
+        """str : Comment character of the simulator
         """
         return '*'
     @property
     def commentline(self):
-        """Comment line for the simulator : str
+        """str : Comment line for the simulator
         """
         return '***********************\n'
     @property
     def nprocflag(self):
-        """String for defining multithread execution : str
+        """str : String for defining multithread execution
         """
         return 'set num_threads='
     @property
     def simulatorcmd(self):
-        """Simulator execution command : str
+        """str : Simulator execution command 
+            (Default: 'ngspice')
         """
         return 'ngspice'
     @property
     def dcsource_declaration(self):
-        """DC source declaration : str
+        """str : DC source declaration
         """
         #self.print_log(type='F', msg='DC source declaration not defined for ngspice')
         return ''
     @property
     def parameter(self):
-        """Netlist parameter definition string : str
+        """str : Netlist parameter definition string
         """
         return '.param'
     @property
     def option(self):
-        """Netlist option definition string : str
+        """str : Netlist option definition string
         """
         return '.option'
     @property
     def include(self):
-        """Netlist include string : str
+        """str : Netlist include string
         """
         return '.include'
     @property
     def dspfinclude(self):
-        """Netlist dspf-file include string : str
+        """str : Netlist dspf-file include string
         """
         return '.include'
     @property
     def subckt(self):
-        """Subcircuit include string : str
+        """str : Subcircuit include string
         """
         return '.subckt'
     @property
     def lastline(self):
-        """Last line of the simulator command file : str
+        """str : Last line of the simulator command file
         """
         return '.end'
     @property
     def eventoutdelim(self):
-        """Delimiter for the events : str
+        """str : Delimiter for the events
         """
         return '  ' #Two spaces
     @property
@@ -158,9 +159,7 @@ class ngspice(thesdk,metaclass=abc.ABCMeta):
 
     @property
     def spicecmd(self):
-        """String
-
-        Simulation command string to be executed on the command line.
+        """str : Simulation command string to be executed on the command line.
         Automatically generated.
         """
         if not hasattr(self,'_ngspice_spicecmd'):

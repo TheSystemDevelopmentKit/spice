@@ -34,9 +34,11 @@ class spice_module(thesdk):
 
     @property
     def file(self):
-        """String
+        """ Filepath to the entity's spice netlist source file 
+        (i.e. './spice/entityname.scs').  
         
-        Filepath to the entity's spice netlist source file (i.e. './spice/entityname.scs').
+        :type: str
+        
         """
         if not hasattr(self,'_file'):
             self._file=None
@@ -47,27 +49,29 @@ class spice_module(thesdk):
     
     @property
     def name(self):
-        """String
+        """Entity name
         
-        Entity name."""
+        :type: str
+
+        """
         if not self._name:
             self._name=os.path.splitext(os.path.basename(self.file))[0]
         return self._name
 
     @property
     def custom_subckt_name(self):
-        """String
-
-        Custom name of the subcircuit to look from from the netlist file during parsing for 
+        """Custom name of the subcircuit to look from from the netlist file during parsing for 
         'subckt' property. Enables using compatible (in term sof IOs paremeters) netlists defined 
         for designs of different name.
+
+        :type: str
  
         Example:
             Most common use case of module is a dut in a testbench. There you 
-            can set this parameter before execution as
+            can set this parameter before execution as::
 
-            | self.spice_tb.dut.custom_subckt_name = 'some_name'
-            | self.run_spice()
+                self.spice_tb.dut.custom_subckt_name = 'some_name'
+                self.run_spice()
 
         """
         if not hasattr(self,'_custom_subckt_name'):
@@ -80,11 +84,11 @@ class spice_module(thesdk):
 
     @property
     def subckt(self):
-        """String
-        
-        String containing the contents of the subcircuit definition file of the entity.
+        """The contents of the subcircuit definition file of the entity.
         Extract the definitions form the source netlist. The source netlist when accessed. 
         Can be written to the subckt_file with export_subckt method. 
+
+        :type: str
 
         """
         if not hasattr(self,'_subckt'):
@@ -117,10 +121,11 @@ class spice_module(thesdk):
 
     @property
     def instance(self):
-        """String
+        """The subcircuit instance to be placed in the testbench. Parsed from
+        the subckt property
+
+        :type: str
         
-        String containing the subcircuit instance to be placed in the
-        testbench. Parsed from the subckt property
         """
         try:
             if not hasattr(self,'_instance'):

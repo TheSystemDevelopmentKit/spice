@@ -1,9 +1,9 @@
 """
 =================
-Ngspice Testbench
+Spectre Testbench
 =================
 
-Simulators sepecific testbench generation class for Ngspice.
+Simulators sepecific testbench generation class for Spectre.
 
 """
 import os
