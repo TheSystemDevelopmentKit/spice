@@ -46,9 +46,6 @@ class testbench_common(spice_module):
         
         #The methods for these are derived from spice_module
         self._name=''
-        self.iofiles=Bundle()
-        #self.dcsources=Bundle()
-        self.simcmds=Bundle()
         
     @property
     def header(self):
@@ -80,12 +77,29 @@ class testbench_common(spice_module):
         self._options=None
 
     @property
+    def iofiles(self):
+        """bundle :  bundle of iofiles inherited from parent
+        """
+        if not hasattr(self,'_iofiles'):
+            self._iofiles = self.parent.iofile_bundle
+        return self._iofiles
+
+
+    @property
     def dcsources(self):
         """bundle :  bundle of DC sources inherited from parent
         """
         if not hasattr(self,'_dcsources'):
             self._dcsources = self.parent.dcsource_bundle
         return self._dcsources
+
+    @property
+    def simcmds(self):
+        """bundle :  bundle of simulation commands inherited from parent
+        """
+        if not hasattr(self,'_simcmds'):
+            self._simcmds = self.parent.simcmd_bundle
+        return self._simcmds
 
     def esc_bus(self,name, esc_colon=True):
         """

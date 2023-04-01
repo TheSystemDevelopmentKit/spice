@@ -130,3 +130,167 @@ class spectre_testbench(testbench_common):
                             ('%ssource' % val.sourcetype.lower()),value,val.ramp)
         return self._dcsourcestr
 
+    @property
+    def inputsignals(self):
+        """str : Input signal definitions parsed from spice_iofile objects instantiated
+        in the parent entity.
+        """
+        if not hasattr(self,'_inputsignals'):
+            self._inputsignals = "%s Input signals\n" % self.parent.spice_simulator.commentchar
+            for name, val in self.iofiles.Members.items():
+                # Input file becomes a source
+                if val.dir.lower()=='in' or val.dir.lower()=='input':
+                    # Event signals are analog
+                    if val.iotype.lower()=='event':
+                        for i in range(len(val.ionames)):
+                            # Finding the max time instant
+                            try:
+                                maxtime = val.Data[-1,0]
+                            except TypeError:
+                                self.print_log(type='F', msg='Input data not assinged to IO %s! Terminating.' % name)
+                            if float(self._trantime) < float(maxtime):
+                                self._trantime_name = name
+                                self._trantime = maxtime
+                            # Adding the source
+                            if val.pos and val.neg:
+                                self._inputsignals += "%s%s %s %s %ssource type=pwl file=\"%s\"\n" % \
+                                        (val.sourcetype.upper(),self.esc_bus(val.ionames[i].lower()),
+                                        self.esc_bus(val.pos), self.esc_bus(val.neg),val.sourcetype.lower(),val.file[i])
+                            else:
+                                self._inputsignals += "%s%s %s 0 %ssource type=pwl file=\"%s\"\n" % \
+                                        (val.sourcetype.upper(),self.esc_bus(val.ionames[i].lower()),
+                                        self.esc_bus(val.ionames[i]),val.sourcetype.lower(),val.file[i])
+                    # Sample signals are digital
+                    # Presumably these are already converted to bitstrings
+                    elif val.iotype.lower()=='sample':
+                        for i in range(len(val.ionames)):
+                            # This is a lazy way to handle non-list val.Data
+                            try:
+                                if float(self._trantime) < len(val.Data)/val.rs:
+                                    self._trantime = len(val.Data)/val.rs
+                                    self._trantime_name = name
+                            except:
+                                pass
+                            self._inputsignals += 'vec_include "%s"\n' % val.file[i]
+                    else:
+                        self.print_log(type='F',msg='Input type \'%s\' undefined.' % val.iotype)
+
+            if self._trantime == 0:
+                self._trantime = "UNDEFINED"
+                self.print_log(type='I',msg='Transient time could not be inferred from input signals. Make sure to provide tstop argument to spice_simcmd.')
+        return self._inputsignals
+    @inputsignals.setter
+    def inputsignals(self,value):
+        self._inputsignals=value
+    @inputsignals.deleter
+    def inputsignals(self,value):
+        self._inputsignals=None
+
+    @property
+    def simcmdstr(self):
+        """str : Simulation command definition parsed from spice_simcmd object
+        instantiated in the parent entity.
+        """
+        if not hasattr(self,'_simcmdstr'):
+            self._simcmdstr = "%s Simulation commands\n" % self.parent.spice_simulator.commentchar
+            for sim, val in self.simcmds.Members.items():
+                if val.mc:
+                    self._simcmdstr += 'mc montecarlo donominal=no variations=all %snumruns=1 {\n' \
+                            % ('' if val.mc_seed is None else 'seed=%d '%val.mc_seed)
+                if str(sim).lower() == 'tran':
+                    simtime = val.tstop if val.tstop is not None else self._trantime
+                    if val.tstop is None:
+                        self.print_log(type='D',msg='Inferred transient duration is %g s from \'%s\'.' % (simtime,self._trantime_name))
+                    #TODO initial conditions
+                    self._simcmdstr += 'TRAN_analysis %s pstep=%s stop=%s %s ' % \
+                            (sim,str(val.tprint),str(simtime),'UIC' if val.uic else '')
+                    if val.noise:
+                        if val.seed==0:
+                            self.print_log(type='W',msg='Spectre disables noise if seed=0.')
+                        self._simcmdstr += 'trannoisemethod=default noisefmin=%s noisefmax=%s %s ' % \
+                                (str(val.fmin),str(val.fmax),'noiseseed=%d'%(val.seed) if val.seed is not None else '')
+                    if val.method is not None:
+                        self._simcmdstr += 'method=%s ' %  (str(val.method))
+                    if val.cmin is not None:
+                        self._simcmdstr += 'cmin=%s ' %  (str(val.cmin))
+                    if val.maxstep is not None:
+                        self._simcmdstr += 'maxstep=%s ' % (str(val.maxstep))
+                    if val.step is not None:
+                        self._simcmdstr += 'step=%s ' % (str(val.step))
+                    if val.strobeperiod is not None:
+                        self._simcmdstr += 'strobeperiod=%s strobeoutput=strobeonly ' % (str(val.strobeperiod))
+                    if val.strobedelay is not None:
+                        self._simcmdstr += 'strobedelay=%s' % (str(val.strobedelay))
+                    if val.skipstart is not None:
+                        self._simcmdstr += 'skipstart=%s' % (str(val.skipstart))
+                    self._simcmdstr += '\n\n' 
+
+                elif str(sim).lower() == 'dc':
+                    if len(val.sweep) == 0: # This is not a sweep analysis
+                        self._simcmdstr+='oppoint dc\n\n'
+                    else:
+                        if self.parent.distributed_run:
+                            distributestr = 'distribute=lsf numprocesses=%d' % self.parent.num_processes 
+                        else:
+                            distributestr = ''
+                        if len(val.subcktname) != 0: # Sweep subckt parameter
+                            length=len(val.subcktname)
+                            if any(len(lst) != length for lst in [val.sweep, val.swpstart, val.swpstop, val.swpstep]):
+                                self.print_log(type='F', msg='Mismatch in length of simulation parameters.\nEnsure that sweep points and subcircuit names have the same number of elements!')
+                            for i in range(len(val.subcktname)):
+                                self._simcmdstr+='Sweep%d sweep param=%s sub=%s start=%s stop=%s step=%s %s { \n' \
+                                    % (i, val.sweep[i], val.subcktname[i], val.swpstart[i], val.swpstop[i], val.swpstep[i], distributestr)
+                        elif len(val.devname) != 0: # Sweep device parameter
+                            length=len(val.devname)
+                            if any(len(lst) != length for lst in [val.sweep, val.swpstart, val.swpstop, val.swpstep]):
+                                self.print_log(type='F', msg='Mismatch in length of simulation parameters.\nEnsure that sweep points and device names have the same number of elements!')
+                            for i in range(len(val.devname)):
+                                self._simcmdstr+='Sweep%d sweep param=%s dev=%s start=%s stop=%s step=%s %s { \n' \
+                                    % (i, val.sweep[i], val.devname[i], val.swpstart[i], val.swpstop[i], val.swpstep[i], distributestr)
+                        else: # Sweep top-level netlist parameter
+                            length=len(val.sweep)
+                            if any(len(lst) != length for lst in [val.swpstart, val.swpstop, val.swpstep]):
+                                self.print_log(type='F', msg='Mismatch in length of simulation parameters.\nEnsure that sweep points and parameter names have the same number of elements!')
+                            for i in range(len(val.sweep)):
+                                self._simcmdstr+='Sweep%d sweep param=%s start=%s stop=%s step=%s %s { \n' \
+                                    % (i, val.sweep[i], val.swpstart[i], val.swpstop[i], val.swpstep[i], distributestr)
+                        self._simcmdstr+='oppoint dc\n'
+                        # Closing brackets
+                        for j in range(i, -1, -1):
+                            self._simcmdstr+='}\n'
+                        self._simcmdstr+='\n'
+                elif str(sim).lower() == 'ac':
+                    if val.fscale.lower()=='log':
+                        if val.fpoints != 0:
+                            pts_str='log=%d' % val.fpoints
+                        elif val.fstepsize != 0:
+                            pts_str='dec=%d' % val.fstepsize
+                        else:
+                            self.print_log(type='F', msg='Set either fpoints or fstepsize for AC simulation!')
+                    elif val.fscale.lower()=='lin':
+                        if val.fpoints != 0:
+                            pts_str='lin=%d' % val.fpoints
+                        elif val.fstepsize != 0:
+                            pts_str='step=%d' % val.fstepsize
+                        else:
+                            self.print_log(type='F', msg='Set either fpoints or fstepsize for AC simulation!')
+                    else:
+                        self.print_log(type='F', msg='Unsupported frequency scale %s for AC simulation!' % val.fscale)
+                    self._simcmdstr += 'AC_analysis %s start=%s stop=%s %s' % \
+                            (sim,str(val.fmin),str(val.fmax),pts_str)
+                    self._simcmdstr += '\n\n'
+
+                else:
+                    self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
+                if val.mc:
+                    self._simcmdstr += '}\n\n'
+            if val.model_info:
+                self._simcmdstr += 'element info what=inst where=rawfile \nmodelParameter info what=models where=rawfile\n\n'
+        return self._simcmdstr
+    @simcmdstr.setter
+    def simcmdstr(self,value):
+        self._simcmdstr=value
+    @simcmdstr.deleter
+    def simcmdstr(self,value):
+        self._simcmdstr=None
+
