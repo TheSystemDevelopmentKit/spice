@@ -1024,7 +1024,7 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
             # Loading a previously stored state
             if self.load_output_file:
                 self.spice_tb.iofiles = self.iofile_bundle
-                self.spice_tb.dcsources = self.dcsource_bundle
+                #self.spice_tb.dcsources = self.dcsource_bundle
                 self.spice_tb.simcmds = self.simcmd_bundle
                 self.read_spice_outputs()
                 self.connect_spice_outputs()
@@ -1039,7 +1039,7 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
         else:
             # Normal execution of full simulation
             self.spice_tb.iofiles = self.iofile_bundle
-            self.spice_tb.dcsources = self.dcsource_bundle
+            #self.spice_tb.dcsources = self.dcsource_bundle
             self.spice_tb.simcmds = self.simcmd_bundle
             self.connect_spice_inputs()
             self.spice_tb.generate_contents()

@@ -205,6 +205,14 @@ class testbench(testbench_common):
     def misccmd(self,value):
         self._misccmd=None
 
+    @property
+    def dcsources(self):
+        """bundle :  bundle of DC sources inherited from parent
+        """
+        if not hasattr(self,'_dcsources'):
+            self._dcsources = self.parent.dcsource_bundle
+        return self._dcsources
+
     # Generating spice dcsources string
     @property
     def dcsourcestr(self):
