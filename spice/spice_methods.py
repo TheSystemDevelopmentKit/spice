@@ -12,7 +12,7 @@ import sys
 from abc import * 
 from thesdk import *
 
-class spice_methods:
+class spice_methods(metaclass=abc.ABCMeta):
 
     def filter_strobed(self, key,ioname):
         """
@@ -147,36 +147,18 @@ class spice_methods:
             return strval # Was a text value
 
 
-    #### [TODO] To be relocated
-    # Strobing related stuff should not be in this class. Maybe spice_iofile or 
-    # testbench also suposedly these are spectre specific
-    @property
-    def strobe_indices(self):
-        """
-        Internally set list of indices corresponding to time,amplitude pairs
-        whose time value of is a multiple of the strobeperiod (see spice_simcmd).
-        """
-        if not hasattr(self,'_strobe_indices'):
-            self._strobe_indices=[]
-        return self._strobe_indices
 
-    @strobe_indices.setter
-    def strobe_indices(self,val):
-        if isinstance(val, list) or isinstance(val, np.ndarray):
-            self._strobe_indices=val
-        else:
-            self.print_log(type='W', msg='Cannot set strobe_indices to be of type: %s' % type(val))
+    def sorter(val):
+        '''
+        Function for sorting the files in correct order
+        Files that are output from simulation are of form
 
-    @property
-    def is_strobed(self):
+        SweepN-<integer>_SweepN+1-<integer>_ ... _oppoint.dc
+
+        Strategy: extract integer from filename and sort based on the integer.
+
         '''
-        Check if simulation was strobed or not
-        '''
-        if not hasattr(self, '_is_strobed'):
-            self._is_strobed=False
-            for simtype, simcmd in self.simcmd_bundle.Members.items():
-                if simtype=='tran':
-                    if simcmd.strobeperiod:
-                        self._is_strobed=True
-        return self._is_strobed
+
+        keys = val.split('_')[:-1]
+        return sum([int(key.split('-')[-1]) for key in keys])
 
