@@ -249,10 +249,10 @@ class spectre(spice_common):
                         break
                 # For distributed runs
                 if self.parent.distributed_run:
-                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.name, '[0-9]*', fname)
+                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, '[0-9]*', fname)
                     files = sorted(glob.glob(path),key=self.sorter)
                 else:
-                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.name, fname)
+                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, fname)
                     files = glob.glob(path)
                 valbegin = 'VALUE\n'
                 eof = 'END\n'
