@@ -200,7 +200,7 @@ class ngspice(spice_common):
             if 'dc' in self.parent.simcmd_bundle.Members.keys(): # Unsupported model
                 raise Exception('Unrecognized model %s.' % self.model)
             else: # DC analysis not in simcmds, oppts is empty
-                self.parent.extracts.Members.update({'oppts' : {}})
+                self.extracts.Members.update({'oppts' : {}})
         except:
             self.print_log(type='W', msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting DC operating points.')

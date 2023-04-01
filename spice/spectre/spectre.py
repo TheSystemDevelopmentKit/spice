@@ -235,7 +235,7 @@ class spectre(spice_common):
 
         try:
             if 'dc' in self.parent.simcmd_bundle.Members.keys():
-                self.parent.extracts.Members.update({'oppts' : {}})
+                self.extracts.Members.update({'oppts' : {}})
                 # Get dc simulation file name
                 for name, val in self.simcmd_bundle.Members.items():
                     if name == 'dc':
@@ -272,12 +272,12 @@ class spectre(spice_common):
                                         dev = parts[0]
                                         param = parts[1]
                                     val = float(parts[2])
-                                    if dev not in self.parent.extracts.Members['oppts']: # Found new device
-                                        self.parent.extracts.Members['oppts'].update({dev : {}}) 
-                                    if param not in self.parent.extracts.Members['oppts'][dev]: # Found new parameter for device
-                                        self.parent.extracts.Members['oppts'][dev].update({param : [val]})
+                                    if dev not in self.extracts.Members['oppts']: # Found new device
+                                        self.extracts.Members['oppts'].update({dev : {}}) 
+                                    if param not in self.extracts.Members['oppts'][dev]: # Found new parameter for device
+                                        self.extracts.Members['oppts'][dev].update({param : [val]})
                                     else: # Parameter already existed, just append value. This can occur in e.g. sweeps
-                                        self.parent.extracts.Members['oppts'][dev][param].append(val)
+                                        self.extracts.Members['oppts'][dev][param].append(val)
                             elif line == eof:
                                 parsevals = False
         except:
