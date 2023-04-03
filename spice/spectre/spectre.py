@@ -208,7 +208,7 @@ class spectre(spice_common):
         while tries < 100:
             if os.path.exists(self.parent.spicedbpath):
                 # More than just the logfile exists
-                if len(os.listdir(self.parent.picedbpath)) > 1:
+                if len(os.listdir(self.parent.spicedbpath)) > 1:
                     # Database file has something written to it
                     filesize = []
                     for f in os.listdir(self.parent.spicedbpath):
