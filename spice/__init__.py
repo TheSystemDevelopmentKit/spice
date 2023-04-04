@@ -687,20 +687,11 @@ class spice(spice_common):
     def plotprogcmd(self):
         """ str : Command to be run for interactive simulations.
         """
-        if not hasattr(self, '_plotprogcmd'):
-            if self.plotprogram == 'ezwave':
-                self._plotprogcmd='%s -MAXWND -LOGfile %s/ezwave.log %s &' % \
-                        (self.plotprogram,self.spicesimpath,self.spicedbpath)
-            elif self.plotprogram == 'viva':
-                self._plotprogcmd='%s -datadir %s -nocdsinit &' % \
-                        (self.plotprogram,self.spicedbpath)
-            else:
-                self._plotprogcmd = ''
-                self.print_log(type='W',msg='Unsupported plot program \'%s\'.' % self.plotprogram)
-        return self._plotprogcmd
+        return self.spice_simulator.plotprogcmd
+
     @plotprogcmd.setter
     def plotprogcmd(self, value):
-        self._plotprogcmd=value
+        self.spice_simulator.plotprogcmd = value
 
     @property
     def save_database(self): 
