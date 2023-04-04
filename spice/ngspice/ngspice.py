@@ -157,6 +157,40 @@ class ngspice(spice_common):
     def plflag(self, val):
         self.print_log(type='W', msg='Postlayout flag unsupported for Eldo')
 
+    @property
+    def plotprogram(self):
+        """ String
+
+        Sets the program to be used for visualizing waveform databases.
+        """
+        if not hasattr(self, '_plotprogram'):
+            self._plotprogram='gnuplot'
+        return self._plotprogram
+    @plotprogram.setter
+    def plotprogram(self, value):
+        if value not in  [ 'gnuplot' ]:  
+            self.print_log(type='F', 
+                    msg='%s not supported for plotprogram, only ezvave and viva are supported')
+        else:
+            self._plotprogram = value
+
+    @property
+    def plotprogcmd(self):
+        """ str : Command to be run for interactive simulations.
+        """
+        if not hasattr(self, '_plotprogcmd'):
+            if self.plotprogram == 'ezwave':
+                self._plotprogcmd='%s -MAXWND -LOGfile %s/ezwave.log %s &' % \
+                        (self.plotprogram,self.parent.spicesimpath,self.parent.spicedbpath)
+            elif self.plotprogram == 'viva':
+                self._plotprogcmd='%s -datadir %s -nocdsinit &' % \
+                        (self.plotprogram,self.parent.spicedbpath)
+            else:
+                self.print_log(type='F',msg='Unsupported plot program \'%s\'.' % self.plotprogram)
+        return self._plotprogcmd
+    @plotprogcmd.setter
+    def plotprogcmd(self, value):
+        self._plotprogcmd=value
 
     @property
     def spicecmd(self):
@@ -177,7 +211,7 @@ class ngspice(spice_common):
                 self.print_log(type='W',msg='Post-layout optimization not suported for Ngspice')
 
             if self.parent.interactive_spice:
-                self._ngspice_spicecmd = self.spice_submission+self.langmodule.simulatorcmd+' '+self.spicetbsrc
+                self._ngspice_spicecmd = self.parent.spice_submission+self.simulatorcmd+' '+self.parent.spicetbsrc
             else:
                 self._ngspice_spicecmd = self.parent.spice_submission + self.simulatorcmd + ' -b '+self.parent.spicetbsrc
         return self._ngspice_spicecmd
