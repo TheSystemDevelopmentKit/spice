@@ -274,7 +274,7 @@ class spectre(spice_common):
             if 'dc' in self.parent.simcmd_bundle.Members.keys():
                 self.extracts.Members.update({'oppts' : {}})
                 # Get dc simulation file name
-                for name, val in self.simcmd_bundle.Members.items():
+                for name, val in self.parent.simcmd_bundle.Members.items():
                     if name == 'dc':
                         fname=''
                         if len(val.sweep) != 0:
