@@ -160,9 +160,9 @@ class ngspice_testbench(testbench_common):
                                     and len(str(val.Data[0,i])) == 1):
                                 self._inputsignals += ( 'a%s [ %s_d ] input_vector_%s\n'
                                         % ( val.ionames[i], val.ionames[i], val.ionames[i]) )
-                                # Ngsim assumes lowercase filenames
+                                # Ngsim assumes lowercase filenames, filenames must be quoted
                                 self._inputsignals += (
-                                        '.model input_vector_%s d_source(input_file = %s)\n'
+                                        '.model input_vector_%s d_source(input_file = \"%s\")\n'
                                         % ( val.ionames[i], os.path.basename(val.file[i]).lower() )) 
                                 self._inputsignals += (
                                         'adac_%s [ %s_d ] [ %s ] dac_%s\n' % ( val.ionames[i],

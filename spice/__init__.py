@@ -985,7 +985,7 @@ class spice(spice_common):
                         self.print_log(type='E',msg='Failed saving waveform database to %s/%s' % (self.statedir,dbname))
                 if self.save_output_file:
                     output_name = 'tb_%s.print' % self.name
-                    filepath = self.simpath
+                    filepath = self.spicesimpath
                     output_path = os.path.join(filepath, output_name)
                     targ_path = os.path.join(self.statedir, output_name)
                     shutil.copyfile(output_path, targ_path)

@@ -174,7 +174,7 @@ class spice_iofile(iofile):
                     % ( self.parent.runname,self.dir,ioname.replace('<','').replace('>','').replace('.','_'),
                         self.iotype))
             if not self.parent.load_output_file:
-                filepath = self.parent.simpath+'/'
+                filepath = self.parent.spicesimpath+'/'
             else:
                 filepath = self.parent.statedir
             # For now, all outputs are event type stored in a common file
