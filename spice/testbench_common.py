@@ -46,9 +46,6 @@ class testbench_common(spice_module):
         
         #The methods for these are derived from spice_module
         self._name=''
-        self.iofiles=Bundle()
-        self.dcsources=Bundle()
-        self.simcmds=Bundle()
         
     @property
     def header(self):
@@ -66,9 +63,7 @@ class testbench_common(spice_module):
     # Generating spice options string
     @property
     def options(self):
-        """String
-        
-        Spice options string parsed from self.spiceoptions -dictionary in the
+        """str : Spice options string parsed from self.spiceoptions -dictionary in the
         parent entity.
         """
         if not hasattr(self,'_options'):
@@ -80,4 +75,45 @@ class testbench_common(spice_module):
     @options.deleter
     def options(self,value):
         self._options=None
+
+    @property
+    def iofiles(self):
+        """bundle :  bundle of iofiles inherited from parent
+        """
+        if not hasattr(self,'_iofiles'):
+            self._iofiles = self.parent.iofile_bundle
+        return self._iofiles
+
+
+    @property
+    def dcsources(self):
+        """bundle :  bundle of DC sources inherited from parent
+        """
+        if not hasattr(self,'_dcsources'):
+            self._dcsources = self.parent.dcsource_bundle
+        return self._dcsources
+
+    @property
+    def simcmds(self):
+        """bundle :  bundle of simulation commands inherited from parent
+        """
+        if not hasattr(self,'_simcmds'):
+            self._simcmds = self.parent.simcmd_bundle
+        return self._simcmds
+
+    def esc_bus(self,name, esc_colon=True):
+        """
+        Helper function to escape bus characters for Spectre simulations::
+
+            self.esc_bus('bus<3:0>') 
+            # Returns 'bus\<3\:0\>'
+        """
+        # This is so simple that does not make sense to split
+        if self.parent.model == 'spectre':
+            if esc_colon:
+                return name.replace('<','\\<').replace('>','\\>').replace('[','\\[').replace(']','\\]').replace(':','\\:')
+            else: # Cannot escape colon for DC analyses..
+                return name.replace('<','\\<').replace('>','\\>').replace('[','\\[').replace(']','\\]')
+        else:
+            return name
 

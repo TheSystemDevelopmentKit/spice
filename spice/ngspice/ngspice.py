@@ -11,9 +11,10 @@ import os
 import sys
 from abc import * 
 from thesdk import *
+from spice.spice_common import *
 import numpy as np
 
-class ngspice(thesdk,metaclass=abc.ABCMeta):
+class ngspice(spice_common):
     """This class is used as instance in simulatormodule property of 
     spice class. Contains language dependent definitions.
 
@@ -156,6 +157,40 @@ class ngspice(thesdk,metaclass=abc.ABCMeta):
     def plflag(self, val):
         self.print_log(type='W', msg='Postlayout flag unsupported for Eldo')
 
+    @property
+    def plotprogram(self):
+        """ String
+
+        Sets the program to be used for visualizing waveform databases.
+        """
+        if not hasattr(self, '_plotprogram'):
+            self._plotprogram='gnuplot'
+        return self._plotprogram
+    @plotprogram.setter
+    def plotprogram(self, value):
+        if value not in  [ 'gnuplot' ]:  
+            self.print_log(type='F', 
+                    msg='%s not supported for plotprogram, only ezvave and viva are supported')
+        else:
+            self._plotprogram = value
+
+    @property
+    def plotprogcmd(self):
+        """ str : Command to be run for interactive simulations.
+        """
+        if not hasattr(self, '_plotprogcmd'):
+            if self.plotprogram == 'ezwave':
+                self._plotprogcmd='%s -MAXWND -LOGfile %s/ezwave.log %s &' % \
+                        (self.plotprogram,self.parent.spicesimpath,self.parent.spicedbpath)
+            elif self.plotprogram == 'viva':
+                self._plotprogcmd='%s -datadir %s -nocdsinit &' % \
+                        (self.plotprogram,self.parent.spicedbpath)
+            else:
+                self.print_log(type='F',msg='Unsupported plot program \'%s\'.' % self.plotprogram)
+        return self._plotprogcmd
+    @plotprogcmd.setter
+    def plotprogcmd(self, value):
+        self._plotprogcmd=value
 
     @property
     def spicecmd(self):
@@ -176,7 +211,7 @@ class ngspice(thesdk,metaclass=abc.ABCMeta):
                 self.print_log(type='W',msg='Post-layout optimization not suported for Ngspice')
 
             if self.parent.interactive_spice:
-                self._ngspice_spicecmd = self.spice_submission+self.langmodule.simulatorcmd+' '+self.spicetbsrc
+                self._ngspice_spicecmd = self.parent.spice_submission+self.simulatorcmd+' '+self.parent.spicetbsrc
             else:
                 self._ngspice_spicecmd = self.parent.spice_submission + self.simulatorcmd + ' -b '+self.parent.spicetbsrc
         return self._ngspice_spicecmd
@@ -189,5 +224,19 @@ class ngspice(thesdk,metaclass=abc.ABCMeta):
         '''
         self.print_log(type='W',msg='Interactive plotting not implemented for ngspice.')
         return 0
+
+    def read_oppts(self):
+        """ Internally called function to read the DC operating points of the circuit
+            TODO: Implement for Eldo as well.
+        """
+
+        try:
+            if 'dc' in self.parent.simcmd_bundle.Members.keys(): # Unsupported model
+                raise Exception('Unrecognized model %s.' % self.parent.model)
+            else: # DC analysis not in simcmds, oppts is empty
+                self.extracts.Members.update({'oppts' : {}})
+        except:
+            self.print_log(type='W', msg=traceback.format_exc())
+            self.print_log(type='W',msg='Something went wrong while extracting DC operating points.')
 
 

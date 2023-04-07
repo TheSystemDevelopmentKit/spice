@@ -47,22 +47,18 @@ import numpy as np
 from numpy import genfromtxt
 import pandas as pd
 from functools import reduce
+from spice.spice_common import *
 from spice.testbench import testbench as stb
 from spice.spice_simcmd import spice_simcmd as spice_simcmd
 from spice.spice_iofile import spice_iofile as spice_iofile
 from spice.spice_dcsource import spice_dcsource as spice_dcsource
 from spice.spice_module import spice_module as spice_module
-from spice.spice_methods import spice_methods
 # Simulator modules
 from spice.ngspice.ngspice import ngspice
 from spice.eldo.eldo import eldo
 from spice.spectre.spectre import spectre
-from spice.spectre.spectre import spectre
 
-class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
-    #These need to be converted to abstact properties
-    def __init__(self):
-        pass
+class spice(spice_common):
 
     @property
     def si_prefix_mult(self):
@@ -483,12 +479,11 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
 
         A thesdk.Bundle containing extracted quantities.
         """
-        if not hasattr(self,'_extracts'):
-            self._extracts=Bundle()
-        return self._extracts
+
+        return self.spice_simulator.extracts
     @extracts.setter
     def extracts(self,value):
-        self._extracts=value
+        self.spice_simulator.extracts = value
 
     @property 
     def spice_submission(self):
@@ -686,28 +681,17 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
     @plotprogram.setter
     def plotprogram(self, value):
         self._plotprogram=value
+    ### End to be relocated
 
     @property
     def plotprogcmd(self):
-        """ String
-
-        Sets the command to be run for interactive simulations.
+        """ str : Command to be run for interactive simulations.
         """
-        if not hasattr(self, '_plotprogcmd'):
-            if self.plotprogram == 'ezwave':
-                self._plotprogcmd='%s -MAXWND -LOGfile %s/ezwave.log %s &' % \
-                        (self.plotprogram,self.spicesimpath,self.spicedbpath)
-            elif self.plotprogram == 'viva':
-                self._plotprogcmd='%s -datadir %s -nocdsinit &' % \
-                        (self.plotprogram,self.spicedbpath)
-            else:
-                self._plotprogcmd = ''
-                self.print_log(type='W',msg='Unsupported plot program \'%s\'.' % self.plotprogram)
-        return self._plotprogcmd
+        return self.spice_simulator.plotprogcmd
+
     @plotprogcmd.setter
     def plotprogcmd(self, value):
-        self._plotprogcmd=value
-    ### End to be relocated
+        self.spice_simulator.plotprogcmd = value
 
     @property
     def save_database(self): 
@@ -924,82 +908,15 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
         """ Internally called function to read the DC operating points of the circuit
             TODO: Implement for Eldo as well.
         """
-        def sorter(val):
-            '''
-            Function for sorting the files in correct order
-            Files that are output from simulation are of form
 
-            SweepN-<integer>_SweepN+1-<integer>_ ... _oppoint.dc
+        self.spice_simulator.read_oppts()
 
-            Strategy: extract integer from filename and sort based on the integer.
-
-            '''
-
-            keys = val.split('_')[:-1]
-            return sum([int(key.split('-')[-1]) for key in keys])
-
-        try:
-            if self.model=='spectre' and 'dc' in self.simcmd_bundle.Members.keys():
-                self.extracts.Members.update({'oppts' : {}})
-                # Get dc simulation file name
-                for name, val in self.simcmd_bundle.Members.items():
-                    if name == 'dc':
-                        fname=''
-                        if len(val.sweep) != 0:
-                            for i in range(0, len(val.sweep)):
-                                fname += 'Sweep%d-[0-9]*_' % i
-                            fname+='oppoint.dc'
-                        else:
-                            fname = 'oppoint*.dc'
-                        break
-                # For distributed runs
-                if self.distributed_run:
-                    path=os.path.join(self.spicesimpath,'tb_%s.raw' % self.name, '[0-9]*', fname)
-                    files = sorted(glob.glob(path),key=sorter)
-                else:
-                    path=os.path.join(self.spicesimpath,'tb_%s.raw' % self.name, fname)
-                    files = glob.glob(path)
-                valbegin = 'VALUE\n'
-                eof = 'END\n'
-                parsevals = False
-                for file in files:
-                    with open(file, 'r') as f:
-                        for line in f:
-                            if line == valbegin: # Scan file until unit descriptions end and values start
-                                parsevals = True
-                            elif line != eof and parsevals: # Scan values from output until EOF
-                                line = line.replace('\"', '')
-                                parts = line.split()
-                                if len(parts) >= 3:
-                                    if ':' in parts[0]: # This line contains op point parameter (e.g. vgs)
-                                        dev, param = parts[0].split(':')
-                                    elif ':' not in parts[0] and parts[1] == 'V': # This is a node voltage
-                                        dev = parts[0]
-                                        param = parts[1]
-                                    val = float(parts[2])
-                                    if dev not in self.extracts.Members['oppts']: # Found new device
-                                        self.extracts.Members['oppts'].update({dev : {}}) 
-                                    if param not in self.extracts.Members['oppts'][dev]: # Found new parameter for device
-                                        self.extracts.Members['oppts'][dev].update({param : [val]})
-                                    else: # Parameter already existed, just append value. This can occur in e.g. sweeps
-                                        self.extracts.Members['oppts'][dev][param].append(val)
-                            elif line == eof:
-                                parsevals = False
-            elif self.model == 'eldo' and 'dc' in self.simcmd_bundle.Members.keys():
-                raise Exception('DC optpoint extraction not supported for Eldo.')
-            elif 'dc' in self.simcmd_bundle.Members.keys(): # Unsupported model
-                raise Exception('Unrecognized model %s.' % self.model)
-            else: # DC analysis not in simcmds, oppts is empty
-                self.extracts.Members.update({'oppts' : {}})
-        except:
-            self.print_log(type='W', msg=traceback.format_exc())
-            self.print_log(type='W',msg='Something went wrong while extracting DC operating points.')
 
     @property
     def spice_tb(self):
         """Testbench instance
 
-        You can set the attributes of the testbench adn dut below it before you execute run_spice.
+        You can set the attributes of the testbench and dut below it before you execute run_spice.
         if 
 
         Example:
@@ -1023,9 +940,6 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
         if self.load_state != '': 
             # Loading a previously stored state
             if self.load_output_file:
-                self.spice_tb.iofiles = self.iofile_bundle
-                self.spice_tb.dcsources = self.dcsource_bundle
-                self.spice_tb.simcmds = self.simcmd_bundle
                 self.read_spice_outputs()
                 self.connect_spice_outputs()
                 # Are these really something to be part of
@@ -1038,9 +952,6 @@ class spice(spice_methods,thesdk,metaclass=abc.ABCMeta):
                 self._read_state()
         else:
             # Normal execution of full simulation
-            self.spice_tb.iofiles = self.iofile_bundle
-            self.spice_tb.dcsources = self.dcsource_bundle
-            self.spice_tb.simcmds = self.simcmd_bundle
             self.connect_spice_inputs()
             self.spice_tb.generate_contents()
             self.spice_tb.export(force=True)
