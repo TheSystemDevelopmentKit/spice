@@ -62,7 +62,7 @@ class spice(spice_common):
 
     @property
     def si_prefix_mult(self):
-        """ Dict : Dictionary mapping SI-prefixes to multipliers.
+        """dict : Dictionary mapping SI-prefixes to multipliers.
         """
         if hasattr(self, '_si_prefix_mult'):
             return self._si_prefix_mult
@@ -133,11 +133,19 @@ class spice(spice_common):
 
     @property 
     def spicesimpath(self):
+        """ str : Path to the directory where the simulation results are stored.
+
+          ( Default : self.simpath )
+
+        """
         if not hasattr(self,'_spicesimpath'):
             self._spicesimpath=self.simpath
         return self._spicesimpath
 
     def delete_spicesimpath(self):
+        """ Method to clean up files from spicesimpath.
+
+        """
         if os.path.exists(self.spicesimpath):
             # This is used to check if the waveform database would prevent the deletion of the directory
             keepdb = False
@@ -189,11 +197,12 @@ class spice(spice_common):
 
     @property
     def distributed_run(self):
-        """ True | False (default)
-
-        If True, distributes applicable simulations (currently DC sweep
+        """bool : If True, distributes applicable simulations (currently DC sweep
         supported) into the LSF cluster. The number of subprocesses launched is
         set by self.num_processes.
+
+            (Default False)
+
         """
         if hasattr(self, '_distributed_run'):
             return self._distributed_run
@@ -206,9 +215,8 @@ class spice(spice_common):
 
     @property
     def num_processes(self):
-        """ Integer
+        """int :  Maximum number of spawned child processes for distributed runs.
 
-        Maximum number of spawned child processes for distributed runs.
         """
         if hasattr(self, '_num_processes'):
             return self._num_processes
@@ -221,26 +229,30 @@ class spice(spice_common):
 
     @property
     def load_state(self):  
-        """ String (default '')
-
-        Feature for loading results of previous simulation. The Spice
+        """str : Feature for loading results of previous simulation. The Spice
         simulation is not re-executed, but the outputs will be read from
         existing files. The string value should be the `runname` of the desired
         simulation.
+
+            ( Default '' ) 
         
-        Loading the most recent result automatically::
+        Example
+        -------
 
-            self.load_state = 'last'
-            # or
-            self.load_state = 'latest'
+            Loading the most recent result automatically::
 
-        Loading a specific past result using the `runname`::
+                self.load_state = 'last'
+                # or
+                self.load_state = 'latest'
 
-            self.load_state = '20201002103638_tmpdbw11nr4'
+            Loading a specific past result using the `runname`::
 
-        List available results by providing any non-existent `runname`::
+                self.load_state = '20201002103638_tmpdbw11nr4'
 
-            self.load_state = 'this_does_not_exist'
+            List available results by providing any non-existent `runname`::
+
+                self.load_state = 'this_does_not_exist'
+
         """
         if not hasattr(self,'_load_state'):
             self._load_state=''
@@ -251,19 +263,19 @@ class spice(spice_common):
 
     @property
     def spicecorner(self):  
-        """Dictionary
-
-        Feature for specifying the 'section' of the model library file and
+        """dict : Feature for specifying the 'section' of the model library file and
         simulation temperature. The path to model libraries should be set in
         TheSDK.config as either ELDOLIBFILE, SPECTRELIBFILE or NGSPICELIBFILE
         variable.
 
-        Example::
+        Example
+        -------
+            ::
 
-            self.spicecorner = {
-                    'temp': 27,
-                    'corner': 'top_tt'
-                    }
+                self.spicecorner = {
+                        'temp': 27,
+                        'corner': 'top_tt'
+                        }
 
         """
         if hasattr(self,'_spicecorner'):
@@ -280,14 +292,14 @@ class spice(spice_common):
 
     @property
     def spiceoptions(self):  
-        """Dictionary
-
-        Feature for specifying options for spice simulation. The key is the
+        """dict : Feature for specifying options for spice simulation. The key is the
         name of the option (as in simulator manual specifies), and the value is
         the value given to said option. Valid key-value pairs can be found from
         the manual of the simulator (Eldo, Spectre or Ngspice).
 
-        Example::
+        Example
+        -------
+        ::
 
             self.spiceoptions = {
                        'save': 'lvlpub',
@@ -308,13 +320,13 @@ class spice(spice_common):
 
     @property
     def spiceparameters(self): 
-        """Dictionary
-
-        Feature for specifying simulation parameters for spice simulation. The
+        """dict : Feature for specifying simulation parameters for spice simulation. The
         key is the name of the parameter , and the value is the value given to
         said parameter.
 
-        Example::
+        Example
+        -------
+        ::
 
             self.spiceparameters = {
                        'nf_pmos': 8,
@@ -332,11 +344,12 @@ class spice(spice_common):
 
     @property
     def interactive_spice(self):
-        """ True | False (default)
-        
-        Launch simulator in interactive mode. A waveform viewer (ezwave by
+        """bool : Launch simulator in interactive mode. A waveform viewer (ezwave by
         default) is opened during the simulation for debugging. See
         `plotprogram` for selecting waveform viewer program.
+         
+            ( Default : False )
+
         """
 
         if hasattr(self,'_interactive_spice'):
@@ -350,14 +363,14 @@ class spice(spice_common):
 
     @property
     def nproc(self):
-        """ Integer
-        
-        Requested maximum number of threads for multithreaded simulations.
+        """int : Requested maximum number of threads for multithreaded simulations.
 
         Eldo : maps to command line parameter '-nproc'
 
         Spectre :  maps to command line parameter '+mt'.
+
         Ngspice :  maps to 'set num_threads=' line in testbench.
+
         """
         if hasattr(self,'_nproc'):
             return self._nproc
@@ -372,14 +385,14 @@ class spice(spice_common):
     # DSPF filenames
     @property
     def dspf(self):
-        """ List of str
-        
-        List containing filenames for DSPF-files to be included for post-layout
+        """[str] : List containing filenames for DSPF-files to be included for post-layout
         simulations. The names given in this list are matched to dspf-files in
         './spice/' -directory. A postfix '.pex.dspf' is automatically appended
         to the given names (this will probably change later).
         
-        Example::
+        Example
+        -------
+        ::
 
             self.dspf = ['inv_v2','switch_v3']
 
@@ -388,6 +401,7 @@ class spice(spice_common):
         dspf-file contains definition matching the original design name of the
         top-level netlist, it gets also renamed to match the module name
         (dspf-file for top-level instance is possible).
+
         """
         if not hasattr(self,'_dspf'):
             self._dspf = []
@@ -422,13 +436,12 @@ class spice(spice_common):
 
     @property
     def iofile_eventdict(self):
-        """ Dictionary
-
-        Dictionary to store event type output from the simulations. This should
+        """dict : Dictionary to store event type output from the simulations. This should
         speed up reading the results.
 
         NOTE: Eldo seems to force output names to uppercase, let's
         uppercase everything here to avoid key mismatches. (This should be changed).
+
         """
         if not hasattr(self, '_iofile_eventdict'):
             self._iofile_eventdict=dict()
@@ -443,13 +456,12 @@ class spice(spice_common):
 
     @property
     def dcsource_bundle(self):
-        """ Bundle
-
-        A thesdk.Bundle containing `spice_dcsource` objects. The `spice_dcsource`
+        """Bundle : A thesdk.Bundle containing `spice_dcsource` objects. The `spice_dcsource`
         objects are automatically added to this Bundle, nothing should be
         manually added.
 
         This is to automate biasing and operation conditions of the circuit.
+
         """
         if not hasattr(self,'_dcsource_bundle'):
             self._dcsource_bundle=Bundle()
@@ -460,11 +472,10 @@ class spice(spice_common):
 
     @property
     def simcmd_bundle(self):
-        """ Bundle
-
-        A thesdk.Bundle containing `spice_simcmd` objects. The `spice_simcmd`
+        """ Bundle : A thesdk.Bundle containing `spice_simcmd` objects. The `spice_simcmd`
         objects are automatically added to this Bundle, nothing should be
         manually added.
+
         """
         if not hasattr(self,'_simcmd_bundle'):
             self._simcmd_bundle=Bundle()
@@ -475,9 +486,7 @@ class spice(spice_common):
 
     @property
     def extracts(self):
-        """ Bundle
-
-        A thesdk.Bundle containing extracted quantities.
+        """ Bundle : A thesdk.Bundle containing extracted quantities.
         """
 
         return self.spice_simulator.extracts
@@ -487,12 +496,11 @@ class spice(spice_common):
 
     @property 
     def spice_submission(self):
-        """ String
-
-        Defines spice submission prefix from thesdk.GLOBALS['LSFSUBMISSION']
+        """str : Defines spice submission prefix from thesdk.GLOBALS['LSFSUBMISSION']
         and thesdk.GLOBALS['LSFINTERACTIVE'] for LSF submissions.
 
         Usually something like 'bsub -K' or 'bsub -I'.
+
         """
         if not hasattr(self, '_spice_submission'):
             try:
@@ -549,9 +557,7 @@ class spice(spice_common):
 
     @property
     def name(self):
-        """String
-
-        Name of the module.
+        """str : Name of the module.
         """
         if not hasattr(self, '_name'):
             self._name=os.path.splitext(os.path.basename(self._classfile))[0]
@@ -559,12 +565,11 @@ class spice(spice_common):
 
     @property
     def spicesrcpath(self):
-        """String
-
-        Path to the spice source of the entity. Can be set manually to desired location.
+        """str : Path to the spice source of the entity. Can be set manually to desired location.
         This variable provides the dspf-parasitic netlist filepath.
 
-        Default: <entity path>/spice
+            ( Default: <entity path>/spice )
+
         """
         if not hasattr(self, '_spicesrcpath'):
             self._spicesrcpath  =  self.entitypath + '/spice'
@@ -581,11 +586,9 @@ class spice(spice_common):
 
     @property
     def spicesrc(self):
-        """String
-
-        Path to the source netlist. Can be set manually to desired location.
+        """str : Path to the source netlist. Can be set manually to desired location.
         
-        Default: 'spice/entityname.scs'
+            ( Default: 'spice/entityname.scs' )
 
 
         N.B!:
@@ -603,10 +606,9 @@ class spice(spice_common):
 
     @property
     def spicetbsrc(self):
-        """String
-
-        Path to the spice testbench ('<spicesimpath>/tb_entityname.<suffix>').
+        """str : Path to the spice testbench ('<spicesimpath>/tb_entityname.<suffix>').
         This shouldn't be set manually.
+
         """
         if not hasattr(self, '_spicetbsrc'):
             self._spicetbsrc=self.spicesimpath + '/tb_' + self.name + self.spice_simulator.cmdfile_ext
@@ -614,10 +616,9 @@ class spice(spice_common):
 
     @property
     def spicesubcktsrc(self):
-        """String
-
-        Path to the parsed subcircuit file. ('<spicesimpath>/subckt_entityname.<suffix>').
+        """str : Path to the parsed subcircuit file. ('<spicesimpath>/subckt_entityname.<suffix>').
         This shouldn't be set manually.
+
         """
         if not hasattr(self, '_spicesubcktsrc'):
             self._spicesubcktsrc=self.spicesimpath + '/subckt_' + self.name + self.spice_simulator.cmdfile_ext
@@ -626,8 +627,7 @@ class spice(spice_common):
     
     @property
     def plflag(self):
-        '''
-        Postlayout simulation accuracy/RC reduction flag.
+        ''' str : Postlayout simulation accuracy/RC reduction flag.
 
         '''
         if not hasattr(self, '_plflag'):
@@ -639,10 +639,9 @@ class spice(spice_common):
             
     @property
     def spicecmd(self):
-        """String
-
-        Simulation command string to be executed on the command line.
+        """str : Simulation command string to be executed on the command line.
         Automatically generated.
+
         """
         if not hasattr(self,'_spicecmd'):
                 self._spicecmd = self.spice_simulator.spicecmd
@@ -654,10 +653,9 @@ class spice(spice_common):
 
     @property
     def spicedbpath(self):
-        """String
-
-        Path to output waveform database. (<spicesimpath>/tb_<entityname>.<resultfile_ext>)
+        """str : Path to output waveform database. (<spicesimpath>/tb_<entityname>.<resultfile_ext>)
         (For now only for spectre. HOW? should work for Eldo too)
+
         """
         if not hasattr(self,'_spicedbpath'):
             self._spicedbpath=self.spicesimpath+'/tb_'+self.name+self.spice_simulator.resultfile_ext
@@ -670,10 +668,9 @@ class spice(spice_common):
     ### These are simuator related i.e. ezwave does not work for ngspice.
     @property
     def plotprogram(self):
-        """ String
-
-        Sets the program to be used for visualizing waveform databases.
+        """str : Sets the program to be used for visualizing waveform databases.
         Options are ezwave (default) or viva.
+
         """
         if not hasattr(self, '_plotprogram'):
             self._plotprogram='ezwave'
@@ -686,6 +683,7 @@ class spice(spice_common):
     @property
     def plotprogcmd(self):
         """ str : Command to be run for interactive simulations.
+
         """
         return self.spice_simulator.plotprogcmd
 
@@ -695,10 +693,10 @@ class spice(spice_common):
 
     @property
     def save_database(self): 
-        """ True | False (default)
-
-        Whether to save the waveform database (.wdb-file for eldo, raw-database
+        """bool : Whether to save the waveform database (.wdb-file for eldo, raw-database
         for spectre), when save_state=True.
+
+            ( Default : False)
 
         """
         if not hasattr(self,'_save_database'):
@@ -711,11 +709,12 @@ class spice(spice_common):
 
     @property
     def save_output_file(self):
-        """ True | False (default)
-            
-            If True and save_state is True, copy the output file of simulator
-            to entity statedir. Useful for scavenging results if simulator exited
-            but state was not written to disk for some reason.
+        """bool : If True and save_state is True, copy the output file of simulator
+        to entity statedir. Useful for scavenging results if simulator exited
+        but state was not written to disk for some reason.
+
+           ( Default : False)
+
         """
         if not hasattr(self, '_save_output_file'):
             self._save_output_file=False
@@ -728,13 +727,13 @@ class spice(spice_common):
 
     @property
     def load_output_file(self): 
-        """ True | False (default)
-
-        Whether to load the outputs from simulator output file.
+        """bool : Whether to load the outputs from simulator output file.
         This only works if the file exists in the state directory, i.e.
         the simulator was run with save_output_file=True.
         WARNING: This will read the IOS from the output file, and REWRITE
         THE ENTITY STATE on disk.
+
+            ( Default : False )
 
         """
         if not hasattr(self,'_load_output_file'):
@@ -748,7 +747,9 @@ class spice(spice_common):
 
     def connect_spice_inputs(self):
         """Automatically called function to connect iofiles (inputs) to top
-        entity IOS Bundle items."""
+        entity IOS Bundle items.
+
+        """
         for ioname,io in self.IOS.Members.items():
             if ioname in self.iofile_bundle.Members:
                 val=self.iofile_bundle.Members[ioname]
@@ -760,14 +761,18 @@ class spice(spice_common):
 
     def connect_spice_outputs(self):
         """Automatically called function to connect iofiles (outputs) to top
-        entity IOS Bundle items."""
+        entity IOS Bundle items.
+
+        """
         for name,val in self.iofile_bundle.Members.items():
             if val.dir == 'out':
                 self.IOS.Members[name].Data=self.iofile_bundle.Members[name].Data
 
     def write_spice_inputs(self):
         """Automatically called function to call write() functions of each
-        iofile with direction 'input'."""
+        iofile with direction 'input'.
+
+        """
         for name, val in self.iofile_bundle.Members.items():
             if val.dir.lower()=='in':
                 self.iofile_bundle.Members[name].write()
@@ -779,7 +784,9 @@ class spice(spice_common):
 
     def read_spice_outputs(self):
         """Automatically called function to call read() functions of each
-        iofile with direction 'output'."""
+        iofile with direction 'output'.
+
+        """
         first=True
         for name, val in self.iofile_bundle.Members.items():
             if val.dir.lower()=='out' or val.dir.lower()=='output':
@@ -833,7 +840,9 @@ class spice(spice_common):
                         %(self.iofile_bundle.Members[name]))
     
     def execute_spice_sim(self):
-        """Automatically called function to execute spice simulation."""
+        """Automatically called function to execute spice simulation.
+
+        """
         self.print_log(type='I', msg="Running external command %s" %(self.spicecmd) )
         if os.system(self.spicecmd) > 0:
             self.print_log(type='E', msg="Simulator (%s) returned non-zero exit code." % (self.model))
@@ -843,6 +852,7 @@ class spice(spice_common):
 
         The plotting program command can be set with 'plotprogram'.
         Tested for spectre and eldo.
+
         '''
         self.spice_simulator.run_plotprogram()
 
@@ -907,6 +917,7 @@ class spice(spice_common):
     def read_oppts(self):
         """ Internally called function to read the DC operating points of the circuit
             TODO: Implement for Eldo as well.
+
         """
 
         self.spice_simulator.read_oppts()
@@ -914,14 +925,16 @@ class spice(spice_common):
 
     @property
     def spice_tb(self):
-        """Testbench instance
-
-        You can set the attributes of the testbench and dut below it before you execute run_spice.
+        """spice_module : Testbench instance. You can set the attributes of the testbench and dut below it before you execute run_spice.
         if 
 
-        Example:
+        Example
+        -------
+
+        ::
             self.spice_tb.dut.custom_subckt_name='custom_inverter'
             self.run_spice()
+
         """
         if not hasattr(self,'_spice_tb'):
             if hasattr(self,'_tb'):
@@ -936,7 +949,9 @@ class spice(spice_common):
             self._spice_tb = value
 
     def run_spice(self):
-        """Externally called function to execute spice simulation."""
+        """Externally called function to execute spice simulation.
+
+        """
         if self.load_state != '': 
             # Loading a previously stored state
             if self.load_output_file:
@@ -996,9 +1011,7 @@ class spice(spice_common):
     # Obsolete stuff
     @property
     def plotlist(self): 
-        """ List of str
-
-        List of net names to be saved in the waveform database.
+        """ [ str ] : List of net names to be saved in the waveform database.
 
         .. note:: 
             Obsolete! Moved to `spice_simcmd` as a keyword argument.
@@ -1014,14 +1027,14 @@ class spice(spice_common):
 
     @property
     def errpreset(self):
-        """ String
-        
-        Global accuracy parameter for Spectre simulations. Options include
+        """str : Global accuracy parameter for Spectre simulations. Options include
         'liberal', 'moderate' and 'conservative', in order of rising accuracy.
 
-         Example
-         -------
-         self.spice_simulator.errpreset='conservative'
+        Example
+        -------
+        ::
+
+            self.spice_simulator.errpreset='conservative'
 
         """
         if not hasattr(self,'_errpreset'):
