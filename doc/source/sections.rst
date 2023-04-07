@@ -4,10 +4,18 @@ Spice simulator interface classess
    :members:
    :undoc-members:
 
+.. automodule:: spice.spice_common
+   :members:
+   :undoc-members:
+
+
 .. automodule:: spice.testbench
    :members:
    :undoc-members:
 
+.. automodule:: spice.testbench_common
+   :members:
+   :undoc-members:
 
 .. automodule:: spice.spice_iofile
    :members:
@@ -32,7 +40,6 @@ Spice simulator interface classess
 .. automodule:: spice.spectre.spectre
    :members:
    :undoc-members:
-
 
 .. automodule:: spice.ngspice.ngspice_testbench
    :members:
