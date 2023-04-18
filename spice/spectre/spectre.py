@@ -275,14 +275,21 @@ class spectre(spice_common):
                 self.extracts.Members.update({'oppts' : {}})
                 # Get dc simulation file name
                 for name, val in self.parent.simcmd_bundle.Members.items():
+                    mc = val.mc
                     if name == 'dc':
                         fname=''
                         if len(val.sweep) != 0:
                             for i in range(0, len(val.sweep)):
                                 fname += 'Sweep%d-[0-9]*_' % i
-                            fname+='oppoint.dc'
+                            if mc:
+                                fname+='mc_oppoint.dc'
+                            else:
+                                fname+='oppoint.dc'
                         else:
-                            fname = 'oppoint*.dc'
+                            if mc:
+                                fname = 'mc_oppoint*.dc'
+                            else:
+                                fname = 'oppoint*.dc'
                         break
                 # For distributed runs
                 if self.parent.distributed_run:
