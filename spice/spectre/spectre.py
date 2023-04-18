@@ -149,7 +149,7 @@ class spectre(spice_common):
     @plflag.setter
     def plflag(self, val):
         if val in ["upa", "hpa"]:
-            self._plflag="+postlayout" %(val)
+            self._plflag="+postlayout=%s" %(val)
         else:
             self.print_log(type='W', msg='Unsupported postlayout flag: %s' % val)
 
