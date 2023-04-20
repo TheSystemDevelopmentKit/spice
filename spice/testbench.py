@@ -154,6 +154,7 @@ class testbench(testbench_common):
                     dspfpath = '%s/%s.pex.dspf' % (self.parent.spicesrcpath,cellname)
                     try:    
                         rename = False
+                        found = False # This is essentially same as rename, but included here for clarity
                         with open(dspfpath) as dspffile:
                             lines = dspffile.readlines()
                             for line in lines:
@@ -163,6 +164,12 @@ class testbench(testbench_common):
                                     if cellname.lower() == self.parent.name.lower():
                                         self.print_log(type='I',msg='Found DSPF cell name matching to original top-level cell name.')
                                         rename = True
+                                        found = True
+                                        self._origcellname=cellname
+                                    elif cellname.lower() == self.dut.custom_subckt_name:
+                                        self.print_log(type='I',msg='Found DSPF cellname matching to custom_subckt_name: %s.' % cellname)
+                                        rename = True
+                                        found = True
                                         self._origcellname=cellname
                                     break
                             if rename:
@@ -170,6 +177,11 @@ class testbench(testbench_common):
                                 with fileinput.FileInput(dspfpath,inplace=True,backup='.bak') as f:
                                     for line in f:
                                         print(line.replace(self._origcellname,self.parent.name),end='')
+                            # The below case is exactly same as else for the 'if rename'. However, renaming shouldn't be necessary if cellname matches self.parent.name??
+                            if not found:
+                                self.print_log(type='W',msg='Included DSPF file %s doesn\'t contain subckt definition with name %s!' % (dspfpath, self.parent.name))
+                                self.print_log(type='W',msg='You may also rename the subckt by setting self.spice_tb.dut.custom_subckt_name in you testbench!')
+                                self.print_log(type='W',msg='Included parasitics from file %s may NOT be visible to the simulator.' % (dspfpath))
                             self.print_log(type='I',msg='Including DSPF-file: %s' % dspfpath)
                             self._dspfincludecmd += "%s \"%s\"\n" % (self.parent.spice_simulator.dspfinclude,dspfpath)
                     except:
