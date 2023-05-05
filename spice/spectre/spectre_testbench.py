@@ -463,7 +463,7 @@ class spectre_testbench(testbench_common):
                     if val.datatype.lower() == 'complex':
                         self._num_cols += 2
                     else:
-                        self._num_cols += 2
+                        self._num_cols += 1
         return self._num_cols
 
     @num_cols.setter
