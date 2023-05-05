@@ -442,6 +442,8 @@ class spectre_testbench(testbench_common):
                     self._plotcmd += savestr
                     self._plotcmd += 'simulator lang=spice\n'
                     self._plotcmd += '.option ingold 2\n'
+                    # Format the output to same "table", 15 bits per column
+                    self._plotcmd += '.option co=%d\n' % (self.num_cols * 15)
                     self._plotcmd += plotstr
                     self._plotcmd += 'simulator lang=spectre\n'
         return self._plotcmd
@@ -451,4 +453,20 @@ class spectre_testbench(testbench_common):
     @plotcmd.deleter
     def plotcmd(self,value):
         self._plotcmd=None
+
+    @property
+    def num_cols(self):
+        if not hasattr(self, '_num_cols'):
+            self._num_cols=0
+            for name, val in self.iofiles.Members.items():
+                if val.dir.lower() == 'out':
+                    if val.datatype.lower() == 'complex':
+                        self._num_cols += 2
+                    else:
+                        self._num_cols += 2
+        return self._num_cols
+
+    @num_cols.setter
+    def num_cols(self, val):
+        self._num_cols=val
 
