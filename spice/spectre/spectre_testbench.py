@@ -154,11 +154,11 @@ class spectre_testbench(testbench_common):
                             # Adding the source
                             if val.pos and val.neg:
                                 self._inputsignals += "%s%s %s %s %ssource type=pwl file=\"%s\"\n" % \
-                                        (val.sourcetype.upper(),self.esc_bus(val.ionames[i].lower()),
+                                        (val.sourcetype.upper(),self.esc_bus(val.name.lower()),
                                         self.esc_bus(val.pos), self.esc_bus(val.neg),val.sourcetype.lower(),val.file[i])
                             else:
                                 self._inputsignals += "%s%s %s 0 %ssource type=pwl file=\"%s\"\n" % \
-                                        (val.sourcetype.upper(),self.esc_bus(val.ionames[i].lower()),
+                                        (val.sourcetype.upper(),self.esc_bus(val.name.lower()),
                                         self.esc_bus(val.ionames[i]),val.sourcetype.lower(),val.file[i])
                     # Sample signals are digital
                     # Presumably these are already converted to bitstrings
