@@ -443,7 +443,7 @@ class spectre_testbench(testbench_common):
                     self._plotcmd += 'simulator lang=spice\n'
                     self._plotcmd += '.option ingold 2\n'
                     # Format the output to same "table", 15 bits per column
-                    self._plotcmd += '.option co=%d\n' % (self.num_cols * 15)
+                    self._plotcmd += '.option co=%d\n' % (self.num_cols)
                     self._plotcmd += plotstr
                     self._plotcmd += 'simulator lang=spectre\n'
         return self._plotcmd
@@ -456,14 +456,21 @@ class spectre_testbench(testbench_common):
 
     @property
     def num_cols(self):
+        '''
+        Number of columns in the output file, when using Spectre.
+        Each signal takes 1 column (unless it is complex, then two).
+        Each column is 15 bit wide, hence number of columns is multiplied by 15.
+        '''
         if not hasattr(self, '_num_cols'):
             self._num_cols=0
+            pdb.set_trace()
             for name, val in self.iofiles.Members.items():
                 if val.dir.lower() == 'out':
                     if val.datatype.lower() == 'complex':
                         self._num_cols += 2
                     else:
                         self._num_cols += 1
+        self._num_cols *= 15
         return self._num_cols
 
     @num_cols.setter
