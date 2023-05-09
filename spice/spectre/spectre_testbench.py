@@ -463,7 +463,6 @@ class spectre_testbench(testbench_common):
         '''
         if not hasattr(self, '_num_cols'):
             self._num_cols=0
-            pdb.set_trace()
             for name, val in self.iofiles.Members.items():
                 if val.dir.lower() == 'out':
                     if val.datatype.lower() == 'complex':
