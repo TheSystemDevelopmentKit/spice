@@ -154,11 +154,11 @@ class spectre_testbench(testbench_common):
                             # Adding the source
                             if val.pos and val.neg:
                                 self._inputsignals += "%s%s %s %s %ssource type=pwl file=\"%s\"\n" % \
-                                        (val.sourcetype.upper(),self.esc_bus(val.ionames[i].lower()),
+                                        (val.sourcetype.upper(),self.esc_bus(val.name.lower()),
                                         self.esc_bus(val.pos), self.esc_bus(val.neg),val.sourcetype.lower(),val.file[i])
                             else:
                                 self._inputsignals += "%s%s %s 0 %ssource type=pwl file=\"%s\"\n" % \
-                                        (val.sourcetype.upper(),self.esc_bus(val.ionames[i].lower()),
+                                        (val.sourcetype.upper(),self.esc_bus(val.name.lower()),
                                         self.esc_bus(val.ionames[i]),val.sourcetype.lower(),val.file[i])
                     # Sample signals are digital
                     # Presumably these are already converted to bitstrings
@@ -442,6 +442,8 @@ class spectre_testbench(testbench_common):
                     self._plotcmd += savestr
                     self._plotcmd += 'simulator lang=spice\n'
                     self._plotcmd += '.option ingold 2\n'
+                    # Format the output to same "table", 15 bits per column
+                    self._plotcmd += '.option co=%d\n' % (self.num_cols)
                     self._plotcmd += plotstr
                     self._plotcmd += 'simulator lang=spectre\n'
         return self._plotcmd
@@ -451,4 +453,26 @@ class spectre_testbench(testbench_common):
     @plotcmd.deleter
     def plotcmd(self,value):
         self._plotcmd=None
+
+    @property
+    def num_cols(self):
+        '''
+        Number of columns in the output file, when using Spectre.
+        Each signal takes 1 column (unless it is complex, then two).
+        Each column is 15 bit wide, hence number of columns is multiplied by 15.
+        '''
+        if not hasattr(self, '_num_cols'):
+            self._num_cols=0
+            for name, val in self.iofiles.Members.items():
+                if val.dir.lower() == 'out':
+                    if val.datatype.lower() == 'complex':
+                        self._num_cols += 2
+                    else:
+                        self._num_cols += 1
+        self._num_cols *= 15
+        return self._num_cols
+
+    @num_cols.setter
+    def num_cols(self, val):
+        self._num_cols=val
 
