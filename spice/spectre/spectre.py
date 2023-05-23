@@ -182,8 +182,6 @@ class spectre(spice_common):
         if not hasattr(self, '_plotprogram'):
             if hasattr(self.parent,'plotprogram'):
                 self._plotprogram=self.parent.plotprogram
-                # update plotprogcmd (have to call the property)
-                update=self.plotprogcmd
             else:
                 self._plotprogram='ezwave' 
         return self._plotprogram
