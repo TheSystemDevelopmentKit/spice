@@ -28,7 +28,6 @@ class spectre(spice_common):
     """
 
     def __init__(self, parent=None,**kwargs):
-
             if parent==None:
                 self.print_log(type='F', msg="Parent of simulator module not given")
             else:
@@ -181,7 +180,12 @@ class spectre(spice_common):
         Options are ezwave (default) or viva.
         """
         if not hasattr(self, '_plotprogram'):
-            self._plotprogram='ezwave'
+            if hasattr(self.parent,'plotprogram'):
+                self._plotprogram=self.parent.plotprogram
+                # update plotprogcmd (have to call the property)
+                update=self.plotprogcmd
+            else:
+                self._plotprogram='ezwave' 
         return self._plotprogram
     @plotprogram.setter
     def plotprogram(self, value):
