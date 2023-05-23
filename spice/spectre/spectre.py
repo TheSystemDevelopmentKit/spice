@@ -199,15 +199,14 @@ class spectre(spice_common):
     def plotprogcmd(self):
         """ str : Command to be run for interactive simulations.
         """
-        if not hasattr(self, '_plotprogcmd'):
-            if self.plotprogram == 'ezwave':
-                self._plotprogcmd='%s -MAXWND -LOGfile %s/ezwave.log %s &' % \
-                        (self.plotprogram,self.parent.spicesimpath,self.parent.spicedbpath)
-            elif self.plotprogram == 'viva':
-                self._plotprogcmd='%s -datadir %s -nocdsinit &' % \
-                        (self.plotprogram,self.parent.spicedbpath)
-            else:
-                self.print_log(type='F',msg='Unsupported plot program \'%s\'.' % self.plotprogram)
+        if self.plotprogram == 'ezwave':
+            self._plotprogcmd='%s -MAXWND -LOGfile %s/ezwave.log %s &' % \
+                    (self.plotprogram,self.parent.spicesimpath,self.parent.spicedbpath)
+        elif self.plotprogram == 'viva':
+            self._plotprogcmd='%s -datadir %s -nocdsinit &' % \
+                    (self.plotprogram,self.parent.spicedbpath)
+        else:
+            self.print_log(type='F',msg='Unsupported plot program \'%s\'.' % self.plotprogram)
         return self._plotprogcmd
     @plotprogcmd.setter
     def plotprogcmd(self, value):
