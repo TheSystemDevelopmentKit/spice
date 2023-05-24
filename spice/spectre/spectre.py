@@ -273,6 +273,7 @@ class spectre(spice_common):
         try:
             if 'dc' in self.parent.simcmd_bundle.Members.keys():
                 self.extracts.Members.update({'oppts' : {}})
+                sweep=False
                 # Get dc simulation file name
                 for name, val in self.parent.simcmd_bundle.Members.items():
                     mc = val.mc
@@ -280,6 +281,7 @@ class spectre(spice_common):
                         fname=''
                         if len(val.sweep) != 0:
                             for i in range(0, len(val.sweep)):
+                                sweep=True
                                 fname += 'Sweep%d-[0-9]*_' % i
                             if mc:
                                 fname+='mc_oppoint.dc'
@@ -292,12 +294,18 @@ class spectre(spice_common):
                                 fname = 'oppoint*.dc'
                         break
                 # For distributed runs
+                if sweep:
+                    num_sweeps=len(val.sweep)
+                else:
+                    num_sweeps=1
                 if self.parent.distributed_run:
                     path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, '[0-9]*',
                             fname)
                 else:
                     path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, fname)
-                files = glob.glob(path)
+                # Sort files so that sweeps are in correct order
+                for i in range(num_sweeps):
+                    files = sorted(glob.glob(path),key=lambda x: self.sorter(x, i))
                 valbegin = 'VALUE\n'
                 eof = 'END\n'
                 parsevals = False

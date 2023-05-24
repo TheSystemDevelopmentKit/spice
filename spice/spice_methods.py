@@ -148,17 +148,19 @@ class spice_methods(metaclass=abc.ABCMeta):
 
 
 
-    def sorter(val):
+    def sorter(self,val,index=0):
         '''
         Function for sorting the files in correct order
         Files that are output from simulation are of form
 
-        SweepN-<integer>_SweepN+1-<integer>_ ... _oppoint.dc
+        SweepN-<integer>_SweepN-1-<integer>_ ... _oppoint.dc
 
-        Strategy: extract integer from filename and sort based on the integer.
+        Strategy: Extract the innermost sweep (e.g. Sweep0) string, find the sweep number
+        and sort based on that. If the sweep is nested, run this algorithm N times with increasing
+        index to sort the outer sweep results.
 
         '''
-
-        keys = val.split('_')[:-1]
-        return sum([int(key.split('-')[-1]) for key in keys])
-
+        base=os.path.basename(val)
+        sweeps=list(reversed(base.split('_')[:-1]))
+        key = sweeps[index].split('-')[-1]
+        return int(key)
