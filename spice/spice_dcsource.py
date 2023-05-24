@@ -97,7 +97,10 @@ class spice_dcsource(thesdk):
             self.print_log(type='F', msg="Spice DC source definition failed.")
         # This enables e.g. DC sweeps
         if isinstance(self.paramname, str):
-            self.parent.spiceparameters.update({self.paramname:self.value})
+            if self.paramname[0] == '-': # instance parameters may be negative of the actual param
+                self.parent.spiceparameters.update({self.paramname[1:]:self.value})
+            else:
+                self.parent.spiceparameters.update({self.paramname:self.value})
         if hasattr(self.parent,'dcsource_bundle'):
             self.parent.dcsource_bundle.new(name=self.name,val=self)
 
