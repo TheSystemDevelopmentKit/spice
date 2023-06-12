@@ -294,18 +294,20 @@ class spectre(spice_common):
                                 fname = 'oppoint*.dc'
                         break
                 # For distributed runs
-                if sweep:
-                    num_sweeps=len(val.sweep)
-                else:
-                    num_sweeps=1
                 if self.parent.distributed_run:
                     path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, '[0-9]*',
                             fname)
                 else:
                     path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, fname)
                 # Sort files so that sweeps are in correct order
-                for i in range(num_sweeps):
-                    files = sorted(glob.glob(path),key=lambda x: self.sorter(x, i))
+                if sweep:
+                    num_sweeps = len(val.sweep)
+                    for i in range(num_sweeps):
+                        files = sorted(glob.glob(path),key=lambda x: self.sorter(x, i))
+                else:
+                    files = glob.glob(path)
+                    if len(files)>1:# This shoudln't happen
+                        self.print_log(type='W', msg='DC analysis was not a sweep, but multiple output files were found! Results may be in incorrect order!')
                 valbegin = 'VALUE\n'
                 eof = 'END\n'
                 parsevals = False
