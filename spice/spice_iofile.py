@@ -343,15 +343,8 @@ class spice_iofile(iofile):
             file=self.file[0] # File is the same for all event type outputs
             label_match=re.compile(r'\(([^)]+)\)') # Match one or more characters that are not ) and capture.
             if self.parent.model in ['spectre','ngspice']:
-                for i in range(5):
-                    # Try to find the lines of print file where data headers are defined. The file may contain multiple header lines, depending on the number of save statements
-                    block_count=subprocess.check_output('grep -n \"time\|freq\" %s | sed \'s/^\([0-9]\+\):/\\1|/\'' % file, shell=True).decode('utf-8')
-                    # If not found, wait 2 sec, try again (it may take some time for the file to show up on disk)
-                    if not block_count:
-                        sleep(2)
-                        self.print_log(type='D', msg='.print file not found %s after %d seconds, trying again in 2 seconds.' % ('/' + '/'.join(file.split('/')[:-1]), i*2))
-                    else: # Found the block count
-                        break
+                os.system('sync %s' % self.parent.spicesimpath)
+                block_count=subprocess.check_output('grep -n \"time\|freq\" %s | sed \'s/^\([0-9]\+\):/\\1|/\'' % file, shell=True).decode('utf-8')
                 if not block_count: 
                     # We couldn't find the block count, exit
                     if os.path.isfile(file):
