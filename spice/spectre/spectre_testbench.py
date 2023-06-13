@@ -118,7 +118,7 @@ class spectre_testbench(testbench_common):
         if not hasattr(self,'_dcsourcestr'):
             self._dcsourcestr = "%s DC sources\n" % self.parent.spice_simulator.commentchar
             for name, val in self.dcsources.Members.items():
-                value = val.value if val.paramname is None else val.paramname
+                value = val.value
                 supply = '%s%s' % (val.sourcetype.upper(),val.name.upper())
                 if val.ramp == 0:
                     self._dcsourcestr += "%s %s %s %s%s\n" % \
