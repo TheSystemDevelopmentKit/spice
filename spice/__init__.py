@@ -854,7 +854,10 @@ class spice(spice_common):
         Tested for spectre and eldo.
 
         '''
-        self.spice_simulator.run_plotprogram()
+        if not self.distributed_run:
+            self.spice_simulator.run_plotprogram()
+        else:
+            self.print_log(type='I', msg='Waveform viewer %s not launched due to distributed run.' % self.plotprogram)
 
     def extract_powers(self):
         """
