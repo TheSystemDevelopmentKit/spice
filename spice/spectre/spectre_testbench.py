@@ -463,12 +463,21 @@ class spectre_testbench(testbench_common):
         '''
         if not hasattr(self, '_num_cols'):
             self._num_cols=0
+            # If power is extracted, it adds current line
+            for name, val in self.dcsources.Members.items():
+                if val.extract: 
+                    self._num_cols += 1
             for name, val in self.iofiles.Members.items():
                 if val.dir.lower() == 'out':
-                    if val.datatype.lower() == 'complex':
-                        self._num_cols += 2
+                    if '<' and '>' in name:
+                        start=name.split('<')[1]
+                        start=start.split(':')
+                        higher=start[0]
+                        lower=start[1].split('>')[0]
+                        add=int(higher)-int(lower)
+                        self._num_cols += 2*add if val.datatype.lower()=='complex' else add
                     else:
-                        self._num_cols += 1
+                        self._num_cols += 2 if val.datatype.lower()=='complex' else 1
         self._num_cols *= 15
         return self._num_cols
 
