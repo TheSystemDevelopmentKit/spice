@@ -172,11 +172,16 @@ class testbench(testbench_common):
                                     # Break looping once found
                                     break
                             if found:
-                                # Match is case insensitive, we will rename for perfect match.
-                                self.print_log(type='I',msg='Renaming DSPF top cell name accordingly from "%s" to "%s".' % (cellname,self.parent.name))
-                                with fileinput.FileInput(dspfpath,inplace=True,backup='.bak') as f:
-                                    for line in f:
-                                        print(line.replace(self._origcellname,self.parent.name),end='')
+                                if not self.parent.par: # The line replacing does not work with parallel simulations (crashes)
+                                    # Match is case insensitive, we will rename for perfect match.
+                                    self.print_log(type='I',msg='Renaming DSPF top cell name accordingly from "%s" to "%s".' % (cellname,self.parent.name))
+                                    with fileinput.FileInput(dspfpath,inplace=True,backup='.bak') as f:
+                                        for line in f:
+                                            print(line.replace(self._origcellname,self.parent.name),end='')
+                                else: #Parallel run
+                                    self.print_log(type='I',
+                                            msg='Parallel run detected. Not renaming DSPF top cell name, assuming "%s" is the same as "%s"' % (cellname,self.parent.name))
+                                    
                             else:
                                 self.print_log(type='F',msg='No DESIGN string in DSPF matching %s or %s. Aborting' %(self.parent.name. self.dut.custom_subckt_name))
 
