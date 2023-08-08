@@ -165,7 +165,7 @@ class testbench(testbench_common):
                                         self.print_log(type='I',msg='Found DSPF cell name matching to original top-level cell name.')
                                         found = True
                                         self._origcellname=cellname
-                                    elif cellname.lower() == self.dut.custom_subckt_name:
+                                    elif cellname.lower() == self.dut.custom_subckt_name.lower():
                                         self.print_log(type='I',msg='Found DSPF cellname matching to custom_subckt_name: %s.' % cellname)
                                         found = True
                                         self._origcellname=cellname
