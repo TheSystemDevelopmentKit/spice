@@ -178,12 +178,12 @@ class testbench(testbench_common):
                                     for line in f:
                                         print(line.replace(self._origcellname,self.parent.name),end='')
                             else:
-                                self.print_log(type='F',msg='No DESIGN string in DSPF matching %s or %s. Aborting' %(self.parent.name. self.dut.custom_subckt_name))
+                                self.print_log(type='F',msg='No DESIGN string in DSPF matching %s or %s. Aborting' %(self.parent.name, self.dut.custom_subckt_name))
 
                             self.print_log(type='I',msg='Including DSPF-file: %s' % dspfpath)
                             self._dspfincludecmd += "%s \"%s\"\n" % (self.parent.spice_simulator.dspfinclude,dspfpath)
                     except:
-                        self.print_log(type='F',msg='No DESIGN string in DSPF matching %s or %s. Aborting' %(self.parent.name. self.dut.custom_subckt_name))
+                        self.print_log(type='F',msg='No DESIGN string in DSPF matching %s or %s. Aborting' %(self.parent.name, self.dut.custom_subckt_name))
                         self.print_log(type='F',msg=traceback.format_exc())
             else:
                 self._dspfincludecmd = ''
