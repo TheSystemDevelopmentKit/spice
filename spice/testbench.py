@@ -11,6 +11,7 @@ import sys
 import subprocess
 import shlex
 import fileinput
+import shutil
 from thesdk import *
 from spice.testbench_common import testbench_common
 from spice.ngspice.ngspice_testbench import ngspice_testbench
