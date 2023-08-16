@@ -137,6 +137,17 @@ class testbench(testbench_common):
     def includecmd(self,value):
         self._includecmd=None
 
+    def copy_dspf(self):
+        try:
+            for cell in self.parent.dspf:
+                src = os.path.join(self.parent.spicesrcpath, '%s.pex.dspf' % cell)
+                dest = os.path.join(self.parent.spicesimpath, '%s.pex.dspf' % cell)
+                shutil.copy(src, dest)
+        except:
+            self.print_log(type='F',msg='Could not copy DSPF for cell %s to %s' %(cell, dest))
+            self.print_log(type='F',msg=traceback.format_exc())
+
+
     # DSPF include commands
     @property
     def dspfincludecmd(self):
@@ -147,11 +158,12 @@ class testbench(testbench_common):
         """
         if not hasattr(self,'_dspfincludecmd'):
             if len(self.parent.dspf) > 0:
+                self.copy_dspf()
                 self.print_log(type='I',msg='Including exctracted parasitics from DSPF.')
                 self._dspfincludecmd = "%s Extracted parasitics\n"  % self.parent.spice_simulator.commentchar
                 origcellmatch = re.compile(r"DESIGN")
                 for cellname in self.parent.dspf:
-                    dspfpath = '%s/%s.pex.dspf' % (self.parent.spicesrcpath,cellname)
+                    dspfpath = '%s/%s.pex.dspf' % (self.parent.spicesimpath,cellname)
                     try:    
                         found = False
                         with open(dspfpath) as dspffile:
