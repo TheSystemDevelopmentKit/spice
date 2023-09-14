@@ -381,6 +381,35 @@ class spice(spice_common):
     def nproc(self,value):
         self._nproc=value
 
+    
+    # DSPF filenames
+    @property
+    def postlayout_subckt(self):
+        """[str] : List containing filenames for subcircuit DSPF-files to be included for 
+        post-layout simulations. The names given in this list are matched to dspf-files in
+        './spice/' -directory. A postfix '.pex.dspf' is automatically appended
+        to the given names (this will probably change later).
+        
+        Example
+        -------
+        ::
+
+            self.postlayout_subckt = ['inv_v2','switch_v3']
+
+        would include files './spice/inv_v2.pex.dspf' and
+        './spice/switch_v3.pex.dspf' as postlayout_subckt-files in the testbench. If top level 
+        dspf (self.dspf) is given these are omitted. Otherwise simulator will replace 
+        subcircuits with corresponding name with the postlayout netlist defined in the 
+        dspf file. 
+        """
+        if not hasattr(self,'_postlayout_subckt'):
+            self._postlayout_subckt = []
+        return self._postlayout_subckt
+    @postlayout_subckt.setter
+    def postlayout_subckt(self,value):
+        self._postlayout_subckt=value
+    
+
 
     # DSPF filenames
     @property
@@ -394,10 +423,10 @@ class spice(spice_common):
         -------
         ::
 
-            self.dspf = ['inv_v2','switch_v3']
+            self.dspf = ['adc_top_level']
 
-        would include files './spice/inv_v2.pex.dspf' and
-        './spice/switch_v3.pex.dspf' as dspf-files in the testbench. If the
+        would include files './spice/adc_top_level.pex.dspf' as 
+        a top level dspf-file in the testbench. If the
         dspf-file contains definition matching the original design name of the
         top-level netlist, it gets also renamed to match the module name
         (dspf-file for top-level instance is possible).

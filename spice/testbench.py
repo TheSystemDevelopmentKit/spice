@@ -200,6 +200,16 @@ class testbench(testbench_common):
                         self.print_log(type='F',msg=traceback.format_exc())
             else:
                 self._dspfincludecmd = ''
+                if len(self.parent.postlayout_subckt) > 0:
+                    self.print_log(type='I',msg='Including exctracted parasitics from subcircuit DSPF.')
+                    self._dspfincludecmd = "%s Extracted subcircuit parasitics\n"  % self.parent.spice_simulator.commentchar
+                    for dspf in self.parent.postlayout_subckt:
+                        dspfpath = '%s/%s.pex.dspf' % (self.parent.spicesrcpath,dspf)
+                        if os.path.exists(dspfpath):
+                            self.print_log(type='I',msg='Including subcircuit DSPF-file: %s' % dspfpath)
+                            self._dspfincludecmd += "%s \"%s\"\n" % (self.parent.spice_simulator.dspfinclude,dspfpath)
+                        else:
+                            self.print_log(type='W',msg='No such file or directory %s.'%dspfpath)
             return self._dspfincludecmd
     @dspfincludecmd.setter
     def dspfincludecmd(self,value):
