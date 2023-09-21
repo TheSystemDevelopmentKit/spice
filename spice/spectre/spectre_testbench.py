@@ -11,6 +11,7 @@ import sys
 import subprocess
 import shlex
 import fileinput
+import re
 
 from thesdk import *
 from spice.testbench_common import testbench_common
@@ -469,17 +470,18 @@ class spectre_testbench(testbench_common):
                     self._num_cols += 1
             for name, val in self.iofiles.Members.items():
                 if val.dir.lower() == 'out':
-                    if isinstance(val.ionames, list):
-                        self._num_cols += len(val.ionames)
-                    elif '<' and '>' in name:
-                        start=name.split('<')[1]
-                        start=start.split(':')
-                        higher=start[0]
-                        lower=start[1].split('>')[0]
-                        add=int(higher)-int(lower)
-                        self._num_cols += 2*add if val.datatype.lower()=='complex' else add
-                    else:
-                        self._num_cols += 2 if val.datatype.lower()=='complex' else 1
+                    for io_name in val.ionames:
+                        num_addition=2 if val.datatype.lower()=='complex' else 1
+                        pattern=re.compile('<[0-9]+:[0-9]+>')
+                        if pattern.search(io_name):
+                            start=io_name.split('<')[1]
+                            start=start.split(':')
+                            lower=start[0]
+                            higher=start[1].split('>')[0]
+                            add=abs(int(higher)-int(lower))+1
+                            self._num_cols += num_addition*add 
+                        else:
+                            self._num_cols += num_addition 
         self._num_cols *= 15
         return self._num_cols
 
