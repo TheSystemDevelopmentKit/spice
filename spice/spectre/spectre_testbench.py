@@ -469,7 +469,9 @@ class spectre_testbench(testbench_common):
                     self._num_cols += 1
             for name, val in self.iofiles.Members.items():
                 if val.dir.lower() == 'out':
-                    if '<' and '>' in name:
+                    if isinstance(val.ionames, list):
+                        self._num_cols += len(val.ionames)
+                    elif '<' and '>' in name:
                         start=name.split('<')[1]
                         start=start.split(':')
                         higher=start[0]
