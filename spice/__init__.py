@@ -384,7 +384,7 @@ class spice(spice_common):
     
     # DSPF filenames
     @property
-    def postlayout_subckt(self):
+    def postlayout_subckts(self):
         """[str] : List containing filenames for subcircuit DSPF-files to be included for 
         post-layout simulations. The names given in this list are matched to dspf-files in
         './spice/' -directory. A postfix '.pex.dspf' is automatically appended
@@ -394,20 +394,20 @@ class spice(spice_common):
         -------
         ::
 
-            self.postlayout_subckt = ['inv_v2','switch_v3']
+            self.postlayout_subckts = ['inv_v2','switch_v3']
 
         would include files './spice/inv_v2.pex.dspf' and
-        './spice/switch_v3.pex.dspf' as postlayout_subckt-files in the testbench. If top level 
+        './spice/switch_v3.pex.dspf' as postlayout_subckts-files in the testbench. If top level 
         dspf (self.dspf) is given these are omitted. Otherwise simulator will replace 
         subcircuits with corresponding name with the postlayout netlist defined in the 
         dspf file. 
         """
-        if not hasattr(self,'_postlayout_subckt'):
-            self._postlayout_subckt = []
-        return self._postlayout_subckt
-    @postlayout_subckt.setter
-    def postlayout_subckt(self,value):
-        self._postlayout_subckt=value
+        if not hasattr(self,'_postlayout_subckts'):
+            self._postlayout_subckts = []
+        return self._postlayout_subckts
+    @postlayout_subckts.setter
+    def postlayout_subckts(self,value):
+        self._postlayout_subckts=value
     
 
 
