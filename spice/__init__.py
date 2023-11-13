@@ -53,6 +53,7 @@ from spice.spice_simcmd import spice_simcmd as spice_simcmd
 from spice.spice_iofile import spice_iofile as spice_iofile
 from spice.spice_dcsource import spice_dcsource as spice_dcsource
 from spice.spice_module import spice_module as spice_module
+from spice.spice_port import spice_port
 # Simulator modules
 from spice.ngspice.ngspice import ngspice
 from spice.eldo.eldo import eldo
