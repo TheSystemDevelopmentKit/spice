@@ -951,6 +951,20 @@ class spice(spice_common):
     def spice_tb(self, value):
             self._spice_tb = value
 
+    @property
+    def spice_ports(self):
+        """
+        Dictionary mapping port names to corresponding port objects.
+        """
+        if not hasattr(self, '_spice_ports'):
+            self._spice_ports={}
+        return self._spice_ports
+
+    @spice_ports.setter
+    def spice_ports(self, val):
+        self._spice_ports=val
+
+
     def run_spice(self):
         """Externally called function to execute spice simulation.
 
