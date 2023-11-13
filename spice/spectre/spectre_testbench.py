@@ -110,6 +110,25 @@ class spectre_testbench(testbench_common):
     def libcmd(self,value):
         self._libcmd=None
 
+    
+    @property
+    def portsrcstr(self):
+        """
+        Port source defintions parsed from from self.parent.spice_ports
+        """
+        if not hasattr(self, '_portsrcstr'):
+            self._portsrcstr = f"{self.parent.spice_simulator.commentchar} Port sources \n"
+            for name,port in self.parent.spice_ports.items():
+                self.portsrcstr += f"{name} ({port.pos} {port.neg}) port num={port.num} res={port.res} type={port.type} freq={port.freq} mag={port.mag}\n"
+        return self._portsrcstr
+    @portsrcstr.setter
+    def portsrcstr(self, val):
+        self._portsrcstr=val
+    @portsrcstr.deleter
+    def portsrcstr(self, val):
+        self._portsrcstr=None
+
+
     @property
     def dcsourcestr(self):
         """str : DC source definitions parsed from spice_dcsource objects instantiated

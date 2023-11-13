@@ -240,6 +240,21 @@ class testbench(testbench_common):
     def dcsourcestr(self,value):
         self.testbench_simulator.dcsourcestr = value
 
+
+    @property
+    def portsrcstr(self):
+        """
+        Documentation for parameter portsrcstr
+        """
+        if not hasattr(self, '_portsrcstr'):
+            self._portsrcstr=self.testbench_simulator.portsrcstr
+        return self._portsrcstr
+
+    @portsrcstr.setter
+    def portsrcstr(self, val):
+        self._portsrcstr=val
+
+
     @property
     def inputsignals(self):
         """str : Input signal definitions parsed from spice_iofile objects instantiated
@@ -309,6 +324,7 @@ class testbench(testbench_common):
                         self.dut.instance + "\n\n" +
                         self.misccmd + "\n" +
                         self.dcsourcestr + "\n" +
+                        self.portsrcstr + "\n" +
                         self.inputsignals + "\n" +
                         self.simcmdstr + "\n" +
                         self.plotcmd + "\n" +
