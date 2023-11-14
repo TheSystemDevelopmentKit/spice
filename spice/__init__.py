@@ -97,10 +97,12 @@ class spice(spice_common):
         if not hasattr(self,'_spice_simulator'):
             if self.model == 'ngspice':
                 self._spice_simulator=ngspice(parent=self)
-            if self.model == 'eldo':
+            elif self.model == 'eldo':
                 self._spice_simulator=eldo(parent=self)
-            if self.model == 'spectre':
+            elif self.model == 'spectre':
                 self._spice_simulator=spectre(parent=self)
+            else:
+                self.print_log(type='F', msg=f'Unsupported simulator: {self.model}')
         return self._spice_simulator
    
 
