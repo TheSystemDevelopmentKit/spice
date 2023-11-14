@@ -23,6 +23,7 @@ import pandas as pd
 from numpy import genfromtxt
 import traceback
 from bitstring import BitArray
+from psf_utils import *
 
 class spice_iofile(iofile):
     """
@@ -152,6 +153,7 @@ class spice_iofile(iofile):
             self.pos=kwargs.get('pos', None)
             self.neg=kwargs.get('neg', None)
             self.strobe=kwargs.get('strobe', False)
+            self.psfasciiflag=kwargs.get('psfasciiflag', False)
         except:
             self.print_log(type='F', msg="spice IO file definition failed.")
 
@@ -168,7 +170,10 @@ class spice_iofile(iofile):
         self._file = []
         for ioname in self.ionames:
             if self.dir == 'out':
-                filename = 'tb_%s.print' % (self.parent.name)
+                if self.psfasciiflag:
+                    filename = 'tb_%s.raw/PSS_analysis.fd.pss' % (self.parent.name)
+                else:
+                    filename = 'tb_%s.print' % (self.parent.name)
             else:
                 filename = ( '%s_%s_%s_%s.txt' 
                     % ( self.parent.runname,self.dir,ioname.replace('<','').replace('>','').replace('.','_'),
@@ -435,6 +440,20 @@ class spice_iofile(iofile):
                         self.parent.iofile_eventdict[label.upper()]=np.hstack((arr[:,0].reshape(-1,1),arr[:,col_idx+1].reshape(-1,1))).reshape(-1,2)
                     else:
                         self.print_log(type='W', msg='Label format mismatch with \'%s\'.' %  (label))
+        elif self.iotype=='psfascii':
+            self.psfasciiflag=True
+            if not self.parent.model=='spectre':
+                self.print_log(type='F', msg='Only spectre supported for psfascii outputs')
+            else:
+                file=self.file[0] # File is the same for all psfascii type outputs
+                os.system('sync %s' % self.parent.spicesimpath) #Why this?
+            psf = PSF(file)
+            sweep=psf.get_sweep()
+            for signal in psf.all_signals():
+                    print(f'{signal.name}') #test
+                    tmpdata = np.vstack((sweep.abscissa, psf.get_signal(f'{signal.name}').ordinate))
+                    self.parent.iofile_eventdict[signal.name.upper()]=tmpdata
+                
         else:
             if len(self.file) == 0:
                 self.print_log(type='W', msg='No output file defined for IO %s. Check self.ionames!' % self.name)

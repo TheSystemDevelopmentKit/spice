@@ -835,6 +835,14 @@ class spice(spice_common):
                             except KeyError:
                                 self.print_log(type='E', msg='Invalid ioname %s for iofile %s' % (key, name))
                         self.iofile_bundle.Members[name].Data=data
+                elif val.iotype=='psfascii':
+                    if first:
+                        self.iofile_bundle.Members[name].read() #read() should use psf_utils
+                        first=False
+                    try:
+                        self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()]
+                    except KeyError:
+                        self.print_log(type='E',msg='Invalid ioname %s for iofile %s' % (val.ionames[0], name))
                 else:
                     self.iofile_bundle.Members[name].read()
             elif val.dir.lower()=='output':
