@@ -299,6 +299,22 @@ class spectre_testbench(testbench_common):
                             (sim,str(val.fmin),str(val.fmax),pts_str)
                     self._simcmdstr += '\n\n'
 
+                elif str(sim).lower() == 'sp':
+                    if val.fscale.lower()=='log':
+                        if val.fpoints != 0:
+                            pts_str='log=%d' % val.fpoints
+                        elif val.fstepsize != 0:
+                            pts_str='dec=%d' % val.fstepsize
+                        else:
+                            self.print_log(type='F', msg='Set either fpoints or fstepsize for SP simulation!')
+                    elif val.fscale.lower()=='lin':
+                        if val.fpoints != 0:
+                            pts_str='lin=%d' % val.fpoints
+                        elif val.fstepsize != 0:
+                            pts_str='step=%d' % val.fstepsize
+                        else:
+                            self.print_log(type='F', msg='Set either fpoints or fstepsize for SP simulation!')
+                    self._simcmdstr += f'SP_analysis sp ports=[{" ".join(self.parent.spice_ports.keys())}] start={val.fmin} stop={val.fmax} {pts_str} file=\"{self.parent.name}.s2p\" datafmt=touchstone datatype=realimag paramtype=s\n'
                 else:
                     self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
                 if val.mc:
