@@ -23,7 +23,7 @@ import pandas as pd
 from numpy import genfromtxt
 import traceback
 from bitstring import BitArray
-from psf_utils import *
+import psf_utils.psf_utils as psfu
 
 class spice_iofile(iofile):
     """
@@ -447,7 +447,7 @@ class spice_iofile(iofile):
             else:
                 file=self.file[0] # File is the same for all psfascii type outputs
                 os.system('sync %s' % self.parent.spicesimpath) #Why this?
-            psf = PSF(file)
+            psf = psfu.PSF(file)
             sweep=psf.get_sweep()
             for signal in psf.all_signals():
                     print(f'{signal.name}') #test
