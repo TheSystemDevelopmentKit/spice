@@ -45,6 +45,7 @@ class spice_port(thesdk):
             self.num=kwargs.get('num', 1)
             self.type=kwargs.get('type', 'sine')
             self.freq=kwargs.get('freq', 1e6)
+            self.dc=kwargs.get('dc', 0)
             self.mag=kwargs.get('mag', 1)
             self.name=kwargs.get('name', f'PORT{self.num}')
             self.parent.spice_ports[self.name] = self
