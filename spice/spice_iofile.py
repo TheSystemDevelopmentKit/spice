@@ -451,7 +451,7 @@ class spice_iofile(iofile):
             sweep=psf.get_sweep()
             for signal in psf.all_signals():
                     print(f'{signal.name}') #test
-                    tmpdata = np.vstack((sweep.abscissa, psf.get_signal(f'{signal.name}').ordinate))
+                    tmpdata = np.vstack((sweep.abscissa, psf.get_signal(f'{signal.name}').ordinate)).T
                     self.parent.iofile_eventdict[signal.name.upper()]=tmpdata
                 
         else:
