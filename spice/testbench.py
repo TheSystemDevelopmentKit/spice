@@ -286,11 +286,7 @@ class testbench(testbench_common):
 
         """
         force=kwargs.get('force', False)
-
-        if len(self.parent.dspf) == 0 and self.parent.postlayout:
-            self.print_log(type='I',msg='No dspf for postlayout simulation. Not exporting subcircuit.')
-        else:
-            self.dut.export_subckts(file=self._subcktfile, force=force)
+        self.dut.export_subckts(file=self._subcktfile, force=force)
 
         if not os.path.isfile(self.file):
             self.print_log(type='D',msg='Exporting spice testbench to %s' %(self.file))
