@@ -665,6 +665,7 @@ class spice(spice_common):
     @plflag.setter
     def plflag(self, val):
         self.spice_simulator.plflag = val
+        self._plflag = val
             
     @property
     def spicecmd(self):

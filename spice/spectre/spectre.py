@@ -134,6 +134,15 @@ class spectre(spice_common):
         """Needs documentation. Lines skipped in result file : int
         """
         return 0
+    @property
+    def plflag_simcmd_prefix(self):
+        """
+        Simulator specific prefix for enabling postlayout optimization
+        Postfix comes from self.plflag (user defined)
+        """
+        if not hasattr(self, '_plflag_simcmd_prefix'):
+            self._plflag_simcmd_prefix="+postlayout="
+        return self._plflag_simcmd_prefix
 
     @property
     def plflag(self):
@@ -142,13 +151,13 @@ class spectre(spice_common):
         See: https://community.cadence.com/cadence_blogs_8/b/cic/posts/spectre-optimizing-spectre-aps-performance 
         '''
         if not hasattr(self, '_plflag'):
-            self._plflag="+postlayout=upa"
+            self._plflag=f"upa"
         return self._plflag
 
     @plflag.setter
     def plflag(self, val):
         if val in ["upa", "hpa"]:
-            self._plflag="+postlayout=%s" %(val)
+            self._plflag=val
         else:
             self.print_log(type='W', msg='Unsupported postlayout flag: %s' % val)
 
@@ -226,7 +235,7 @@ class spectre(spice_common):
                 nprocflag = ""
 
             if self.parent.postlayout:
-                plflag=self.plflag
+                plflag=f"{self.plflag_simcmd_prefix}{self.plflag}"
                 self.print_log(type='I',msg='Enabling post-layout optimization \'%s\'.' % plflag)
             else:
                 plflag = ''
