@@ -286,6 +286,9 @@ class testbench(testbench_common):
 
         """
         force=kwargs.get('force', False)
+        if self.parent.postlayout and len(self.parent.dspf) == 0 and len(self.parent.postlayout_subckts) == 0:
+            self.print_log(type='W',msg='No top-cell dspf or subcircuit dspf for postlayout simulation. Are you using some other netlist format?')
+            self.print_log(type='W',msg=f'Exporting subcircuit, but simulation is not postlayout unless {self.parent.spicesrc} is postlayout netlist!')
         self.dut.export_subckts(file=self._subcktfile, force=force)
 
         if not os.path.isfile(self.file):
