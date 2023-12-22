@@ -171,7 +171,7 @@ class spice_iofile(iofile):
         for ioname in self.ionames:
             if self.dir == 'out':
                 if self.psfasciiflag:
-                    #ANALYSIS NAME HARDCODED, MUST CURRENTLY BE 'PSS'! 
+                    #ANALYSIS NAME HARDCODED, MUST CURRENTLY BE 'PSS_analysis'! 
                     filename = 'tb_%s.raw/*PSS_analysis.fd.pss' % (self.parent.name) #return filename with wildcard for possible sweep (-> several files)
                 else:
                     filename = 'tb_%s.print' % (self.parent.name)
@@ -451,7 +451,7 @@ class spice_iofile(iofile):
                 if len(files)>1: #if True, a sweep was run
                     #extract folderpath 
                     foldername = os.path.dirname(files[0])
-                    files.remove(os.path.join(foldername,'PSS_analysis.fd.pss')) #this file not needed if sweeping (ANALYSIS NAME HARDCODED, MUST CURRENTLY BE 'PSS'!) 
+                    files.remove(os.path.join(foldername,'PSS_analysis.fd.pss')) #this file not needed if sweeping (ANALYSIS NAME HARDCODED, MUST CURRENTLY BE 'PSS_analysis'!) 
                     files = sorted(files) #glob doesn't return files in aplhabetical order
 
                 os.system('sync %s' % self.parent.spicesimpath) #Why this?
