@@ -449,9 +449,9 @@ class spice_iofile(iofile):
                 import glob
                 files = glob.glob(self.file[0]) #filepath with wildcard -> list of filepath strings 
                 if len(files)>1: #if True, a sweep was run
-                    #extract folderpath 
-                    foldername = os.path.dirname(files[0])
-                    files.remove(os.path.join(foldername,'PSS_analysis.fd.pss')) #this file not needed if sweeping (ANALYSIS NAME HARDCODED, MUST CURRENTLY BE 'PSS_analysis'!) 
+                    ##extract folderpath 
+                    #foldername = os.path.dirname(files[0])
+                    #files.remove(os.path.join(foldername,'PSS_analysis.fd.pss')) #this file not needed if sweeping (ANALYSIS NAME HARDCODED, MUST CURRENTLY BE 'PSS_analysis'!) 
                     files = sorted(files) #glob doesn't return files in aplhabetical order
 
                 os.system('sync %s' % self.parent.spicesimpath) #Why this?
