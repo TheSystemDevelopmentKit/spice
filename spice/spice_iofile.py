@@ -460,11 +460,10 @@ class spice_iofile(iofile):
                 sweep=psf.get_sweep()
                 for signal in psf.all_signals():
                         tmpdata = np.vstack((sweep.abscissa, psf.get_signal(f'{signal.name}').ordinate)).T
-                        if signal.name.upper() in self.parent.iofile_eventdict: #first sweep index added as before (in else below)
-                            self.parent.iofile_eventdict[signal.name.upper()]=np.insert( self.parent.iofile_eventdict[signal.name.upper()], len(self.parent.iofile_eventdict[signal.name.upper()][0,:]-1), tmpdata[:,1], axis=1) #Add sweep iteration's result as column to io
+                        if signal.name.upper() in self.parent.iofile_eventdict: #first sweep index is added in else below
+                            self.parent.iofile_eventdict[signal.name.upper()]=np.insert( self.parent.iofile_eventdict[signal.name.upper()], len(self.parent.iofile_eventdict[signal.name.upper()][0,:]-1), tmpdata[:,1], axis=1) #Add sweep iteration's result as new column to io
                         else:
                             self.parent.iofile_eventdict[signal.name.upper()]=tmpdata
-                        #pdb.set_trace()
                 
         else:
             if len(self.file) == 0:
