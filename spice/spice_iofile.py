@@ -171,7 +171,8 @@ class spice_iofile(iofile):
         for ioname in self.ionames:
             if self.dir == 'out':
                 if self.psfasciiflag:
-                    filename = 'tb_%s.raw/PSS_analysis.fd.pss' % (self.parent.name)
+                    #ANALYSIS NAME HARDCODED, MUST CURRENTLY BE 'PSS'! 
+                    filename = 'tb_%s.raw/*PSS_analysis.fd.pss' % (self.parent.name) #return filename with wildcard for possible sweep (-> several files)
                 else:
                     filename = 'tb_%s.print' % (self.parent.name)
             else:
@@ -445,14 +446,25 @@ class spice_iofile(iofile):
             if not self.parent.model=='spectre':
                 self.print_log(type='F', msg='Only spectre supported for psfascii outputs')
             else:
-                file=self.file[0] # File is the same for all psfascii type outputs
+                import glob
+                files = glob.glob(self.file[0]) #filepath with wildcard -> list of filepath strings 
+                if len(files)>1: #if True, a sweep was run
+                    #extract folderpath 
+                    foldername = os.path.dirname(files[0])
+                    files.remove(os.path.join(foldername,'PSS_analysis.fd.pss')) #this file not needed if sweeping (ANALYSIS NAME HARDCODED, MUST CURRENTLY BE 'PSS'!) 
+                    files = sorted(files) #glob doesn't return files in aplhabetical order
+
                 os.system('sync %s' % self.parent.spicesimpath) #Why this?
-            psf = psfu.PSF(file)
-            sweep=psf.get_sweep()
-            for signal in psf.all_signals():
-                    print(f'{signal.name}') #test
-                    tmpdata = np.vstack((sweep.abscissa, psf.get_signal(f'{signal.name}').ordinate)).T
-                    self.parent.iofile_eventdict[signal.name.upper()]=tmpdata
+            for file in files:
+                psf = psfu.PSF(file)
+                sweep=psf.get_sweep()
+                for signal in psf.all_signals():
+                        tmpdata = np.vstack((sweep.abscissa, psf.get_signal(f'{signal.name}').ordinate)).T
+                        if signal.name.upper() in self.parent.iofile_eventdict: #first sweep index added as before (in else below)
+                            self.parent.iofile_eventdict[signal.name.upper()]=np.insert( self.parent.iofile_eventdict[signal.name.upper()], len(self.parent.iofile_eventdict[signal.name.upper()][0,:]-1), tmpdata[:,1], axis=1) #Add sweep iteration's result as column to io
+                        else:
+                            self.parent.iofile_eventdict[signal.name.upper()]=tmpdata
+                        #pdb.set_trace()
                 
         else:
             if len(self.file) == 0:
