@@ -333,6 +333,21 @@ class spectre_testbench(testbench_common):
                     savestr=''
                     plotstr=''
                     first=True
+                    # Parse supply current extractions first, because if there are
+                    # manually probed signals, supply extractions will be placed
+                    # after them in the print file and nothing will work correctly
+                    for name, val in self.dcsources.Members.items():
+                        if val.extract:
+                            supply = '%s%s' % (val.sourcetype.upper(),val.name.upper())
+                            if supply not in self.parent.iofile_eventdict:
+                                self.parent.iofile_eventdict[supply] = None
+                            if first:
+                                savestr += 'save %s:pwr %s:p' % (supply,supply)
+                                plotstr += '.print I(%s)' % (supply)
+                                first=False
+                            else:
+                                savestr += ' %s:pwr %s:p' % (supply,supply)
+                                plotstr += ' I(%s)' % (supply)
                     for name, val in self.iofiles.Members.items():
                         # Output iofile becomes a plot/print command
                         if val.dir.lower()=='out' or val.dir.lower()=='output':
@@ -423,20 +438,6 @@ class spectre_testbench(testbench_common):
                             else:
                                 self.print_log(type='W',msg='Output filetype incorrectly defined.')
 
-                    # Parsing supply currents here as well (I think ngspice
-                    # plots need to be grouped like this)
-                    for name, val in self.dcsources.Members.items():
-                        if val.extract:
-                            supply = '%s%s' % (val.sourcetype.upper(),val.name.upper())
-                            if supply not in self.parent.iofile_eventdict:
-                                self.parent.iofile_eventdict[supply] = None
-                            if first:
-                                savestr += 'save %s:pwr %s:p' % (supply,supply)
-                                plotstr += '.print I(%s)' % (supply)
-                                first=False
-                            else:
-                                savestr += ' %s:pwr %s:p' % (supply,supply)
-                                plotstr += ' I(%s)' % (supply)
                     # Output accumulated save and print statement to plotcmd
                     savestr += '\n'
                     plotstr += '\n'
