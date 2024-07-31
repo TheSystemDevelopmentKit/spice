@@ -202,6 +202,9 @@ class spice_simcmd(thesdk):
             self.strobeperiod = kwargs.get('strobeperiod', None)
             self.strobedelay = kwargs.get('strobedelay', None)
             self.skipstart = kwargs.get('skipstart', None)
+            self.iprobe = kwargs.get('iprobe', None)
+            self.pnode = kwargs.get('pnode', None)
+            self.nnode = kwargs.get('nnode', None)
             # Make list, if they are not already
             self.sweep = kwargs.get('sweep',[]) if type(kwargs.get('sweep', [])) == list else [kwargs.get('sweep')]
             self.subcktname = kwargs.get('subcktname',[]) if type(kwargs.get('subcktname', [])) == list else [kwargs.get('subcktname')]
@@ -217,6 +220,9 @@ class spice_simcmd(thesdk):
             self.parent.simcmd_bundle.new(name=self.sim,val=self)
         if self.sim == 'dc' and self.parent.model=='spectre':
             self.print_log(type='I', msg='Saving results in human-readable format (requirement for DC simulation)!')
+            self.parent.spiceoptions.update({'rawfmt': 'psfascii'})
+        if self.sim == 'pz' and self.parent.model=='spectre':
+            self.print_log(type='I', msg='Saving results in human-readable format (requirement for PZ simulation)!')
             self.parent.spiceoptions.update({'rawfmt': 'psfascii'})
         if len(self.subcktname) != 0 and len(self.devname) != 0:
             self.print_log(type='F', msg='Cannot specify subckt sweep and device sweep in the same simcmd instance!')

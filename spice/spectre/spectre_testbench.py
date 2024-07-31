@@ -281,6 +281,13 @@ class spectre_testbench(testbench_common):
                             (sim,str(val.fmin),str(val.fmax),pts_str)
                     self._simcmdstr += '\n\n'
 
+                elif str(sim).lower() == 'pz':
+                    pnode = val.pnode
+                    nnode = val.nnode
+                    iprobe = val.iprobe
+                    self._simcmdstr += 'PZ_analysis (%s %s) %s iprobe=%s' % \
+                            (pnode,nnode,sim,iprobe)
+                    self._simcmdstr += '\n\n'
                 else:
                     self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
                 if val.mc:
