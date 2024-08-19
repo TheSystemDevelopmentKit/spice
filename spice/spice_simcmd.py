@@ -205,6 +205,7 @@ class spice_simcmd(thesdk):
             self.iprobe = kwargs.get('iprobe', None)
             self.pnode = kwargs.get('pnode', None)
             self.nnode = kwargs.get('nnode', None)
+            self.freq= kwargs.get('freq', None)
             # Make list, if they are not already
             self.sweep = kwargs.get('sweep',[]) if type(kwargs.get('sweep', [])) == list else [kwargs.get('sweep')]
             self.subcktname = kwargs.get('subcktname',[]) if type(kwargs.get('subcktname', [])) == list else [kwargs.get('subcktname')]

@@ -285,8 +285,11 @@ class spectre_testbench(testbench_common):
                     pnode = val.pnode
                     nnode = val.nnode
                     iprobe = val.iprobe
+                    freq = val.freq
                     self._simcmdstr += 'PZ_analysis (%s %s) %s iprobe=%s' % \
                             (pnode,nnode,sim,iprobe)
+                    if not freq==None:
+                        self._simcmdstr += ' freq=%s' %(freq)
                     self._simcmdstr += '\n\n'
                 else:
                     self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
