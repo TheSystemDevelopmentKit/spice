@@ -3,7 +3,7 @@
 Spectre Testbench
 =================
 
-Simulators sepecific testbench generation class for Spectre.
+Simulators specific testbench generation class for Spectre.
 
 """
 import os
@@ -99,7 +99,7 @@ class spectre_testbench(testbench_common):
                     else:
                         self._libcmd += 'include "%s" section=%s\n' % (files[0], corner)
             except:
-                self.print_log(type='W',msg='Global TheSDK variable SPECTRELIBPATH not set.')
+                self.print_log(type='W',msg='Global TheSDK variable SPECTRELIBFILE not set.')
                 self._libcmd = "// Spectre device models (undefined)\n"
                 self._libcmd += "//include " + libfile + " " + corner + "\n"
             self._libcmd += 'tempOption options temp=%s\n' % str(temp)

@@ -450,8 +450,6 @@ class spice(spice_common):
                 self.print_log(type='I', msg = 'Setting postlayout to True due to given dspf-files')
                 self._postlayout = True
             else:
-                self.print_log(type='O', 
-                               msg='In release v1.9, automatic postlayout simulation detection from netlist has been removed. This warning will be removed in coming releases.')
                 self.print_log(type='W', 
                                msg='Postlayout attribute accessed before defined. Defaulting to False.')
                 self._postlayout=False
