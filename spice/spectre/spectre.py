@@ -359,8 +359,6 @@ class spectre(spice_common):
             if 'noise' in self.parent.simcmd_bundle.Members.keys():
                 analysis='noise'
             nodes=self.parent.simcmd_bundle.Members[analysis].nodes
-            if len(nodes)==0:
-                nodes=['1']
             mc=self.parent.simcmd_bundle.Members[analysis].mc
             self.extracts.Members.update({analysis: {}})
             # Get simulation result file name

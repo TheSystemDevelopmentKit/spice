@@ -361,7 +361,7 @@ class spectre_testbench(testbench_common):
                     if val.harmonics==None:
                         self.print_log(type='F', msg='Harmonics must be defined for PAC simulation')
                     self._simcmdstr += 'Initial_analysis pss fund={val.fc} outputtype=freq maxacfreq={val.fmax} harms={val.harmonics}\n'
-                    self._simcmdstr += 'PAC_analysis pac values=[{val.fsig}] maxsideband={val.harmonics}'
+                    self._simcmdstr += f'PAC_analysis pac values=[{val.fsig}] maxsideband={val.harmonics}'
                 elif str(sim).lower() == 'pss':
                     if val.fc==None:
                         self.print_log(type='F', msg='fc must be given for PSS simulation')
@@ -371,7 +371,7 @@ class spectre_testbench(testbench_common):
                         self.print_log(type='F', msg='Fmax must be given for PSS simulation')
                     if val.harmonics==None:
                         self.print_log(type='F', msg='Harmonics must be defined for PSS simulation')
-                    self._simcmdstr += 'PSS_analysis pss fund={val.fsig} outputtype=freq maxacfreq={val.fmax} harms={val.harmonics}'
+                    self._simcmdstr += f'PSS_analysis pss fund={val.fsig} outputtype=freq maxacfreq={val.fmax} harms={val.harmonics}'
                 else:
                     self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
                 if val.mc:
