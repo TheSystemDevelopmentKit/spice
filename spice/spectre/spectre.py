@@ -12,6 +12,7 @@ from abc import *
 from thesdk import *
 from spice.spice_common import *
 import numpy as np
+import psf_utils.psf_utils as psfu
 
 class spectre(spice_common):
     """This class is used as instance in spice_simulatormodule property of 
@@ -240,7 +241,7 @@ class spectre(spice_common):
     def run_plotprogram(self):
         ''' Starting a parallel process for waveform viewer program.
 
-        The plotting program command can be set with 'plotprogram' property.
+         The plotting program command can be set with 'plotprogram' property.
         '''
         tries = 0
         while tries < 100:
@@ -265,6 +266,160 @@ class spectre(spice_common):
         except: 
             self.print_log(type='W',msg='Something went wrong while launcing %s.' % self.plotprogram)
             self.print_log(type='W',msg=traceback.format_exc())
+
+    def read_sp_result(self,**kwargs):
+        """ Internally called function to read the S-parameter simulation results
+            TODO: Implement for Eldo as well.
+        """
+        read_type=kwargs.get('read_type')
+        try:
+            if 'sp' in self.parent.simcmd_bundle.Members.keys():
+                self.extracts.Members.update({read_type: {}})
+                sweep=False
+                # Get sp simulation file name
+                for name, val in self.parent.simcmd_bundle.Members.items():
+                    mc=val.mc
+                    if name=='sp':
+                        fname=''
+                        if len(val.sweep)!=0:
+                            for i in range(0, len(val.sweep)):
+                                sweep=True
+                                fname+='Sweep%d-*_' % i
+                            if mc:
+                                # TODO: implement.
+                                self.print_log(type='F',
+                                        msg=f"Monte carlo currently not supported for \
+                                                S-parameter simulations.")
+                                fname+='mc_oppoint.dc'
+                            else:
+                                if 'sparams' in read_type:
+                                    fname+=f'SPanalysis.sp'
+                                elif 'sprobe' in read_type:
+                                    fname+=f'SPanalysis.sprobe.sp'
+                        else:
+                            if mc:
+                                # TODO: implement.
+                                self.print_log(type='F',
+                                        msg=f"Monte carlo currently not supported for \
+                                                S-parameter simulations.")
+                                fname+='mc_oppoint.dc'
+                            else:
+                                if 'sparams' in read_type:
+                                    fname+=f'SPanalysis.sp'
+                                elif 'sprobe' in read_type:
+                                    fname+=f'SPanalysis.sprobe.sp'
+                        break
+                # For distributed runs
+                if self.parent.distributed_run:
+                    # TODO: check functionality and implement
+                    self.print_log(type='F',
+                            msg=f"Distributed runs not currently supported for \
+                                    S-parameter analyses.")
+                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, '[0-9]*',
+                            fname)
+                else:
+                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name,
+                            fname)
+                # Sort files such that the sweeps are in correct order.
+                if sweep:
+                    num_sweeps=len(val.sweep)
+                    files=glob.glob(path)
+                    for i in range(num_sweeps):
+                        files=sorted(files,key=lambda x: self.sorter(x, i))
+                    rd, fileptr = self.create_nested_sweepresult_dict(0,0,
+                            self.extracts.Members['sweeps_ran'],files,
+                            read_type)
+                else:
+                    files=glob.glob(path)
+                    if len(files)>1: # This should not happen
+                        self.print_log(type='W',
+                                msg="S-parameter analysis was not a sweep, but for \
+                                        some reason multiple output files were found. \
+                                        results may be in wrong order!")
+                    result={}
+                    psf = psfu.PSF(files[0])
+                    psfsweep=psf.get_sweep()
+                    for signal in psf.all_signals():
+                        result[signal.name]=np.vstack((psf.abscissa, 
+                            psf.get_signal(f'{signal.name}').ordinate)).T
+                        rd={0:{'param':'nosweep', 'value':0, read_type:results}}
+                self.extracts.Members[read_type].update({'results':rd})
+        except:
+            self.print_log(type='W',
+                    msg=traceback.format_exc())
+            self.print_log(type='W',
+                    msg="Something went wrong while extracting S-parameters")
+
+
+    def read_psf(self,**kwargs):
+        """ Internally called function to read the S-parameter simulation results
+            TODO: Implement for Eldo as well.
+        """
+        try:
+            if 'noise' in self.parent.simcmd_bundle.Members.keys():
+                analysis='noise'
+            nodes=self.parent.simcmd_bundle.Members[analysis].nodes
+            if len(nodes)==0:
+                nodes=['1']
+            mc=self.parent.simcmd_bundle.Members[analysis].mc
+            self.extracts.Members.update({analysis: {}})
+            # Get simulation result file name
+            fnames=[]
+            for node in nodes:
+                if mc:
+                    # TODO: implement.
+                    self.print_log(type='F',
+                            msg=f"Monte carlo currently not yet supported for \
+                                    {analysis} simulations. Please implement.")
+                else:
+                    if 'noise' in analysis:
+                        fnames.append(f'noise_analysis_{node}.noise')
+
+            # For distributed runs
+            for i in range(len(fnames)):
+                if self.parent.distributed_run:
+                    # TODO: check functionality and implement
+                    self.print_log(type='F',
+                            msg=f"Distributed runs not currently supported for \
+                                    PSF file read analyses.")
+                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, '[0-9]*',
+                            fnames[i])
+                else:
+                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name,
+                            fnames[i])
+                files=glob.glob(path)
+                result={}
+                psf = psfu.PSF(files[0])
+                psfsweep=psf.get_sweep()
+                freq=psf.get_sweep().abscissa
+                if 'noise' in analysis:
+                    NF=psf.get_signal('NF').ordinate
+                    self.extracts.Members[analysis].update({
+                        f'{nodes[i]}_freq':freq,
+                        f'{nodes[i]}_NF':NF,
+                        })
+        except:
+            self.print_log(type='W',
+                    msg=traceback.format_exc())
+            self.print_log(type='W',
+                    msg="Something went wrong while extracting S-parameters")
+
+    def create_nested_sweepresult_dict(self, level, fileptr, sweeps_ran_dict,
+            files,read_type):
+        rd={} # Return this to upper level
+        if level < len(sweeps_ran_dict)-1:
+            for v in np.arange(len(sweeps_ran_dict[level]['values'])):
+                result={}
+                psf = psfu.PSF(files[fileptr])
+                fileptr += 1
+                psfsweep=psf.get_sweep()
+                for signal in psf.all_signals():
+                    result[signal.name]=np.vstack((psfsweep.abscissa,
+                        psf.get_signal(f'{signal.name}').ordinate)).T
+                    rd.update({v:{'param':sweeps_ran_dict[level]['param'],
+                        'value':sweeps_ran_dict[level]['values'][v],
+                        read_type:result}})
+        return rd, fileptr
 
     def read_oppts(self):
         """ Internally called function to read the DC operating points of the circuit
@@ -303,8 +458,9 @@ class spectre(spice_common):
                 # Sort files so that sweeps are in correct order
                 if sweep:
                     num_sweeps = len(val.sweep)
+                    files = glob.glob(path)
                     for i in range(num_sweeps):
-                        files = sorted(glob.glob(path),key=lambda x: self.sorter(x, i))
+                        files = sorted(files,key=lambda x: self.sorter(x, i))
                 else:
                     files = glob.glob(path)
                     if len(files)>1:# This shoudln't happen

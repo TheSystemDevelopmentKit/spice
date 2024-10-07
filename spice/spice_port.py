@@ -19,6 +19,8 @@ class spice_port(thesdk):
         Node to which the negative terminal of the port is to be attached
     res: float or int
         Series resistance of the port
+    reactance: float
+        Reference reactance, ignored for time domain analyses
     num: int
         Number of the port (for S-parameter analysis). Must be larger than zero.
         Default: 1.
@@ -42,6 +44,7 @@ class spice_port(thesdk):
             self.pos=kwargs.get('pos', None)
             self.neg=kwargs.get('neg', None)
             self.res=kwargs.get('res', 50)
+            self.reactance=kwargs.get('reactance', 0)
             self.num=kwargs.get('num', 1)
             self.type=kwargs.get('type', 'sine')
             self.freq=kwargs.get('freq', 1e6)
