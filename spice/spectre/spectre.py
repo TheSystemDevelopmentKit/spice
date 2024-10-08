@@ -326,9 +326,10 @@ class spectre(spice_common):
                     files=glob.glob(path)
                     for i in range(num_sweeps):
                         files=sorted(files,key=lambda x: self.sorter(x, i))
-                    rd, fileptr = self.create_nested_sweepresult_dict(0,0,
-                            self.extracts.Members['sweeps_ran'],files,
-                            read_type)
+                    if len(files)>0:
+                        rd, fileptr = self.create_nested_sweepresult_dict(0,0,
+                                self.extracts.Members['sweeps_ran'],files,
+                                read_type)
                 else:
                     files=glob.glob(path)
                     if len(files)>1: # This should not happen
@@ -337,12 +338,13 @@ class spectre(spice_common):
                                         some reason multiple output files were found. \
                                         results may be in wrong order!")
                     result={}
-                    psf = psfu.PSF(files[0])
-                    psfsweep=psf.get_sweep()
-                    for signal in psf.all_signals():
-                        result[signal.name]=np.vstack((psf.abscissa, 
-                            psf.get_signal(f'{signal.name}').ordinate)).T
-                        rd={0:{'param':'nosweep', 'value':0, read_type:results}}
+                    if len(files)>0:
+                        psf = psfu.PSF(files[0])
+                        psfsweep=psf.get_sweep()
+                        for signal in psf.all_signals():
+                            result[signal.name]=np.vstack((psfsweep.abscissa, 
+                                psf.get_signal(f'{signal.name}').ordinate)).T
+                    rd={0:{'param':'nosweep', 'value':0, read_type:result}}
                 self.extracts.Members[read_type].update({'results':rd})
         except:
             self.print_log(type='W',
@@ -358,44 +360,44 @@ class spectre(spice_common):
         try:
             if 'noise' in self.parent.simcmd_bundle.Members.keys():
                 analysis='noise'
-            nodes=self.parent.simcmd_bundle.Members[analysis].nodes
-            mc=self.parent.simcmd_bundle.Members[analysis].mc
-            self.extracts.Members.update({analysis: {}})
-            # Get simulation result file name
-            fnames=[]
-            for node in nodes:
-                if mc:
-                    # TODO: implement.
-                    self.print_log(type='F',
-                            msg=f"Monte carlo currently not yet supported for \
-                                    {analysis} simulations. Please implement.")
-                else:
-                    if 'noise' in analysis:
-                        fnames.append(f'noise_analysis_{node}.noise')
+                nodes=self.parent.simcmd_bundle.Members[analysis].nodes
+                mc=self.parent.simcmd_bundle.Members[analysis].mc
+                self.extracts.Members.update({analysis: {}})
+                # Get simulation result file name
+                fnames=[]
+                for node in nodes:
+                    if mc:
+                        # TODO: implement.
+                        self.print_log(type='F',
+                                msg=f"Monte carlo currently not yet supported for \
+                                        {analysis} simulations. Please implement.")
+                    else:
+                        if 'noise' in analysis:
+                            fnames.append(f'noise_analysis_{node}.noise')
 
-            # For distributed runs
-            for i in range(len(fnames)):
-                if self.parent.distributed_run:
-                    # TODO: check functionality and implement
-                    self.print_log(type='F',
-                            msg=f"Distributed runs not currently supported for \
-                                    PSF file read analyses.")
-                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, '[0-9]*',
-                            fnames[i])
-                else:
-                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name,
-                            fnames[i])
-                files=glob.glob(path)
-                result={}
-                psf = psfu.PSF(files[0])
-                psfsweep=psf.get_sweep()
-                freq=psf.get_sweep().abscissa
-                if 'noise' in analysis:
-                    NF=psf.get_signal('NF').ordinate
-                    self.extracts.Members[analysis].update({
-                        f'{nodes[i]}_freq':freq,
-                        f'{nodes[i]}_NF':NF,
-                        })
+                # For distributed runs
+                for i in range(len(fnames)):
+                    if self.parent.distributed_run:
+                        # TODO: check functionality and implement
+                        self.print_log(type='F',
+                                msg=f"Distributed runs not currently supported for \
+                                        PSF file read analyses.")
+                        path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, '[0-9]*',
+                                fnames[i])
+                    else:
+                        path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name,
+                                fnames[i])
+                    files=glob.glob(path)
+                    result={}
+                    psf = psfu.PSF(files[0])
+                    psfsweep=psf.get_sweep()
+                    freq=psf.get_sweep().abscissa
+                    if 'noise' in analysis:
+                        NF=psf.get_signal('NF').ordinate
+                        self.extracts.Members[analysis].update({
+                            f'{nodes[i]}_freq':freq,
+                            f'{nodes[i]}_NF':NF,
+                            })
         except:
             self.print_log(type='W',
                     msg=traceback.format_exc())
