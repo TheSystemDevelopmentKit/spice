@@ -384,6 +384,35 @@ class spice(spice_common):
     def nproc(self,value):
         self._nproc=value
 
+    
+    # DSPF filenames
+    @property
+    def postlayout_subckts(self):
+        """[str] : List containing filenames for subcircuit DSPF-files to be included for 
+        post-layout simulations. The names given in this list are matched to dspf-files in
+        './spice/' -directory. A postfix '.pex.dspf' is automatically appended
+        to the given names (this will probably change later).
+        
+        Example
+        -------
+        ::
+
+            self.postlayout_subckts = ['inv_v2','switch_v3']
+
+        would include files './spice/inv_v2.pex.dspf' and
+        './spice/switch_v3.pex.dspf' as postlayout_subckts-files in the testbench. If top level 
+        dspf (self.dspf) is given these are omitted. Otherwise simulator will replace 
+        subcircuits with corresponding name with the postlayout netlist defined in the 
+        dspf file. 
+        """
+        if not hasattr(self,'_postlayout_subckts'):
+            self._postlayout_subckts = []
+        return self._postlayout_subckts
+    @postlayout_subckts.setter
+    def postlayout_subckts(self,value):
+        self._postlayout_subckts=value
+    
+
 
     # DSPF filenames
     @property
@@ -397,10 +426,10 @@ class spice(spice_common):
         -------
         ::
 
-            self.dspf = ['inv_v2','switch_v3']
+            self.dspf = ['adc_top_level']
 
-        would include files './spice/inv_v2.pex.dspf' and
-        './spice/switch_v3.pex.dspf' as dspf-files in the testbench. If the
+        would include files './spice/adc_top_level.pex.dspf' as 
+        a top level dspf-file in the testbench. If the
         dspf-file contains definition matching the original design name of the
         top-level netlist, it gets also renamed to match the module name
         (dspf-file for top-level instance is possible).
@@ -424,8 +453,6 @@ class spice(spice_common):
                 self.print_log(type='I', msg = 'Setting postlayout to True due to given dspf-files')
                 self._postlayout = True
             else:
-                self.print_log(type='O', 
-                               msg='In release v1.9, automatic postlayout simulation detection from netlist has been removed. This warning will be removed in coming releases.')
                 self.print_log(type='W', 
                                msg='Postlayout attribute accessed before defined. Defaulting to False.')
                 self._postlayout=False
@@ -639,6 +666,7 @@ class spice(spice_common):
     @plflag.setter
     def plflag(self, val):
         self.spice_simulator.plflag = val
+        self._plflag = val
             
     @property
     def spicecmd(self):

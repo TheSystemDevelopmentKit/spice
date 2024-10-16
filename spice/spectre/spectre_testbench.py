@@ -3,7 +3,7 @@
 Spectre Testbench
 =================
 
-Simulators sepecific testbench generation class for Spectre.
+Simulators specific testbench generation class for Spectre.
 
 """
 import os
@@ -11,6 +11,7 @@ import sys
 import subprocess
 import shlex
 import fileinput
+import re
 
 from thesdk import *
 from spice.testbench_common import testbench_common
@@ -98,7 +99,7 @@ class spectre_testbench(testbench_common):
                     else:
                         self._libcmd += 'include "%s" section=%s\n' % (files[0], corner)
             except:
-                self.print_log(type='W',msg='Global TheSDK variable SPECTRELIBPATH not set.')
+                self.print_log(type='W',msg='Global TheSDK variable SPECTRELIBFILE not set.')
                 self._libcmd = "// Spectre device models (undefined)\n"
                 self._libcmd += "//include " + libfile + " " + corner + "\n"
             self._libcmd += 'tempOption options temp=%s\n' % str(temp)
@@ -425,6 +426,21 @@ class spectre_testbench(testbench_common):
                     savestr=''
                     plotstr=''
                     first=True
+                    # Parse supply current extractions first, because if there are
+                    # manually probed signals, supply extractions will be placed
+                    # after them in the print file and nothing will work correctly
+                    for name, val in self.dcsources.Members.items():
+                        if val.extract:
+                            supply = '%s%s' % (val.sourcetype.upper(),val.name.upper())
+                            if supply not in self.parent.iofile_eventdict:
+                                self.parent.iofile_eventdict[supply] = None
+                            if first:
+                                savestr += 'save %s:pwr %s:p' % (supply,supply)
+                                plotstr += '.print I(%s)' % (supply)
+                                first=False
+                            else:
+                                savestr += ' %s:pwr %s:p' % (supply,supply)
+                                plotstr += ' I(%s)' % (supply)
                     for name, val in self.iofiles.Members.items():
                         # Output iofile becomes a plot/print command
                         if val.dir.lower()=='out' or val.dir.lower()=='output':
@@ -515,20 +531,6 @@ class spectre_testbench(testbench_common):
                             else:
                                 self.print_log(type='W',msg='Output filetype incorrectly defined.')
 
-                    # Parsing supply currents here as well (I think ngspice
-                    # plots need to be grouped like this)
-                    for name, val in self.dcsources.Members.items():
-                        if val.extract:
-                            supply = '%s%s' % (val.sourcetype.upper(),val.name.upper())
-                            if supply not in self.parent.iofile_eventdict:
-                                self.parent.iofile_eventdict[supply] = None
-                            if first:
-                                savestr += 'save %s:pwr %s:p' % (supply,supply)
-                                plotstr += '.print I(%s)' % (supply)
-                                first=False
-                            else:
-                                savestr += ' %s:pwr %s:p' % (supply,supply)
-                                plotstr += ' I(%s)' % (supply)
                     # Output accumulated save and print statement to plotcmd
                     savestr += '\n'
                     plotstr += '\n'
@@ -562,15 +564,18 @@ class spectre_testbench(testbench_common):
                     self._num_cols += 1
             for name, val in self.iofiles.Members.items():
                 if val.dir.lower() == 'out':
-                    if '<' and '>' in name:
-                        start=name.split('<')[1]
-                        start=start.split(':')
-                        higher=start[0]
-                        lower=start[1].split('>')[0]
-                        add=int(higher)-int(lower)
-                        self._num_cols += 2*add if val.datatype.lower()=='complex' else add
-                    else:
-                        self._num_cols += 2 if val.datatype.lower()=='complex' else 1
+                    for io_name in val.ionames:
+                        num_addition=2 if val.datatype.lower()=='complex' else 1
+                        pattern=re.compile('<[0-9]+:[0-9]+>')
+                        if pattern.search(io_name):
+                            start=io_name.split('<')[1]
+                            start=start.split(':')
+                            lower=start[0]
+                            higher=start[1].split('>')[0]
+                            add=abs(int(higher)-int(lower))+1
+                            self._num_cols += num_addition*add 
+                        else:
+                            self._num_cols += num_addition 
         self._num_cols *= 15
         return self._num_cols
 

@@ -310,7 +310,7 @@ class spice_iofile(iofile):
                 self.print_log(type='W', msg='Stop index smaller than start index in parse_io_from_file!')
                 nrows=None
             arr=pd.read_csv(filepath,skiprows=start-1, nrows=nrows,
-                    delim_whitespace=True, encoding='utf-8',engine='c',
+                    sep='\s+', encoding='utf-8',engine='c',
                     dtype='float',chunksize=1e6)
             arr=pd.concat(arr).to_numpy()
         except:
