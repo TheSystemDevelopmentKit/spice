@@ -115,10 +115,16 @@ class spice_simcmd(thesdk):
         Use initial conditions flag. Default False.
     noise : bool
         Noise transient flag. Default False.
+    harmonics : float or str
+        Harmonics for PSS and PAC analysis
     fmin : float or str
         Minimum noise frequency. Default 1 (Hz).
     fmax : float or str
         Maximum noise frequency. Default 5e9.
+    fsig : float 
+        Fundamental frequency for PSS and PAC analysis
+    fc : float 
+        Center frequency of the circuit for PAC analysis
     fscale : 'log' or 'lin'
         Logarithmic or linear scale for frequency. Default 'log'.
     fpoints : int
@@ -158,6 +164,10 @@ class spice_simcmd(thesdk):
         if strobedelay is None.
     strobedelay: float
         For Spectre only! Delay between skipstart and the first strobe point.
+    sprobes : str
+        Probes for S-parameter simulation
+    iprobe : str
+        Iprobe for Noise analysis
 
     Examples
     --------
@@ -188,6 +198,8 @@ class spice_simcmd(thesdk):
             self.noise = kwargs.get('noise',False)
             self.fmin = kwargs.get('fmin',1)
             self.fmax = kwargs.get('fmax',5e9)
+            self.fsig = kwargs.get('fsig', None)
+            self.fc = kwargs.get('fc', None)
             self.fscale = kwargs.get('fscale','log')
             self.fpoints = kwargs.get('fpoints',0)
             self.fstepsize = kwargs.get('fstepsize',0)
@@ -202,6 +214,9 @@ class spice_simcmd(thesdk):
             self.strobeperiod = kwargs.get('strobeperiod', None)
             self.strobedelay = kwargs.get('strobedelay', None)
             self.skipstart = kwargs.get('skipstart', None)
+            self.sprobes = kwargs.get('sprobes', None)
+            self.iprobe = kwargs.get('iprobe', None)
+            self.harmonics = kwargs.get('harmonics', None)
             # Make list, if they are not already
             self.sweep = kwargs.get('sweep',[]) if type(kwargs.get('sweep', [])) == list else [kwargs.get('sweep')]
             self.subcktname = kwargs.get('subcktname',[]) if type(kwargs.get('subcktname', [])) == list else [kwargs.get('subcktname')]
@@ -209,17 +224,30 @@ class spice_simcmd(thesdk):
             self.swpstart = kwargs.get('swpstart',[]) if type(kwargs.get('swpstart', [])) == list else [kwargs.get('swpstart')]
             self.swpstop = kwargs.get('swpstop',[]) if type(kwargs.get('swpstop', [])) == list else [kwargs.get('swpstop')]
             self.swpstep = kwargs.get('swpstep',[]) if type(kwargs.get('swpstep', [])) == list else [kwargs.get('swpstep')]
+            self.swpvalues = kwargs.get('swpvalues',[]) if type(kwargs.get('swpvalues', [])) == list else [kwargs.get('swpvalues')]
+            # Used to define noise analysis nodes
+            self.nodes = kwargs.get('nodes',[]) if type(kwargs.get('nodes', [])) == list else [kwargs.get('nodes')]
         except:
             self.print_log(type='E',msg=traceback.format_exc())
             self.print_log(type='F', msg="Simulation command definition failed.")
         if hasattr(self.parent,'simcmd_bundle'):
             # This limits it to 1 of each simulation type. Is this ok?
             self.parent.simcmd_bundle.new(name=self.sim,val=self)
-        if self.sim == 'dc' and self.parent.model=='spectre':
-            self.print_log(type='I', msg='Saving results in human-readable format (requirement for DC simulation)!')
+        if (self.sim == 'dc' or self.sim=='sp' or self.sim=='noise' or self.sim=='pac' or self.sim=='pss') and self.parent.model=='spectre':
+            self.print_log(type='I', msg='Saving results in human-readable format (requirement for DC, S-parameter, PSS, PAC and noise simulations)!')
             self.parent.spiceoptions.update({'rawfmt': 'psfascii'})
         if len(self.subcktname) != 0 and len(self.devname) != 0:
             self.print_log(type='F', msg='Cannot specify subckt sweep and device sweep in the same simcmd instance!')
         if self.strobeperiod and self.strobedelay:
             if self.strobedelay > self.strobeperiod:
                 self.print_log(type='F', msg='Strobedelay cannot be larger than strobeperiod!')
+        # Handle sprobes, if none, skip definition altogether
+        if self.sprobes==None:
+            self.sprobes=''
+        else:
+            # If input is list, transform to str
+            if type(self.sprobes)==list:
+                tmp = ' '.join(self.sprobes)
+            else:
+                tmp=self.sprobes
+            #self._sprobes=f'sprobes=[{tmp}]'

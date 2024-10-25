@@ -93,6 +93,22 @@ class eldo_testbench(testbench_common):
         self._libcmd=None
 
     @property
+    def portsrcstr(self):
+        """
+        Port source defintions parsed from from self.parent.spice_ports
+        """
+        if not hasattr(self, '_portsrcstr'):
+            self.portsrcstr=''
+            self.print_log(type='E', msg='Port support not yet implemented for Eldo!')
+        return self._portsrcstr
+    @portsrcstr.setter
+    def portsrcstr(self, val):
+        self._portsrcstr=val
+    @portsrcstr.deleter
+    def portsrcstr(self, val):
+        self._portsrcstr=None
+
+    @property
     def dcsourcestr(self):
         """String
         

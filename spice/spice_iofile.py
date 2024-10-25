@@ -23,6 +23,8 @@ import pandas as pd
 from numpy import genfromtxt
 import traceback
 from bitstring import BitArray
+import psf_utils.psf_utils as psfu
+import glob
 
 class spice_iofile(iofile):
     """
@@ -152,6 +154,7 @@ class spice_iofile(iofile):
             self.pos=kwargs.get('pos', None)
             self.neg=kwargs.get('neg', None)
             self.strobe=kwargs.get('strobe', False)
+            self.psfasciiflag=kwargs.get('psfasciiflag', False)
         except:
             self.print_log(type='F', msg="spice IO file definition failed.")
 
@@ -168,7 +171,14 @@ class spice_iofile(iofile):
         self._file = []
         for ioname in self.ionames:
             if self.dir == 'out':
-                filename = 'tb_%s.print' % (self.parent.name)
+                if self.psfasciiflag:
+                    #ANALYSIS NAME HARDCODED
+                    if self.iotype=='psfascii_pss':
+                        filename = 'tb_%s.raw/*PSS_analysis.fd.pss' % (self.parent.name) #return filename with wildcard for possible sweep (-> several files)
+                    elif self.iotype=='psfascii_pac':
+                        filename = 'tb_%s.raw/PAC_analysis.*.pac' % (self.parent.name) #return filename with wildcard for possible sweep (-> several files)
+                else:
+                    filename = 'tb_%s.print' % (self.parent.name)
             else:
                 filename = ( '%s_%s_%s_%s.txt' 
                     % ( self.parent.runname,self.dir,ioname.replace('<','').replace('>','').replace('.','_'),
@@ -435,6 +445,44 @@ class spice_iofile(iofile):
                         self.parent.iofile_eventdict[label.upper()]=np.hstack((arr[:,0].reshape(-1,1),arr[:,col_idx+1].reshape(-1,1))).reshape(-1,2)
                     else:
                         self.print_log(type='W', msg='Label format mismatch with \'%s\'.' %  (label))
+        elif self.iotype=='psfascii_pss' or self.iotype=='psfascii_pac':
+            self.psfasciiflag=True
+            if not self.parent.model=='spectre':
+                self.print_log(type='F', msg='Only spectre supported for psfascii outputs')
+            else:
+                files = glob.glob(self.file[0]) #filepath with wildcard -> list of filepath strings 
+                if len(files)>1: #if True, a sweep was run
+                    ##extract folderpath 
+                    #foldername = os.path.dirname(files[0])
+                    #files.remove(os.path.join(foldername,'PSS_analysis.fd.pss')) #this file not needed if sweeping (ANALYSIS NAME HARDCODED)
+                    files = sorted(files) #glob doesn't return files in aplhabetical order
+
+                os.system('sync %s' % self.parent.spicesimpath) #Why this?
+            if self.iotype=='psfascii_pss':
+                for file in files:
+                    psf = psfu.PSF(file)
+                    sweep=psf.get_sweep()
+                    for signal in psf.all_signals():
+                            tmpdata = np.vstack((sweep.abscissa, psf.get_signal(f'{signal.name}').ordinate)).T
+                            if signal.name.upper() in self.parent.iofile_eventdict: #first sweep index is added in else below
+                                self.parent.iofile_eventdict[signal.name.upper()]=np.insert( self.parent.iofile_eventdict[signal.name.upper()], len(self.parent.iofile_eventdict[signal.name.upper()][0,:]-1), tmpdata[:,1], axis=1) #Add sweep iteration's result as new column to io
+                            else:
+                                self.parent.iofile_eventdict[signal.name.upper()]=tmpdata
+            elif self.iotype=='psfascii_pac':
+                for file in files:
+                   psf = psfu.PSF(file)
+                   sweep=psf.get_sweep()
+                   string=os.path.splitext(file)[0] # Remove .pac
+                   string = os.path.splitext(string)[1] # Extract index (with leading .)
+                   string = string[1:]
+                   index=int(string)
+                   for signal in psf.all_signals():
+                       tmpdata=np.vstack((sweep.abscissa,
+                           psf.get_signal(f'{signal.name}').ordinate)).T
+                       # FIrst signal adds freq vector in else below
+                       if not signal.name.upper() in self.parent.iofile_eventdict: 
+                           self.parent.iofile_eventdict[signal.name.upper()]={}
+                       self.parent.iofile_eventdict[signal.name.upper()][index]=tmpdata
         else:
             if len(self.file) == 0:
                 self.print_log(type='W', msg='No output file defined for IO %s. Check self.ionames!' % self.name)
