@@ -8,6 +8,9 @@ Initially written by Okko Järvinen, 2019
 """
 import os
 import sys
+import subprocess
+import pandas as pd
+from collections import defaultdict
 from abc import * 
 from thesdk import *
 from spice.spice_common import *
@@ -368,6 +371,60 @@ class spectre(spice_common):
         """
         try:
             if 'noise' in self.parent.simcmd_bundle.Members.keys():
+                initial_dir = os.getcwd()
+                os.chdir(self.parent.spicesimpath)
+                ocean_command = f"""
+                openResults("tb_{self.parent.name}.raw")
+                selectResult('noise)
+                ocnPrint(?output "{self.parent.name}_nf" ?numberNotation 'scientific getData("NF"))
+                noiseSummary('integrated ?resultsDir "tb_{self.parent.name}.raw" ?result 'noise ?output "{self.parent.name}_noisesum" ?sort '(name))
+                exit
+                """
+                process = subprocess.Popen(
+                        ["ocean", "-nograph"],
+                        stdin=subprocess.PIPE,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True
+                        )
+                stdout, stderr = process.communicate(input=ocean_command)
+                if stderr:
+                    print(stderr, file=sys.stderr)
+
+                df = pd.read_csv(f"{self.parent.name}_nf", delim_whitespace=True, header=None, skiprows=3)
+                df.columns = ['Frequency', 'NF']
+                freq = df['Frequency'].values
+                NF = df['NF'].values
+
+                path = f"{self.parent.name}_noisesum"
+                with open(path, 'r') as file:
+                    lines = file.readlines()
+
+                lines = lines[3:-5]
+                total_rows = []
+
+                for line in lines:
+                    parts = line.split()
+                    if len(parts)==5:
+                        total_rows.append(parts)
+
+                df = pd.DataFrame(total_rows, columns=['Device', 'Percentage_of_total_noise', 'Input_referred_noise','Parameter','Noise_contribution'])
+                df['Percentage_of_total_noise'] = df['Percentage_of_total_noise'].astype(float)
+                df['Input_referred_noise'] = df['Input_referred_noise'].astype(float)
+                df['Noise_contribution'] = df['Noise_contribution'].astype(float)
+
+                device_data = defaultdict(list)
+
+                for index, row in df.iterrows():
+                    device = row['Device']
+                    percentage_of_total_noise = row['Percentage_of_total_noise']
+                    input_referred_noise = row['Input_referred_noise']
+                    parameter = row['Parameter']
+                    noise_contribution = row['Noise_contribution']
+                    
+                    device_data[device].append((percentage_of_total_noise, input_referred_noise, parameter, noise_contribution))
+
+                os.chdir(initial_dir)
                 analysis='noise'
                 nodes=self.parent.simcmd_bundle.Members[analysis].nodes
                 mc=self.parent.simcmd_bundle.Members[analysis].mc
@@ -397,15 +454,11 @@ class spectre(spice_common):
                         path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name,
                                 fnames[i])
                     files=glob.glob(path)
-                    result={}
-                    psf = psfu.PSF(files[0])
-                    psfsweep=psf.get_sweep()
-                    freq=psf.get_sweep().abscissa
                     if 'noise' in analysis:
-                        NF=psf.get_signal('NF').ordinate
                         self.extracts.Members[analysis].update({
                             f'{nodes[i]}_freq':freq,
                             f'{nodes[i]}_NF':NF,
+                            f'{nodes[i]}_noise_contributions':device_data,
                             })
         except:
             self.print_log(type='W',
