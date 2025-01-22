@@ -313,7 +313,30 @@ class spice_iofile(iofile):
                     sep='\s+', encoding='utf-8',engine='c',
                     dtype='float',chunksize=1e6)
             arr=pd.concat(arr).to_numpy()
-        except:
+        except ValueError:
+            # This may happen if the print file
+            # does not round to zero, and the
+            # scientific format exponent may become
+            # over 100, where the space separators
+            # move on top of eachother. This
+            # adds the missing spacebars, which
+            # may fix the crash
+            try:
+                cmd=f'sed -i -E "s/([0-9])+([eE][+-]?[0-9]+)?[+-]/\\1\\2 /g" {filepath}'
+                self.print_log(type='I', msg="Running external command %s" %(cmd) )
+                subprocess.check_output(cmd,shell=True)
+                nrows = stop - start
+                if nrows<0:
+                    self.print_log(type='W', msg='Stop index smaller than start index in parse_io_from_file!')
+                    nrows=None
+                arr=pd.read_csv(filepath,skiprows=start-1, nrows=nrows,
+                        sep='\s+', encoding='utf-8',engine='c',
+                        dtype='float',chunksize=1e6)
+                arr=pd.concat(arr).to_numpy()
+            except: 
+                self.print_log(type='E',msg=traceback.format_exc())
+                self.print_log(type='F',msg='Failed while reading files for %s.' % self.name)
+        except: 
             self.print_log(type='E',msg=traceback.format_exc())
             self.print_log(type='F',msg='Failed while reading files for %s.' % self.name)
         try:
