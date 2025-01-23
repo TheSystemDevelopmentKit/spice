@@ -365,7 +365,7 @@ class spectre(spice_common):
                     msg="Something went wrong while extracting S-parameters")
 
 
-    def read_psf(self,**kwargs):
+    def read_noise_result(self,**kwargs):
         """ Internally called function to read the S-parameter simulation results
             TODO: Implement for Eldo as well.
         """
