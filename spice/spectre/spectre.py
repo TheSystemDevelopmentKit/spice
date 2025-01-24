@@ -8,6 +8,9 @@ Initially written by Okko Järvinen, 2019
 """
 import os
 import sys
+import subprocess
+import pandas as pd
+from collections import defaultdict
 from abc import * 
 from thesdk import *
 from spice.spice_common import *
@@ -362,12 +365,54 @@ class spectre(spice_common):
                     msg="Something went wrong while extracting S-parameters")
 
 
-    def read_psf(self,**kwargs):
+    def read_noise_result(self,**kwargs):
         """ Internally called function to read the S-parameter simulation results
             TODO: Implement for Eldo as well.
         """
         try:
             if 'noise' in self.parent.simcmd_bundle.Members.keys():
+                ocean_command = f"""
+                openResults("{self.parent.spicedbpath}")
+                selectResult('noise)
+                ocnPrint(?output "{os.path.join(self.parent.spicesimpath, '%s_nf' % self.parent.name)}" ?numberNotation 'scientific getData("NF"))
+                noiseSummary('integrated ?resultsDir "{self.parent.spicedbpath}" ?result 'noise ?output "{os.path.join(self.parent.spicesimpath, '%s_noisesum' % self.parent.name)}" ?sort '(name))
+                exit
+                """
+                process = subprocess.Popen(
+                        ["ocean", "-nograph"],
+                        stdin=subprocess.PIPE,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True
+                        )
+                stdout, stderr = process.communicate(input=ocean_command)
+                if stderr:
+                    print(stderr, file=sys.stderr)
+
+                df = pd.read_csv(f"{os.path.join(self.parent.spicesimpath, '%s_nf' % self.parent.name)}", delim_whitespace=True, header=None, skiprows=3)
+                df.columns = ['Frequency', 'NF']
+                freq = df['Frequency'].values
+                NF = df['NF'].values
+
+                df = pd.read_csv(f"{os.path.join(self.parent.spicesimpath, '%s_noisesum' % self.parent.name)}", sep='\s+', header=None, skipinitialspace=True, skipfooter=5, engine='python')
+                noise_data = {}
+                current_device = None
+                for index, row in df.iterrows():
+                    # Device row
+                    if all(pd.notna(row[0:4])) and all(pd.isna(row[5:10])):
+                        current_device = row[0]
+                        noise_data[current_device] = {
+                                'Contribution_percentage': float(row[1]),
+                                'Input_referred': float(row[2]),
+                                'Param': {}
+                                }
+                        noise_data[current_device]['Param'][row[3]] = float(row[4])
+                    # Device param row
+                    elif all(pd.notna(row[0:2])) and all(pd.isna(row[2:10])):
+                        param_name = row[0].strip()
+                        if param_name:
+                            noise_data[current_device]['Param'][param_name] = float(row[1])
+
                 analysis='noise'
                 nodes=self.parent.simcmd_bundle.Members[analysis].nodes
                 mc=self.parent.simcmd_bundle.Members[analysis].mc
@@ -397,15 +442,11 @@ class spectre(spice_common):
                         path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name,
                                 fnames[i])
                     files=glob.glob(path)
-                    result={}
-                    psf = psfu.PSF(files[0])
-                    psfsweep=psf.get_sweep()
-                    freq=psf.get_sweep().abscissa
                     if 'noise' in analysis:
-                        NF=psf.get_signal('NF').ordinate
                         self.extracts.Members[analysis].update({
                             f'{nodes[i]}_freq':freq,
                             f'{nodes[i]}_NF':NF,
+                            f'{nodes[i]}_noise_contributions':noise_data,
                             })
         except:
             self.print_log(type='W',
