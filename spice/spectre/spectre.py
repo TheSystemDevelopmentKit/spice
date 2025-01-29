@@ -155,7 +155,7 @@ class spectre(spice_common):
         See: https://community.cadence.com/cadence_blogs_8/b/cic/posts/spectre-optimizing-spectre-aps-performance 
         '''
         if not hasattr(self, '_plflag'):
-            self._plflag=f"upa"
+            self._plflag=f"=upa"
         return self._plflag
 
     @plflag.setter
