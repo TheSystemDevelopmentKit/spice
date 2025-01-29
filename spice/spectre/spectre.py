@@ -145,7 +145,7 @@ class spectre(spice_common):
         Postfix comes from self.plflag (user defined)
         """
         if not hasattr(self, '_plflag_simcmd_prefix'):
-            self._plflag_simcmd_prefix="+postlayout="
+            self._plflag_simcmd_prefix="+postlayout"
         return self._plflag_simcmd_prefix
 
     @property
@@ -161,7 +161,9 @@ class spectre(spice_common):
     @plflag.setter
     def plflag(self, val):
         if val in ["upa", "hpa"]:
-            self._plflag=val
+            self._plflag=f'={val}'
+        elif val=='':
+            self._plflag=''
         else:
             self.print_log(type='W', msg='Unsupported postlayout flag: %s' % val)
 
