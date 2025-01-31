@@ -365,6 +365,23 @@ class spectre(spice_common):
                     msg=traceback.format_exc())
             self.print_log(type='W',
                     msg="Something went wrong while extracting S-parameters")
+               
+    
+    def get_input_noise_data(self):
+        df = pd.read_csv(f"{os.path.join(self.parent.spicesimpath, '%s_in' % self.parent.name)}", delim_whitespace=True, header=None, skiprows=3)
+        df.columns = ['Frequency', 'in']
+        freq = df['Frequency'].values
+        in_noise = df['in'].values
+
+        return freq, in_noise
+    
+    def get_output_noise_data(self):
+        df = pd.read_csv(f"{os.path.join(self.parent.spicesimpath, '%s_out' % self.parent.name)}", delim_whitespace=True, header=None, skiprows=3)
+        df.columns = ['Frequency', 'out']
+        freq = df['Frequency'].values
+        out_noise = df['out'].values
+
+        return freq, out_noise
 
 
     def read_noise_result(self,**kwargs):
@@ -377,6 +394,8 @@ class spectre(spice_common):
                 openResults("{self.parent.spicedbpath}")
                 selectResult('noise)
                 ocnPrint(?output "{os.path.join(self.parent.spicesimpath, '%s_nf' % self.parent.name)}" ?numberNotation 'scientific getData("NF"))
+                ocnPrint(?output "{os.path.join(self.parent.spicesimpath, '%s_in' % self.parent.name)}" ?numberNotation 'scientific getData("in"))
+                ocnPrint(?output "{os.path.join(self.parent.spicesimpath, '%s_out' % self.parent.name)}" ?numberNotation 'scientific getData("out"))
                 noiseSummary('integrated ?resultsDir "{self.parent.spicedbpath}" ?result 'noise ?output "{os.path.join(self.parent.spicesimpath, '%s_noisesum' % self.parent.name)}" ?sort '(name))
                 exit
                 """
@@ -395,6 +414,10 @@ class spectre(spice_common):
                 df.columns = ['Frequency', 'NF']
                 freq = df['Frequency'].values
                 NF = df['NF'].values
+
+                freq, in_noise = self.get_input_noise_data()
+                
+                freq, out_noise = self.get_output_noise_data()
 
                 df = pd.read_csv(f"{os.path.join(self.parent.spicesimpath, '%s_noisesum' % self.parent.name)}", sep='\s+', header=None, skipinitialspace=True, skipfooter=5, engine='python')
                 noise_data = {}
@@ -448,6 +471,8 @@ class spectre(spice_common):
                         self.extracts.Members[analysis].update({
                             f'{nodes[i]}_freq':freq,
                             f'{nodes[i]}_NF':NF,
+                            f'{nodes[i]}_input_ref_noise':in_noise,
+                            f'{nodes[i]}_output_ref_noise':out_noise,
                             f'{nodes[i]}_noise_contributions':noise_data,
                             })
         except:

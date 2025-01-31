@@ -216,6 +216,7 @@ class spice_simcmd(thesdk):
             self.skipstart = kwargs.get('skipstart', None)
             self.sprobes = kwargs.get('sprobes', None)
             self.iprobe = kwargs.get('iprobe', None)
+            self.probe = kwargs.get('probe', None)
             self.harmonics = kwargs.get('harmonics', None)
             # Make list, if they are not already
             self.sweep = kwargs.get('sweep',[]) if type(kwargs.get('sweep', [])) == list else [kwargs.get('sweep')]

@@ -373,6 +373,18 @@ class spectre_testbench(testbench_common):
                     if val.harmonics==None:
                         self.print_log(type='F', msg='Harmonics must be defined for PSS simulation')
                     self._simcmdstr += f'PSS_analysis pss fund={val.fsig} outputtype=freq maxacfreq={val.fmax} harms={val.harmonics}'
+
+                elif str(sim).lower() == 'stb':
+                    if val.fmin==None:
+                        self.print_log(type='F', msg='fmin must be given for stb simulation')
+                    if val.fmax==None:
+                        self.print_log(type='F', msg='fmax must be given for stb simulation')
+                    if val.probe==None:
+                        self.print_log(type='F', msg='probe must be given for stb simulation')
+                    if val.fstepsize==None:
+                        self.print_log(type='F', msg='fstepsize must be given for stb simulation')
+                    self.simcmdstr += f'STB_analysis stb start={val.fmin} stop={val.fmax} dec={val.fstepsize} probe={val.probe}'
+                
                 else:
                     self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
                 if val.mc:
