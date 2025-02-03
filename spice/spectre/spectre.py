@@ -366,6 +366,83 @@ class spectre(spice_common):
             self.print_log(type='W',
                     msg="Something went wrong while extracting S-parameters")
                
+
+    def read_stb_result(self,**kwargs):
+        ''' Internally called function to read the stb simulation results
+        '''
+
+        if 'stb' in self.parent.simcmd_bundle.Members.keys():
+            try:
+                fname='STB_analysis.margin.stb'
+                file=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, fname)
+                valbegin= 'VALUE\n'
+                eof = 'END\n'
+                parsevals = False
+                with open(file, 'r') as f:
+                    for line in f:
+                        if valbegin == line:
+                            parsevals=True
+                        if parsevals:
+                            if 'gainMarginInfo' in line:
+                                info = line.split("\"")[3].split(" ")
+                                gain_margin = float(info[info.index('margin')+2])
+                                gain_margin_freq = float(info[info.index('frequency')+2])
+                            if 'phaseMarginInfo' in line:
+                                info = line.split("\"")[3].split(" ")
+                                phase_margin = float(info[info.index('margin')+2])
+                                phase_margin_freq = float(info[info.index('frequency')+2])
+                            if 'stb_state' in line:
+                                if 'is stable' in line:
+                                    stable = True
+                                else:
+                                    stable = False
+                        if eof == line:
+                            parsevals=False
+                
+                analysis = 'stb_analysis'
+                self.extracts.Members.update({analysis: {}})
+                self.extracts.Members[analysis].update({
+                    f'Gain Margin': (gain_margin_freq, gain_margin),
+                    f'Phase Margin': (phase_margin_freq, phase_margin),
+                    f'Circuit is ': stable
+                    })
+            except:
+                pass
+            try:
+                ocean_command = f"""
+                openResults("{self.parent.spicedbpath}")
+                selectResult('stb)
+                ocnPrint(?output "{os.path.join(self.parent.spicesimpath, '%s_loopGain_phase' % self.parent.name)}" ?numberNotation 'scientific phase(getData("loopGain")))
+                ocnPrint(?output "{os.path.join(self.parent.spicesimpath, '%s_loopGain_db20' % self.parent.name)}" ?numberNotation 'scientific db20(getData("loopGain")))
+                exit
+                """
+                process = subprocess.Popen(
+                        ["ocean", "-nograph"],
+                        stdin=subprocess.PIPE,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True
+                        )
+                stdout, stderr = process.communicate(input=ocean_command)
+                if stderr:
+                    print(stderr, file=sys.stderr)
+
+                freq, loopGain_db20 = self.get_ocnPrint_data(file_name=self.parent.name+'_loopGain_db20')
+                freq, loopGain_phase = self.get_ocnPrint_data(file_name=self.parent.name+'_loopGain_phase')
+                analysis = 'stb_analysis_waveforms'
+                self.extracts.Members.update({analysis: {}})
+                self.extracts.Members[analysis].update({
+                    f'loopGain_db20': np.concatenate([freq.reshape(-1,1), loopGain_db20.reshape(-1,1)], axis=1),
+                    f'loopGain_phase': np.concatenate([freq.reshape(-1,1), loopGain_phase.reshape(-1,1)], axis=1),
+                    })
+            except:
+                pass
+    
+    def get_ocnPrint_data(self,file_name):
+        df = pd.read_csv(f"{os.path.join(self.parent.spicesimpath, '%s' % file_name)}", delim_whitespace=True, header=None, skiprows=3)
+        freq = df[0].values
+        vals = df[1].values
+        return freq, vals 
     
     def get_input_noise_data(self):
         df = pd.read_csv(f"{os.path.join(self.parent.spicesimpath, '%s_in' % self.parent.name)}", delim_whitespace=True, header=None, skiprows=3)
@@ -382,7 +459,6 @@ class spectre(spice_common):
         out_noise = df['out'].values
 
         return freq, out_noise
-
 
     def read_noise_result(self,**kwargs):
         """ Internally called function to read the S-parameter simulation results

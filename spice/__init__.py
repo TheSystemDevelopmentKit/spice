@@ -961,6 +961,11 @@ class spice(spice_common):
             self.print_log(type='W',msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting power consumptions.')
 
+    def read_stb_result(self):
+        ''' Internally called function to read the PSF output files
+        '''
+        self.spice_simulator.read_stb_result()
+
     def read_noise_result(self):
         """ Internally called function to read the PSF output files
             TODO: Implement for Eldo as well.
@@ -1060,6 +1065,7 @@ class spice(spice_common):
             self.read_oppts()
             self.read_sparams()
             self.read_noise_result()
+            self.read_stb_result()
             ###
             # Save entity state
             if self.save_state:
