@@ -402,9 +402,9 @@ class spectre(spice_common):
                 analysis = 'stb_analysis'
                 self.extracts.Members.update({analysis: {}})
                 self.extracts.Members[analysis].update({
-                    f'Gain Margin': (gain_margin_freq, gain_margin),
-                    f'Phase Margin': (phase_margin_freq, phase_margin),
-                    f'Circuit is ': stable
+                    f'gain_margin': (gain_margin_freq, gain_margin),
+                    f'phase_margin': (phase_margin_freq, phase_margin),
+                    f'status': stable
                     })
             except:
                 pass
