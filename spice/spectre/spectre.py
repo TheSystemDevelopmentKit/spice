@@ -557,6 +557,24 @@ class spectre(spice_common):
                             f'{nodes[i]}_output_ref_noise':out_noise,
                             f'{nodes[i]}_noise_contributions':noise_data,
                             })
+
+                # Read total input referred noise
+                try:
+                    file=os.path.join(self.parent.spicesimpath,'%s_noisesum' % self.parent.name)
+                    with open(file, 'r') as f:
+                        for line in f:
+                            if 'Total Input Referred Noise' in line:
+                                total_input_ref_noise = float(line.split(' ')[-1])
+
+                    self.extracts.Members[analysis].update({
+                        'total_input_ref_noise':total_input_ref_noise
+                        })
+                except:
+                    total_input_ref_noise = 'NaN'
+                    self.extracts.Members[analysis].update({
+                        'total_input_ref_noise':total_input_ref_noise
+                        })
+
         except:
             self.print_log(type='W',
                     msg=traceback.format_exc())
