@@ -407,7 +407,13 @@ class spectre(spice_common):
                     f'status': stable
                     })
             except:
-                pass
+                analysis = 'stb_analysis'
+                self.extracts.Members.update({analysis: {}})
+                self.extracts.Members[analysis].update({
+                    f'gain_margin': ('Nan', 'Nan'),
+                    f'phase_margin': ('Nan', 'Nan'),
+                    f'status': 'Gain margin and Phase margin could not be read, the circuit is unstable!' 
+                    })
             try:
                 ocean_command = f"""
                 openResults("{self.parent.spicedbpath}")
@@ -472,7 +478,7 @@ class spectre(spice_common):
                 ocnPrint(?output "{os.path.join(self.parent.spicesimpath, '%s_nf' % self.parent.name)}" ?numberNotation 'scientific getData("NF"))
                 ocnPrint(?output "{os.path.join(self.parent.spicesimpath, '%s_in' % self.parent.name)}" ?numberNotation 'scientific getData("in"))
                 ocnPrint(?output "{os.path.join(self.parent.spicesimpath, '%s_out' % self.parent.name)}" ?numberNotation 'scientific getData("out"))
-                noiseSummary('integrated ?resultsDir "{self.parent.spicedbpath}" ?result 'noise ?output "{os.path.join(self.parent.spicesimpath, '%s_noisesum' % self.parent.name)}" ?sort '(name))
+                noiseSummary('integrated ?resultsDir "{self.parent.spicedbpath}" ?result 'noise ?output "{os.path.join(self.parent.spicesimpath, '%s_noisesum' % self.parent.name)}" ?sort '(name) ?noiseUnit "V")
                 exit
                 """
                 process = subprocess.Popen(
