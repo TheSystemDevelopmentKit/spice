@@ -9,13 +9,13 @@ Initially written by Marko Kosunen, 2021
 """
 import os
 import sys
-from abc import * 
+from abc import *
 from thesdk import *
 from spice.spice_common import *
 import numpy as np
 
 class ngspice(spice_common):
-    """This class is used as instance in simulatormodule property of 
+    """This class is used as instance in simulatormodule property of
     spice class. Contains language dependent definitions.
 
     Parameters
@@ -25,7 +25,7 @@ class ngspice(spice_common):
     **kwargs :
        None
 
-    
+
     """
 
     def __init__(self, parent=None,**kwargs):
@@ -45,7 +45,7 @@ class ngspice(spice_common):
                 "commentchar" : self.commentchar,
                 "commentline" : self.commentline,
                 "nprocflag" : self.nprocflag,
-                "simulatorcmd" : self.simulatorcmd, 
+                "simulatorcmd" : self.simulatorcmd,
                 "dcsource_declaration" : self.dcsource_declaration,
                 "parameter" : self.parameter,
                 "option" : self.option,
@@ -88,7 +88,7 @@ class ngspice(spice_common):
         return 'set num_threads='
     @property
     def simulatorcmd(self):
-        """str : Simulator execution command 
+        """str : Simulator execution command
             (Default: 'ngspice')
         """
         return 'ngspice'
@@ -154,7 +154,7 @@ class ngspice(spice_common):
     def plflag(self):
         '''
         Postlayout simulation accuracy/RC reduction flag.
-        
+
         '''
         self.print_log(type='W', msg='Postlayout flag unsupported for %s' %(self.parent.model))
         if not hasattr(self, '_plflag'):
@@ -168,15 +168,17 @@ class ngspice(spice_common):
     @property
     def plotprogram(self):
         """ str : Sets the program to be used for visualizing waveform databases.
+
+        Default 'gnuplot'.
         """
         if not hasattr(self, '_plotprogram'):
             self._plotprogram='gnuplot'
         return self._plotprogram
     @plotprogram.setter
     def plotprogram(self, value):
-        if value not in  [ 'gnuplot' ]:  
-            self.print_log(type='F', 
-                    msg='%s not supported for plotprogram, only ezvave and viva are supported')
+        if value not in  [ 'gnuplot' ]:
+            self.print_log(type='F',
+                    msg='%s not supported for plotprogram, only gnuplot is  supported')
         else:
             self._plotprogram = value
 
@@ -204,7 +206,6 @@ class ngspice(spice_common):
         Automatically generated.
         """
         if not hasattr(self,'_ngspice_spicecmd'):
-            
             if self.parent.nproc:
                 nprocflag = "%s%d" % (self.nprocflag,self.parent.nproc)
                 self.print_log(type='I',msg='Enabling multithreading \'%s\'.' % nprocflag)
@@ -212,7 +213,6 @@ class ngspice(spice_common):
             else:
                 nprocflag = ""
 
-            # How is this defined and where. Comes out of the blue
             if self.parent.postlayout:
                 self.print_log(type='W',msg='Post-layout optimization not suported for Ngspice')
 
@@ -229,24 +229,28 @@ class ngspice(spice_common):
         '''
         self.print_log(type='W',msg='Interactive plotting not implemented for ngspice.')
         return 0
+
     def read_sp_result(self,**kwargs):
         """ Internally called function to read the S-parameter simulation results
         """
         read_type=kwargs.get('read_type')
         if 'sp' in self.parent.simcmd_bundle.Members.keys():
             self.print_log(type='W', msg='S-Parameters unsupported for %s' %(self.parent.model))
+
     def read_noise_result(self,**kwargs):
         """ Internally called function to read the noise simulation results
         """
         if 'noise' in self.parent.simcmd_bundle.Members.keys():
             self.print_log(type='F', msg='Noise analysis unsupported for %s' %(self.parent.model))
         return None, None
+
     def create_nested_sweepresult_dict(self, level, fileptr, sweeps_ran_dict,
             files,read_type):
         """Documentation missing
         """
         self.print_log(type='F', msg='create_nested_sweepresulsts unsupported for %s' %(self.parent.model))
         return None, None
+
     def read_oppts(self):
         """ Internally called function to read the DC operating points of the circuit
         """
@@ -254,6 +258,7 @@ class ngspice(spice_common):
         try:
             if 'dc' in self.parent.simcmd_bundle.Members.keys(): # Unsupported model
                 self.print_log(type='F', msg='DC analysis unsupported for %s' %(self.parent.model))
+                raise Exception('DC optpoint extraction not supported for Eldo.')
             else: # DC analysis not in simcmds, oppts is empty
                 self.extracts.Members.update({'oppts' : {}})
         except:

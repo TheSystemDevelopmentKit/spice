@@ -11,14 +11,14 @@ import sys
 import subprocess
 import pandas as pd
 from collections import defaultdict
-from abc import * 
+from abc import *
 from thesdk import *
 from spice.spice_common import *
 import numpy as np
 import psf_utils.psf_utils as psfu
 
 class spectre(spice_common):
-    """This class is used as instance in spice_simulatormodule property of 
+    """This class is used as instance in spice_simulatormodule property of
     spice class. Contains simulator dependent definitions.
 
     Parameters
@@ -28,7 +28,7 @@ class spectre(spice_common):
     **kwargs :
        None
 
-    
+
     """
 
     def __init__(self, parent=None,**kwargs):
@@ -48,7 +48,7 @@ class spectre(spice_common):
                 "commentchar" : self.commentchar,
                 "commentline" : self.commentline,
                 "nprocflag" : self.nprocflag,
-                "simulatorcmd" : self.simulatorcmd, 
+                "simulatorcmd" : self.simulatorcmd,
                 "dcsource_declaration" : self.dcsource_declaration,
                 "parameter" : self.parameter,
                 "option" : self.option,
@@ -91,7 +91,7 @@ class spectre(spice_common):
         return '+mt='
     @property
     def simulatorcmd(self):
-        """str : Simulator execution command 
+        """str : Simulator execution command
             (Default: 'ngspice')
         """
         return 'spectre -64 +lqtimeout=0 ++aps=%s' %(self.errpreset)
@@ -156,7 +156,7 @@ class spectre(spice_common):
     def plflag(self):
         '''
         Postlayout simulation accuracy/RC reduction flag.
-        See: https://community.cadence.com/cadence_blogs_8/b/cic/posts/spectre-optimizing-spectre-aps-performance 
+        See: https://community.cadence.com/cadence_blogs_8/b/cic/posts/spectre-optimizing-spectre-aps-performance
         '''
         if not hasattr(self, '_plflag'):
             self._plflag=f"=upa"
@@ -174,7 +174,7 @@ class spectre(spice_common):
     @property
     def errpreset(self):
         """ String
-        
+
         Global accuracy parameter for Spectre simulations. Options include
         'liberal', 'moderate' and 'conservative', in order of rising accuracy.
         You can set this by accesssing spice langmodule
@@ -201,12 +201,12 @@ class spectre(spice_common):
             if hasattr(self.parent,'plotprogram'):
                 self._plotprogram=self.parent.plotprogram
             else:
-                self._plotprogram='ezwave' 
+                self._plotprogram='ezwave'
         return self._plotprogram
     @plotprogram.setter
     def plotprogram(self, value):
-        if value not in  [ 'ezwave', 'viva' ]:  
-            self.print_log(type='F', 
+        if value not in  [ 'ezwave', 'viva' ]:
+            self.print_log(type='F',
                     msg='%s not supported for plotprogram, only ezvave and viva are supported')
         else:
             self._plotprogram = value
@@ -247,7 +247,7 @@ class spectre(spice_common):
             else:
                 plflag = ''
 
-            spicesimcmd = (self.simulatorcmd + " %s %s -outdir %s " 
+            spicesimcmd = (self.simulatorcmd + " %s %s -outdir %s "
                     % (plflag,nprocflag,self.parent.spicesimpath))
             self._spicecmd = self.parent.spice_submission+spicesimcmd+self.parent.spicetbsrc
 
@@ -278,7 +278,7 @@ class spectre(spice_common):
             ret=os.system(cmd)
             if ret != 0:
                 self.print_log(type='W', msg='%s returned with exit status %d.' % (self.plotprogram, ret))
-        except: 
+        except:
             self.print_log(type='W',msg='Something went wrong while launcing %s.' % self.plotprogram)
             self.print_log(type='W',msg=traceback.format_exc())
 
@@ -357,7 +357,7 @@ class spectre(spice_common):
                         psf = psfu.PSF(files[0])
                         psfsweep=psf.get_sweep()
                         for signal in psf.all_signals():
-                            result[signal.name]=np.vstack((psfsweep.abscissa, 
+                            result[signal.name]=np.vstack((psfsweep.abscissa,
                                 psf.get_signal(f'{signal.name}').ordinate)).T
                     rd={0:{'param':'nosweep', 'value':0, read_type:result}}
                 self.extracts.Members[read_type].update({'results':rd})
@@ -539,7 +539,7 @@ class spectre(spice_common):
                                         param = parts[1]
                                     val = float(parts[2])
                                     if dev not in self.extracts.Members['oppts']: # Found new device
-                                        self.extracts.Members['oppts'].update({dev : {}}) 
+                                        self.extracts.Members['oppts'].update({dev : {}})
                                     if param not in self.extracts.Members['oppts'][dev]: # Found new parameter for device
                                         self.extracts.Members['oppts'][dev].update({param : [val]})
                                     else: # Parameter already existed, just append value. This can occur in e.g. sweeps
