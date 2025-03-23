@@ -3,7 +3,7 @@
 Spice Common
 ============
 
-Mix-in class of ommon properties and methods for spice simulator classes
+Mix-in class of common properties and methods for spice simulator classes
 
 """
 import os

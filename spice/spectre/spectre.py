@@ -39,6 +39,8 @@ class spectre(spice_common):
 
     @property
     def syntaxdict(self):
+        """ dict : Internally used dictionary for syntax conversions
+        """
         self.print_log(type='O', msg='Syntaxdict is obsoleted. Access properties directly')
         self._syntaxdict = {
                 "cmdfile_ext" : self.cmdfile_ext,
@@ -64,73 +66,74 @@ class spectre(spice_common):
 
     @property
     def cmdfile_ext(self):
-        """Extension of the command file : str
+        """str : Extension of the command file
         """
         return '.scs'
     @property
     def resultfile_ext(self):
-        """Extension of the result file : str
+        """str : Extension of the result file
         """
         return '.raw'
     @property
     def commentchar(self):
-        """Comment character of the simulator : str
+        """str : Comment character of the simulator
         """
         return '//'
     @property
     def commentline(self):
-        """Comment line for the simulator : str
+        """str : Comment line for the simulator
         """
         return '///////////////////////\n'
     @property
     def nprocflag(self):
-        """String for defining multithread execution : str
+        """str : String for defining multithread execution
         """
         return '+mt='
     @property
     def simulatorcmd(self):
-        """Simulator execution command : str
+        """str : Simulator execution command 
+            (Default: 'ngspice')
         """
         return 'spectre -64 +lqtimeout=0 ++aps=%s' %(self.errpreset)
     @property
     def dcsource_declaration(self):
-        """DC source declaration : str
+        """str : DC source declaration
         """
         #self.print_log(type='F', msg='DC source declaration not defined for ngspice')
         return 'vsource type=dc dc='
     @property
     def parameter(self):
-        """Netlist parameter definition string : str
+        """str : Netlist parameter definition string
         """
         return 'parameters'
     @property
     def option(self):
-        """Netlist option definition string : str
+        """str : Netlist option definition string
         """
         return 'options'
     @property
     def include(self):
-        """Netlist include string : str
+        """str : Netlist include string
         """
         return 'include'
     @property
     def dspfinclude(self):
-        """Netlist dspf-file include string : str
+        """str : Netlist dspf-file include string
         """
         return 'dspf_include'
     @property
     def subckt(self):
-        """Subcircuit include string : str
+        """str : Subcircuit include string
         """
         return 'subckt'
     @property
     def lastline(self):
-        """Last line of the simulator command file : str
+        """str : Last line of the simulator command file
         """
         return '///'
     @property
     def eventoutdelim(self):
-        """Delimiter for the events : str
+        """str : Delimiter for the events
         """
         return ','
     @property
@@ -138,6 +141,7 @@ class spectre(spice_common):
         """Needs documentation. Lines skipped in result file : int
         """
         return 0
+
     @property
     def plflag_simcmd_prefix(self):
         """
@@ -189,9 +193,8 @@ class spectre(spice_common):
 
     @property
     def plotprogram(self):
-        """ String
+        """ str : Sets the program to be used for visualizing waveform databases.
 
-        Sets the program to be used for visualizing waveform databases.
         Options are ezwave (default) or viva.
         """
         if not hasattr(self, '_plotprogram'):
@@ -228,9 +231,7 @@ class spectre(spice_common):
 
     @property
     def spicecmd(self):
-        """String
-
-        Simulation command string to be executed on the command line.
+        """str : Simulation command string to be executed on the command line.
         Automatically generated.
         """
         if not hasattr(self,'_spicecmd'):
@@ -368,7 +369,7 @@ class spectre(spice_common):
 
 
     def read_noise_result(self,**kwargs):
-        """ Internally called function to read the S-parameter simulation results
+        """ Internally called function to read the noise simulation results
             TODO: Implement for Eldo as well.
         """
         try:
@@ -458,6 +459,8 @@ class spectre(spice_common):
 
     def create_nested_sweepresult_dict(self, level, fileptr, sweeps_ran_dict,
             files,read_type):
+        """Documentation missing
+        """
         rd={} # Return this to upper level
         if level < len(sweeps_ran_dict)-1:
             for v in np.arange(len(sweeps_ran_dict[level]['values'])):
