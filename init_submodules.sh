@@ -3,7 +3,6 @@
 #Written by by Marko Kosunen, marko.kosunen@aalto.fi, 2017
 DIR=$( cd `dirname $0` && pwd )
 SUBMODULES="\
-    ./psf_utils/ \
 "
 
 git submodule sync
