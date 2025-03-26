@@ -15,7 +15,7 @@ from abc import *
 from thesdk import *
 from spice.spice_common import *
 import numpy as np
-import psf_utils.psf_utils as psfu
+import psf_utils as psfu
 
 class spectre(spice_common):
     """This class is used as instance in spice_simulatormodule property of
