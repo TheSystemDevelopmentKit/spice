@@ -244,6 +244,14 @@ class ngspice(spice_common):
             self.print_log(type='F', msg='Noise analysis unsupported for %s' %(self.parent.model))
         return None, None
 
+    def read_stb_result(self,**kwargs):
+        ''' Internally called function to read the stb simulation results
+        '''
+
+        if 'stb' in self.parent.simcmd_bundle.Members.keys():
+            msg='STB analysis unsupported for %s' %(self.model) 
+            self.print_log(type='F', msg=msg)
+
     def create_nested_sweepresult_dict(self, level, fileptr, sweeps_ran_dict,
             files,read_type):
         """Documentation missing

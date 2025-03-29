@@ -154,8 +154,8 @@ class eldo(spice_common):
         Postlayout simulation accuracy/RC reduction flag.
 
         '''
-        self.print_log(type='W', msg='Postlayout flag unsupported for %s' %(self.parent.model))
         if not hasattr(self, '_plflag'):
+            self.print_log(type='W', msg='Postlayout flag unsupported for %s' %(self.parent.model))
             self._plflag=''
         return self._plflag
 
@@ -221,7 +221,7 @@ class eldo(spice_common):
     def run_plotprogram(self):
         ''' Starting a parallel process for waveform viewer program.
 
-        The plotting program command can be set with 'plotprogram'.
+        The plotting program command can be set with 'plotprogram' property.
         Tested for spectre and eldo.
         '''
         # Wait for database to appear.
@@ -248,6 +248,14 @@ class eldo(spice_common):
         read_type=kwargs.get('read_type')
         if 'sp' in self.parent.simcmd_bundle.Members.keys():
             self.print_log(type='W', msg='S-Parameters unsupported for %s' %(self.parent.model))
+
+    def read_stb_result(self,**kwargs):
+        ''' Internally called function to read the stb simulation results
+        '''
+
+        if 'stb' in self.parent.simcmd_bundle.Members.keys():
+            msg='STB analysis unsupported for %s' %(self.model) 
+            self.print_log(type='F', msg=msg)
 
     def read_noise_result(self,**kwargs):
         """ Internally called function to read the noise simulation results

@@ -99,7 +99,6 @@ class spectre(spice_common):
     def dcsource_declaration(self):
         """str : DC source declaration
         """
-        #self.print_log(type='F', msg='DC source declaration not defined for ngspice')
         return 'vsource type=dc dc='
     @property
     def parameter(self):
@@ -228,7 +227,6 @@ class spectre(spice_common):
     def plotprogcmd(self, value):
         self._plotprogcmd=value
 
-
     @property
     def spicecmd(self):
         """str : Simulation command string to be executed on the command line.
@@ -256,8 +254,10 @@ class spectre(spice_common):
     def run_plotprogram(self):
         ''' Starting a parallel process for waveform viewer program.
 
-         The plotting program command can be set with 'plotprogram' property.
+        The plotting program command can be set with 'plotprogram' property.
+        Tested for spectre and eldo.
         '''
+        # Wait for database to appear.
         tries = 0
         while tries < 100:
             if os.path.exists(self.parent.spicedbpath):
@@ -284,7 +284,6 @@ class spectre(spice_common):
 
     def read_sp_result(self,**kwargs):
         """ Internally called function to read the S-parameter simulation results
-            TODO: Implement for Eldo as well.
         """
         read_type=kwargs.get('read_type')
         try:
