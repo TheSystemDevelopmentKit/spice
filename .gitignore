@@ -3,8 +3,11 @@
 *.pdf
 *~
 *.swp
+*.swo
+*.orig
 *.nfs
 *.svn
 *.asv
 Makefile
 doc/build/**
+
