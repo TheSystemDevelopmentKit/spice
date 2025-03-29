@@ -8,13 +8,13 @@ Initially written by Okko Järvinen, 2019
 """
 import os
 import sys
-from abc import * 
+from abc import *
 from thesdk import *
 from spice.spice_common import *
 import numpy as np
 
 class eldo(spice_common):
-    """This class is used as instance in *spice_simulatormodule* property of 
+    """This class is used as instance in *spice_simulatormodule* property of
     spice class. Contains simulator dependent definitions.
 
     Parameters
@@ -24,11 +24,10 @@ class eldo(spice_common):
     **kwargs :
        None
 
-    
+
     """
 
     def __init__(self, parent=None,**kwargs):
-
             if parent==None:
                 self.print_log(type='F', msg="Parent of simulator module not given")
             else:
@@ -36,6 +35,8 @@ class eldo(spice_common):
 
     @property
     def syntaxdict(self):
+        """ dict : Internally used dictionary for syntax conversions
+        """
         self.print_log(type='O', msg='Syntaxdict is obsoleted. Access properties directly')
         self._syntaxdict = {
                 "cmdfile_ext" : self.cmdfile_ext,
@@ -43,7 +44,7 @@ class eldo(spice_common):
                 "commentchar" : self.commentchar,
                 "commentline" : self.commentline,
                 "nprocflag" : self.nprocflag,
-                "simulatorcmd" : self.simulatorcmd, 
+                "simulatorcmd" : self.simulatorcmd,
                 "dcsource_declaration" : self.dcsource_declaration,
                 "parameter" : self.parameter,
                 "option" : self.option,
@@ -61,72 +62,73 @@ class eldo(spice_common):
 
     @property
     def cmdfile_ext(self):
-        """Extension of the command file : str
+        """str : Extension of the command file
         """
         return '.cir'
     @property
     def resultfile_ext(self):
-        """Extension of the result file : str
+        """str : Extension of the result file
         """
         return '.wdb'
     @property
     def commentchar(self):
-        """Comment character of the simulator : str
+        """str : Comment character of the simulator
         """
         return '*'
     @property
     def commentline(self):
-        """Comment line for the simulator : str
+        """str : Comment line for the simulator
         """
         return '***********************\n'
     @property
     def nprocflag(self):
-        """String for defining multithread execution : str
+        """str : String for defining multithread execution
         """
         return '-use_proc '
     @property
     def simulatorcmd(self):
-        """Simulator execution command : str
+        """str : Simulator execution command
+            (Default: 'ngspice')
         """
         return 'eldo -64b'
     @property
     def dcsource_declaration(self):
-        """DC source declaration : str
+        """str : DC source declaration
         """
         return ''
     @property
     def parameter(self):
-        """Netlist parameter definition string : str
+        """str : Netlist parameter definition string
         """
         return '.param'
     @property
     def option(self):
-        """Netlist option definition string : str
+        """str : Netlist option definition string
         """
         return '.option'
     @property
     def include(self):
-        """Netlist include string : str
+        """str : Netlist include string
         """
         return '.include'
     @property
     def dspfinclude(self):
-        """Netlist dspf-file include string : str
+        """str : Netlist dspf-file include string
         """
         return '.include'
     @property
     def subckt(self):
-        """Subcircuit include string : str
+        """str : Subcircuit include string
         """
         return '.subckt'
     @property
     def lastline(self):
-        """Last line of the simulator command file : str
+        """str : Last line of the simulator command file
         """
         return '.end'
     @property
     def eventoutdelim(self):
-        """Delimiter for the events : str
+        """str : Delimiter for the events
         """
         return ' '
     @property
@@ -136,10 +138,21 @@ class eldo(spice_common):
         return 2
 
     @property
+    def plflag_simcmd_prefix(self):
+        """
+        Simulator specific prefix for enabling postlayout optimization
+        Postfix comes from self.plflag (user defined)
+        """
+        if not hasattr(self, '_plflag_simcmd_prefix'):
+            self.print_log(type='I', msg='Postlayout prefix unsupported for %s' %(self.parent.model))
+            self._plflag_simcmd_prefix=""
+        return self._plflag_simcmd_prefix
+
+    @property
     def plflag(self):
         '''
         Postlayout simulation accuracy/RC reduction flag.
-        
+
         '''
         self.print_log(type='W', msg='Postlayout flag unsupported for %s' %(self.parent.model))
         if not hasattr(self, '_plflag'):
@@ -152,9 +165,8 @@ class eldo(spice_common):
 
     @property
     def plotprogram(self):
-        """ String
+        """ str : Sets the program to be used for visualizing waveform databases.
 
-        Sets the program to be used for visualizing waveform databases.
         Options are ezwave (default) or viva.
         """
         if not hasattr(self, '_plotprogram'):
@@ -162,8 +174,8 @@ class eldo(spice_common):
         return self._plotprogram
     @plotprogram.setter
     def plotprogram(self, value):
-        if value not in  [ 'ezwave', 'viva' ]:  
-            self.print_log(type='F', 
+        if value not in  [ 'ezwave', 'viva' ]:
+            self.print_log(type='F',
                     msg='%s not supported for plotprogram, only ezvave and viva are supported')
         else:
             self._plotprogram = value
@@ -186,12 +198,9 @@ class eldo(spice_common):
     def plotprogcmd(self, value):
         self._plotprogcmd=value
 
-
     @property
     def spicecmd(self):
-        """String
-
-        Simulation command string to be executed on the command line.
+        """str : Simulation command string to be executed on the command line.
         Automatically generated.
         """
         if not hasattr(self,'_spicecmd'):
@@ -229,17 +238,38 @@ class eldo(spice_common):
             ret=os.system(cmd)
             if ret != 0:
                 self.print_log(type='W', msg='%s returned with exit status %d.' % (self.parent.plotprogram, ret))
-        except: 
+        except:
             self.print_log(type='W',msg='Something went wrong while launcing %s.' % self.parent.plotprogram)
             self.print_log(type='W',msg=traceback.format_exc())
 
+    def read_sp_result(self,**kwargs):
+        """ Internally called function to read the S-parameter simulation results
+        """
+        read_type=kwargs.get('read_type')
+        if 'sp' in self.parent.simcmd_bundle.Members.keys():
+            self.print_log(type='W', msg='S-Parameters unsupported for %s' %(self.parent.model))
+
+    def read_noise_result(self,**kwargs):
+        """ Internally called function to read the noise simulation results
+        """
+        if 'noise' in self.parent.simcmd_bundle.Members.keys():
+            self.print_log(type='F', msg='Noise analysis unsupported for %s' %(self.parent.model))
+        return None, None
+
+    def create_nested_sweepresult_dict(self, level, fileptr, sweeps_ran_dict,
+            files,read_type):
+        """Documentation missing
+        """
+        self.print_log(type='F', msg='create_nested_sweepresulsts unsupported for %s' %(self.parent.model))
+        return None, None
+
     def read_oppts(self):
         """ Internally called function to read the DC operating points of the circuit
-            TODO: Implement for Eldo as well.
         """
 
         try:
             if 'dc' in self.parent.simcmd_bundle.Members.keys():
+                self.print_log(type='F', msg='DC analysis unsupported for %s' %(self.parent.model))
                 raise Exception('DC optpoint extraction not supported for Eldo.')
             else: # DC analysis not in simcmds, oppts is empty
                 self.extracts.Members.update({'oppts' : {}})

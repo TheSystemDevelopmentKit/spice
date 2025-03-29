@@ -316,6 +316,16 @@ class spectre_testbench(testbench_common):
                             (sim,str(val.fmin),str(val.fmax),pts_str)
                     self._simcmdstr += '\n\n'
 
+                elif str(sim).lower() == 'pz':
+                    pnode = val.pnode
+                    nnode = val.nnode
+                    iprobe = val.iprobe
+                    freq = val.freq
+                    self._simcmdstr += 'PZ_analysis (%s %s) %s iprobe=%s' % \
+                            (pnode,nnode,sim,iprobe)
+                    if not freq==None:
+                        self._simcmdstr += ' freq=%s' %(freq)
+                    self._simcmdstr += '\n\n'
                 elif str(sim).lower() == 'sp':
                     if val.fscale.lower()=='log':
                         if val.fpoints != 0:

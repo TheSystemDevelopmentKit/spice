@@ -11,14 +11,14 @@ import sys
 import subprocess
 import pandas as pd
 from collections import defaultdict
-from abc import * 
+from abc import *
 from thesdk import *
 from spice.spice_common import *
 import numpy as np
-import psf_utils.psf_utils as psfu
+import psf_utils as psfu
 
 class spectre(spice_common):
-    """This class is used as instance in spice_simulatormodule property of 
+    """This class is used as instance in spice_simulatormodule property of
     spice class. Contains simulator dependent definitions.
 
     Parameters
@@ -28,7 +28,7 @@ class spectre(spice_common):
     **kwargs :
        None
 
-    
+
     """
 
     def __init__(self, parent=None,**kwargs):
@@ -39,6 +39,8 @@ class spectre(spice_common):
 
     @property
     def syntaxdict(self):
+        """ dict : Internally used dictionary for syntax conversions
+        """
         self.print_log(type='O', msg='Syntaxdict is obsoleted. Access properties directly')
         self._syntaxdict = {
                 "cmdfile_ext" : self.cmdfile_ext,
@@ -46,7 +48,7 @@ class spectre(spice_common):
                 "commentchar" : self.commentchar,
                 "commentline" : self.commentline,
                 "nprocflag" : self.nprocflag,
-                "simulatorcmd" : self.simulatorcmd, 
+                "simulatorcmd" : self.simulatorcmd,
                 "dcsource_declaration" : self.dcsource_declaration,
                 "parameter" : self.parameter,
                 "option" : self.option,
@@ -64,73 +66,74 @@ class spectre(spice_common):
 
     @property
     def cmdfile_ext(self):
-        """Extension of the command file : str
+        """str : Extension of the command file
         """
         return '.scs'
     @property
     def resultfile_ext(self):
-        """Extension of the result file : str
+        """str : Extension of the result file
         """
         return '.raw'
     @property
     def commentchar(self):
-        """Comment character of the simulator : str
+        """str : Comment character of the simulator
         """
         return '//'
     @property
     def commentline(self):
-        """Comment line for the simulator : str
+        """str : Comment line for the simulator
         """
         return '///////////////////////\n'
     @property
     def nprocflag(self):
-        """String for defining multithread execution : str
+        """str : String for defining multithread execution
         """
         return '+mt='
     @property
     def simulatorcmd(self):
-        """Simulator execution command : str
+        """str : Simulator execution command
+            (Default: 'ngspice')
         """
         return 'spectre -64 +lqtimeout=0 ++aps=%s' %(self.errpreset)
     @property
     def dcsource_declaration(self):
-        """DC source declaration : str
+        """str : DC source declaration
         """
         #self.print_log(type='F', msg='DC source declaration not defined for ngspice')
         return 'vsource type=dc dc='
     @property
     def parameter(self):
-        """Netlist parameter definition string : str
+        """str : Netlist parameter definition string
         """
         return 'parameters'
     @property
     def option(self):
-        """Netlist option definition string : str
+        """str : Netlist option definition string
         """
         return 'options'
     @property
     def include(self):
-        """Netlist include string : str
+        """str : Netlist include string
         """
         return 'include'
     @property
     def dspfinclude(self):
-        """Netlist dspf-file include string : str
+        """str : Netlist dspf-file include string
         """
         return 'dspf_include'
     @property
     def subckt(self):
-        """Subcircuit include string : str
+        """str : Subcircuit include string
         """
         return 'subckt'
     @property
     def lastline(self):
-        """Last line of the simulator command file : str
+        """str : Last line of the simulator command file
         """
         return '///'
     @property
     def eventoutdelim(self):
-        """Delimiter for the events : str
+        """str : Delimiter for the events
         """
         return ','
     @property
@@ -138,6 +141,7 @@ class spectre(spice_common):
         """Needs documentation. Lines skipped in result file : int
         """
         return 0
+
     @property
     def plflag_simcmd_prefix(self):
         """
@@ -152,7 +156,7 @@ class spectre(spice_common):
     def plflag(self):
         '''
         Postlayout simulation accuracy/RC reduction flag.
-        See: https://community.cadence.com/cadence_blogs_8/b/cic/posts/spectre-optimizing-spectre-aps-performance 
+        See: https://community.cadence.com/cadence_blogs_8/b/cic/posts/spectre-optimizing-spectre-aps-performance
         '''
         if not hasattr(self, '_plflag'):
             self._plflag=f"=upa"
@@ -170,7 +174,7 @@ class spectre(spice_common):
     @property
     def errpreset(self):
         """ String
-        
+
         Global accuracy parameter for Spectre simulations. Options include
         'liberal', 'moderate' and 'conservative', in order of rising accuracy.
         You can set this by accesssing spice langmodule
@@ -189,21 +193,20 @@ class spectre(spice_common):
 
     @property
     def plotprogram(self):
-        """ String
+        """ str : Sets the program to be used for visualizing waveform databases.
 
-        Sets the program to be used for visualizing waveform databases.
         Options are ezwave (default) or viva.
         """
         if not hasattr(self, '_plotprogram'):
             if hasattr(self.parent,'plotprogram'):
                 self._plotprogram=self.parent.plotprogram
             else:
-                self._plotprogram='ezwave' 
+                self._plotprogram='ezwave'
         return self._plotprogram
     @plotprogram.setter
     def plotprogram(self, value):
-        if value not in  [ 'ezwave', 'viva' ]:  
-            self.print_log(type='F', 
+        if value not in  [ 'ezwave', 'viva' ]:
+            self.print_log(type='F',
                     msg='%s not supported for plotprogram, only ezvave and viva are supported')
         else:
             self._plotprogram = value
@@ -228,9 +231,7 @@ class spectre(spice_common):
 
     @property
     def spicecmd(self):
-        """String
-
-        Simulation command string to be executed on the command line.
+        """str : Simulation command string to be executed on the command line.
         Automatically generated.
         """
         if not hasattr(self,'_spicecmd'):
@@ -246,7 +247,7 @@ class spectre(spice_common):
             else:
                 plflag = ''
 
-            spicesimcmd = (self.simulatorcmd + " %s %s -outdir %s " 
+            spicesimcmd = (self.simulatorcmd + " %s %s -outdir %s "
                     % (plflag,nprocflag,self.parent.spicesimpath))
             self._spicecmd = self.parent.spice_submission+spicesimcmd+self.parent.spicetbsrc
 
@@ -277,7 +278,7 @@ class spectre(spice_common):
             ret=os.system(cmd)
             if ret != 0:
                 self.print_log(type='W', msg='%s returned with exit status %d.' % (self.plotprogram, ret))
-        except: 
+        except:
             self.print_log(type='W',msg='Something went wrong while launcing %s.' % self.plotprogram)
             self.print_log(type='W',msg=traceback.format_exc())
 
@@ -356,7 +357,7 @@ class spectre(spice_common):
                         psf = psfu.PSF(files[0])
                         psfsweep=psf.get_sweep()
                         for signal in psf.all_signals():
-                            result[signal.name]=np.vstack((psfsweep.abscissa, 
+                            result[signal.name]=np.vstack((psfsweep.abscissa,
                                 psf.get_signal(f'{signal.name}').ordinate)).T
                     rd={0:{'param':'nosweep', 'value':0, read_type:result}}
                 self.extracts.Members[read_type].update({'results':rd})
@@ -467,7 +468,7 @@ class spectre(spice_common):
         return freq, out_noise
 
     def read_noise_result(self,**kwargs):
-        """ Internally called function to read the S-parameter simulation results
+        """ Internally called function to read the noise simulation results
             TODO: Implement for Eldo as well.
         """
         try:
@@ -583,6 +584,8 @@ class spectre(spice_common):
 
     def create_nested_sweepresult_dict(self, level, fileptr, sweeps_ran_dict,
             files,read_type):
+        """Documentation missing
+        """
         rd={} # Return this to upper level
         if level < len(sweeps_ran_dict)-1:
             for v in np.arange(len(sweeps_ran_dict[level]['values'])):
@@ -661,13 +664,58 @@ class spectre(spice_common):
                                         param = parts[1]
                                     val = float(parts[2])
                                     if dev not in self.extracts.Members['oppts']: # Found new device
-                                        self.extracts.Members['oppts'].update({dev : {}}) 
+                                        self.extracts.Members['oppts'].update({dev : {}})
                                     if param not in self.extracts.Members['oppts'][dev]: # Found new parameter for device
                                         self.extracts.Members['oppts'][dev].update({param : [val]})
                                     else: # Parameter already existed, just append value. This can occur in e.g. sweeps
                                         self.extracts.Members['oppts'][dev][param].append(val)
                             elif line == eof:
                                 parsevals = False
+
+            elif 'pz' in self.parent.simcmd_bundle.Members.keys():
+                self.extracts.Members.update({'pz' : {}})
+                # Get pz simulation file name
+                for name, val in self.parent.simcmd_bundle.Members.items():
+                    if name == 'pz':
+                        fname = 'PZ_analysis.pz'
+                # For distributed runs
+                if self.parent.distributed_run:
+                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, '[0-9]*',
+                            fname)
+                else:
+                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, fname)
+                valbegin = 'VALUE\n'
+                eof = 'END\n'
+                parsevals = False
+                valueline_grep = subprocess.check_output('grep -n \"VALUE\" %s' %path, shell=True)
+                valueline = int(valueline_grep.decode('utf-8').split(':')[0])+1
+                eofline_grep = subprocess.check_output('grep -n \"END\" %s' %path, shell=True)
+                eofline = int(eofline_grep.decode('utf-8').split(':')[0])-1
+
+                values_sed = subprocess.check_output('sed -n \'%s,%s p\' %s' %(valueline, eofline, path), shell=True)
+                values_listed = values_sed.decode('utf-8').split('\n"')
+                results = []
+                for v in values_listed:
+                    line = v.replace('"','')
+                    line = line.replace('\n',' ')
+                    line = line.replace('(','')
+                    line = line.replace(')','')
+                    parts = line.split()
+                    results.append(parts)
+
+                for result in results:
+                    if len(result) < 4:
+                        dev = result[0]
+                        val = float(result[2])
+                        self.extracts.Members['pz'].update({dev: val})
+                    elif len(result) >= 4:
+                        pz = result[0]
+                        real = float(result[2])
+                        imag = float(result[3])
+                        q = float(result[4])
+                        val = [real+1j*imag, q]
+                        self.extracts.Members['pz'].update({pz : val})
+
         except:
             self.print_log(type='W', msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting DC operating points.')
