@@ -89,6 +89,23 @@ class ngspice_testbench(testbench_common):
     def libcmd(self,value):
         self._libcmd=None
 
+
+    @property
+    def portsrcstr(self):
+        """
+        Port source defintions parsed from from self.parent.spice_ports
+        """
+        if not hasattr(self, '_portsrcstr'):
+            self.portsrcstr=''
+            self.print_log(type='E', msg='Port support not yet implemented for ngspice!')
+        return self._portsrcstr
+    @portsrcstr.setter
+    def portsrcstr(self, val):
+        self._portsrcstr=val
+    @portsrcstr.deleter
+    def portsrcstr(self, val):
+        self._portsrcstr=None
+
     @property
     def dcsourcestr(self):
         """str : DC source definitions parsed from spice_dcsource objects instantiated

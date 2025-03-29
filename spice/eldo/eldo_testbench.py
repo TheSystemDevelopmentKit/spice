@@ -3,7 +3,7 @@
 Eldo Testbench
 ==============
 
-Simulators sepecific testbench generation class for Ngspice.
+Simulators specific testbench generation class for Eldo.
 
 """
 import os
@@ -11,6 +11,8 @@ import sys
 import subprocess
 import shlex
 import fileinput
+import re
+
 from thesdk import *
 from spice.testbench_common import testbench_common
 import pdb
@@ -49,13 +51,11 @@ class eldo_testbench(testbench_common):
                     self._options += self.parent.spice_simulator.option + ' ' + optname + "=" + optval + "\n"
                 else:
                     self._options += ".option " + optname + "\n"
+
         return self._options
     @options.setter
     def options(self,value):
         self._options=value
-    @options.deleter
-    def options(self,value):
-        self._options=None
 
     @property
     def libcmd(self):
@@ -93,6 +93,22 @@ class eldo_testbench(testbench_common):
         self._libcmd=None
 
     @property
+    def portsrcstr(self):
+        """
+        Port source defintions parsed from from self.parent.spice_ports
+        """
+        if not hasattr(self, '_portsrcstr'):
+            self.portsrcstr=''
+            self.print_log(type='E', msg='Port support not yet implemented for Eldo!')
+        return self._portsrcstr
+    @portsrcstr.setter
+    def portsrcstr(self, val):
+        self._portsrcstr=val
+    @portsrcstr.deleter
+    def portsrcstr(self, val):
+        self._portsrcstr=None
+
+    @property
     def dcsourcestr(self):
         """String
         
@@ -114,13 +130,6 @@ class eldo_testbench(testbench_common):
                             'pulse(0 %g 0 %g)' % (value,abs(val.ramp)), \
                             'NONOISE' if not val.noise else '')
         return self._dcsourcestr
-
-    @dcsourcestr.setter
-    def dcsourcestr(self,value):
-        self._dcsourcestr=value
-    @dcsourcestr.deleter
-    def dcsourcestr(self,value):
-        self._dcsourcestr=None
 
     @property
     def inputsignals(self):
