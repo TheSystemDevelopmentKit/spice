@@ -546,6 +546,51 @@ class spectre(spice_common):
                                         self.extracts.Members['oppts'][dev][param].append(val)
                             elif line == eof:
                                 parsevals = False
+
+            elif 'pz' in self.parent.simcmd_bundle.Members.keys():
+                self.extracts.Members.update({'pz' : {}})
+                # Get pz simulation file name
+                for name, val in self.parent.simcmd_bundle.Members.items():
+                    if name == 'pz':
+                        fname = 'PZ_analysis.pz'
+                # For distributed runs
+                if self.parent.distributed_run:
+                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, '[0-9]*',
+                            fname)
+                else:
+                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, fname)
+                valbegin = 'VALUE\n'
+                eof = 'END\n'
+                parsevals = False
+                valueline_grep = subprocess.check_output('grep -n \"VALUE\" %s' %path, shell=True)
+                valueline = int(valueline_grep.decode('utf-8').split(':')[0])+1
+                eofline_grep = subprocess.check_output('grep -n \"END\" %s' %path, shell=True)
+                eofline = int(eofline_grep.decode('utf-8').split(':')[0])-1
+
+                values_sed = subprocess.check_output('sed -n \'%s,%s p\' %s' %(valueline, eofline, path), shell=True)
+                values_listed = values_sed.decode('utf-8').split('\n"')
+                results = []
+                for v in values_listed:
+                    line = v.replace('"','')
+                    line = line.replace('\n',' ')
+                    line = line.replace('(','')
+                    line = line.replace(')','')
+                    parts = line.split()
+                    results.append(parts)
+
+                for result in results:
+                    if len(result) < 4:
+                        dev = result[0]
+                        val = float(result[2])
+                        self.extracts.Members['pz'].update({dev: val})
+                    elif len(result) >= 4:
+                        pz = result[0]
+                        real = float(result[2])
+                        imag = float(result[3])
+                        q = float(result[4])
+                        val = [real+1j*imag, q]
+                        self.extracts.Members['pz'].update({pz : val})
+
         except:
             self.print_log(type='W', msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting DC operating points.')
