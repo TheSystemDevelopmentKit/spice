@@ -30,6 +30,7 @@ There are now two ways to provide simulator dependent structures that are
     related methods should be provided in *spice_methods* module.
 
 """
+
 import os
 import sys
 import subprocess
@@ -42,11 +43,14 @@ import threading
 import timeit
 from datetime import datetime
 from abc import * 
-from thesdk import *
 import numpy as np
 from numpy import genfromtxt
 import pandas as pd
 from functools import reduce
+#TheSyDeKick modules
+if not (os.path.abspath('../../thesdk') in sys.path):
+    sys.path.append(os.path.abspath('../../thesdk'))
+from thesdk import *
 from spice.spice_common import *
 from spice.testbench import testbench as stb
 from spice.spice_simcmd import spice_simcmd as spice_simcmd
