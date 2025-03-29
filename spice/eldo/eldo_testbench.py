@@ -99,7 +99,7 @@ class eldo_testbench(testbench_common):
         """
         if not hasattr(self, '_portsrcstr'):
             self.portsrcstr=''
-            self.print_log(type='E', msg='Port support not yet implemented for Eldo!')
+            self.print_log(type='W', msg='Port support not yet implemented for Eldo!')
         return self._portsrcstr
     @portsrcstr.setter
     def portsrcstr(self, val):
