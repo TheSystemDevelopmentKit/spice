@@ -302,6 +302,8 @@ class spice_iofile(iofile):
         """ Parse specific lines from a spectre print file.
 
         This is wrapped to a function to allow parallelism.
+        
+        [TODO] Convert to use kwargs
         """
         stack = [(label, None) for label in labels]
         try:
