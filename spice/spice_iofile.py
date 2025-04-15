@@ -597,7 +597,7 @@ class spice_iofile(iofile):
                             if self.ioformat == 'dec':
                                 b2i = np.vectorize(self._bin2int)
                                 # For now only little-endian unsigned
-                                nparr = b2i(nparr)
+                                nparr = b2i(nparr,big_endian=self.big_endian)
                         # Adding nparr to self.Data
                         self.append_to_data(arr=nparr,bits=True,buswidth=buswidth)
                     else:
@@ -698,6 +698,8 @@ class spice_iofile(iofile):
 
     def _bin2int(self,binary,big_endian=False,signed=False):
         ''' Helper method to convert binary string to integer.
+        [TODO] use kwargs
+
         '''
         if not big_endian:
             if signed:
