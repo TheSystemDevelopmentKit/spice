@@ -556,6 +556,7 @@ class spice_iofile(iofile):
                         self.print_log(type='D',msg='Sampling %s with %s (%s).'%(self.ionames[i],trig,self.edgetype))
                         failed = False
                         bitmat = None
+                        # For little endian this busrange MSB->0
                         for j in busrange:
                             # Get event data for the bit voltage
                             if buswidth == 1 and '<' not in self.ionames[i]:
@@ -685,6 +686,7 @@ class spice_iofile(iofile):
         ndarray
             1D-vector with time-stamps of interpolated threshold crossings.
 
+        [TODO] Use kwargs and update outdated docstrings
         """
         sampled = np.ones((len(trigger),2))*np.nan
         for i in range(len(trigger)):
@@ -697,7 +699,7 @@ class spice_iofile(iofile):
     def _bin2int(self,binary,big_endian=False,signed=False):
         ''' Helper method to convert binary string to integer.
         '''
-        if big_endian:
+        if not big_endian:
             if signed:
                 return BitArray(bin=binary).int
             else:
