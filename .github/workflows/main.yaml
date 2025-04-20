@@ -1,0 +1,83 @@
+on: 
+  push:
+    branches:
+      - master
+      - v1.14_RC
+
+jobs:
+  notify_update:
+    runs-on: ubuntu-latest
+    # This project MUST be given permission to use the image blow. at
+    # Package settings-> Manage action access of the project hosting the
+    # package
+    container: 'ghcr.io/thesystemdevelopmentkit/thesdktestimage:latest'
+    name: Notify Update
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        #from https://medium.com/@ibraheemabukaff/github-actions-exporting-multi-line-one-line-value-environment-variable-5bb86d01e866
+      - name: Variable definition
+        run: |
+          MESSAGE_TEXT="Update on $GITHUB_REPOSITORY \n
+          Branch: ${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}} \n
+          Commit message: \n
+          ${{ github.event.head_commit.message }} "
+          echo "MESSAGE<<EOF" >> $GITHUB_ENV
+          # here we can place the command that will generate multi-line text
+          echo $MESSAGE_TEXT >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+      - name: Notification
+        run: >
+          curl -X POST --data-urlencode type=stream
+          --data-urlencode "content=${{ env.MESSAGE }}"
+          --data-urlencode 'to="Update notifications"'
+          --data-urlencode "topic=${{ github.event.repository.name }}"
+          ${{ secrets.ZULIPWEBHOOK }} || exit 1
+
+  #doc_build_job:
+  #  runs-on: ubuntu-latest
+  #  # This project MUST be given permission to use the image blow. at
+  #  # Package settings-> Manage action access of the project hosting the
+  #  # package
+  #  container: 'ghcr.io/thesystemdevelopmentkit/thesdktestimage:latest'
+  #  name: Build documentation
+  #  steps:
+  #    - name: Checkout
+  #      uses: actions/checkout@v3
+  #    - name: Documentation builder action
+  #      run: ./CI-helpers/build_docs.sh -c -t ${{ secrets.THESYDEKICK_TOKEN }}
+
+  #submodule_update_job:
+  #  runs-on: ubuntu-latest
+  #  # This project MUST be given permission to use the image blow. at
+  #  # Package settings-> Manage action access of the project hosting the
+  #  # package
+  #  container: 'ghcr.io/thesystemdevelopmentkit/thesdktestimage:latest'
+  #  name: Update and test submodules
+  #  steps:
+  #    - name: Checkout
+  #      uses: actions/checkout@v3
+  #    - name: Test and release action
+  #      run: ./CI-helpers/test_and_release.sh -c -b ${GITHUB_REF##*/} -t ${{ secrets.THESYDEKICK_TOKEN }}
+
+## This is an example how to run a image pull if needed.
+#  image_pull:
+#    runs-on: ubuntu-latest
+#    name: Pull docker image
+#    steps:
+#      - name: Login to Github Packages
+#        uses: docker/login-action@v1
+#        with:
+#          registry: ghcr.io
+#          username: ${{ github.actor }}
+#          password: ${{ secrets.GITHUB_TOKEN}}
+#
+#      - name: Pull image
+#        uses: docker/login-action@v1
+#        with:
+#          registry: ghcr.io
+#          username: ${{ github.actor }}
+#          password: ${{ secrets.GITHUB_TOKEN}}
+#      - name: Pull Docker image
+#        run: docker pull 'ghcr.io/thesystemdevelopmentkit/thesdktestimage:latest'
+
