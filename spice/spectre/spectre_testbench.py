@@ -257,7 +257,7 @@ class spectre_testbench(testbench_common):
                                 # Link sweep indexes to parameters to help output reading
                                 self.parent.extracts.Members['sweeps_ran'].update({i : {'param': val.sweep[i], 'values':val.swpvalues[i]}})
                             else:
-                                sweepstr_above='Sweep%d sweep param=%s start=%s stop=%s step=%s %s { \n' \
+                                sweepstr_above+='Sweep%d sweep param=%s start=%s stop=%s step=%s %s { \n' \
                                         % (i, val.sweep[i], val.swpstart[i], val.swpstop[i], val.swpstep[i], distributestr)
                     # Closing brackets
                     for j in range(i, -1,-1):
@@ -374,8 +374,8 @@ class spectre_testbench(testbench_common):
                     self._simcmdstr += f'Initial_analysis pss fund={val.fc} outputtype=freq maxacfreq={val.fmax} harms={val.harmonics}\n'
                     self._simcmdstr += f'PAC_analysis pac values=[{val.fsig}] maxsideband={val.harmonics}'
                 elif str(sim).lower() == 'pss':
-                    if val.fc==None:
-                        self.print_log(type='F', msg='fc must be given for PSS simulation')
+                    # if val.fc==None:
+                    #     self.print_log(type='F', msg='fc must be given for PSS simulation')
                     if val.fsig==None:
                         self.print_log(type='F', msg='fsig must be given for PSS simulation')
                     if val.fmax==None:
@@ -393,13 +393,12 @@ class spectre_testbench(testbench_common):
                         self.print_log(type='F', msg='probe must be given for stb simulation')
                     if val.fstepsize==None:
                         self.print_log(type='F', msg='fstepsize must be given for stb simulation')
-                    self.simcmdstr += f'STB_analysis stb start={val.fmin} stop={val.fmax} dec={val.fstepsize} probe={val.probe}'
+                    self.simcmdstr += f'STB_analysis stb start={val.fmin} stop={val.fmax} dec={val.fstepsize} probe={val.probe} mode=CM'
                 
                 else:
                     self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
                 if val.mc:
                     self._simcmdstr += '}\n\n'
-                
             if val.model_info:
                 self._simcmdstr += 'element info what=inst where=rawfile \nmodelParameter info what=models where=rawfile\n\n'
         return self._simcmdstr
