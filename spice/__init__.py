@@ -824,14 +824,32 @@ class spice(spice_common):
         iofile with direction 'output'.
 
         """
-        first=True
+        output_iotypes = np.array([val.iotype.lower() for val in self.iofile_bundle.Members.values() \
+                if val.dir.lower() in ['out', 'output']])
+        output_dtypes = np.array([val.datatype.lower() for val in self.iofile_bundle.Members.values() \
+                if val.dir.lower() in ['out', 'output']])
+        # If there is atleast one complex type output, we need to spesify datatype as 'complex' for read_output_file
+        # currently, read_output_file assumes that if one is complex, all of the outputs should be complex.
+        has_complex_types = np.any(output_dtypes == 'complex') 
+        # Determine if output file has to be read
+        has_event_output = np.any(output_iotypes == 'event')
+        has_sample_output = np.any(output_iotypes == 'sample')
+        has_time_output = np.any(output_iotypes == 'time')
+        read_output_file = has_event_output | has_sample_output | has_time_output
+
+        if read_output_file: # First things first, read in the results from the simulation, regardless of iotype
+            dtype = 'complex' if has_complex_types else 'float'
+            files = [val.file[0] for val in self.iofile_bundle.Members.values() \
+                if val.dir.lower() in ['out', 'output']]
+            if len(set(files)) > 1:
+                self.print_log(type='F', msg='not all outputs have the same file!')
+            self.read_output_file(files[0], dtype=dtype)
+            self.check_output_accuracy() # Time stamps are common to all, need to do only once
+
+        first = True
         for name, val in self.iofile_bundle.Members.items():
             if val.dir.lower()=='out' or val.dir.lower()=='output':
-                if val.iotype=='event': # Event type outs are in same file, read only once to speed up things
-                    if first:
-                        self.iofile_bundle.Members[name].read()
-                        first=False
-                        self.check_output_accuracy(val.ionames[0]) # Time stamps are common to all, need to do only once
+                if val.iotype=='event':
                     if len(val.ionames) == 1:
                         try:
                             if self.model == 'spectre':
@@ -1039,6 +1057,7 @@ class spice(spice_common):
         if self.load_state != '': 
             # Loading a previously stored state
             if self.load_output_file:
+                self.runname = self.load_state
                 self.read_spice_outputs()
                 self.connect_spice_outputs()
                 # Are these really something to be part of
