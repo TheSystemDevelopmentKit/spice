@@ -1,59 +1,6 @@
-Spice simulator interface classess
-==================================
-.. automodule:: spice
-   :members:
-   :undoc-members:
 
-.. automodule:: spice.spice_common
-   :members:
-   :undoc-members:
+.. toctree::
+   :maxdepth: 3
 
-
-.. automodule:: spice.testbench
-   :members:
-   :undoc-members:
-
-.. automodule:: spice.testbench_common
-   :members:
-   :undoc-members:
-
-.. automodule:: spice.spice_iofile
-   :members:
-   :undoc-members:
-
-.. automodule:: spice.spice_simcmd
-   :members:
-   :undoc-members:
-
-.. automodule:: spice.spice_module
-   :members:
-   :undoc-members:
-
-.. automodule:: spice.ngspice.ngspice
-   :members:
-   :undoc-members:
-
-.. automodule:: spice.eldo.eldo
-   :members:
-   :undoc-members:
-
-.. automodule:: spice.spectre.spectre
-   :members:
-   :undoc-members:
-
-.. automodule:: spice.ngspice.ngspice_testbench
-   :members:
-   :undoc-members:
-
-.. automodule:: spice.eldo.eldo_testbench
-   :members:
-   :undoc-members:
-
-.. automodule:: spice.spectre.spectre_testbench
-   :members:
-   :undoc-members:
-
-.. automodule:: spice.spice_dcsource
-   :members:
-   :undoc-members:
-
+   interface_classes
+   examples

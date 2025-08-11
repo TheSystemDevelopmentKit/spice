@@ -30,6 +30,7 @@ There are now two ways to provide simulator dependent structures that are
     related methods should be provided in *spice_methods* module.
 
 """
+
 import os
 import sys
 import subprocess
@@ -42,17 +43,21 @@ import threading
 import timeit
 from datetime import datetime
 from abc import * 
-from thesdk import *
 import numpy as np
 from numpy import genfromtxt
 import pandas as pd
 from functools import reduce
+#TheSyDeKick modules
+if not (os.path.abspath('../../thesdk') in sys.path):
+    sys.path.append(os.path.abspath('../../thesdk'))
+from thesdk import *
 from spice.spice_common import *
 from spice.testbench import testbench as stb
 from spice.spice_simcmd import spice_simcmd as spice_simcmd
 from spice.spice_iofile import spice_iofile as spice_iofile
 from spice.spice_dcsource import spice_dcsource as spice_dcsource
 from spice.spice_module import spice_module as spice_module
+from spice.spice_port import spice_port
 # Simulator modules
 from spice.ngspice.ngspice import ngspice
 from spice.eldo.eldo import eldo
@@ -96,10 +101,12 @@ class spice(spice_common):
         if not hasattr(self,'_spice_simulator'):
             if self.model == 'ngspice':
                 self._spice_simulator=ngspice(parent=self)
-            if self.model == 'eldo':
+            elif self.model == 'eldo':
                 self._spice_simulator=eldo(parent=self)
-            if self.model == 'spectre':
+            elif self.model == 'spectre':
                 self._spice_simulator=spectre(parent=self)
+            else:
+                self.print_log(type='F', msg=f'Unsupported simulator: {self.model}')
         return self._spice_simulator
    
 
@@ -450,8 +457,6 @@ class spice(spice_common):
                 self.print_log(type='I', msg = 'Setting postlayout to True due to given dspf-files')
                 self._postlayout = True
             else:
-                self.print_log(type='O', 
-                               msg='In release v1.9, automatic postlayout simulation detection from netlist has been removed. This warning will be removed in coming releases.')
                 self.print_log(type='W', 
                                msg='Postlayout attribute accessed before defined. Defaulting to False.')
                 self._postlayout=False
@@ -539,12 +544,14 @@ class spice(spice_common):
                 else:
                     if self.interactive_spice:
                         if not self.distributed_run:
-                            self._spice_submission = thesdk.GLOBALS['LSFINTERACTIVE'] + ' '
+                            self._spice_submission = thesdk.GLOBALS['LSFINTERACTIVE']
                         else: # Spectre LSF doesn't support interactive queues
                             self.print_log(type='W', msg='Cannot run in interactive mode if distributed mode is on!')
                             self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
                     else:
                         self._spice_submission = thesdk.GLOBALS['LSFSUBMISSION'] + ' -o %s/bsublog.txt ' % (self.spicesimpath)
+                    if self.nproc:
+                        self._spice_submission+=' -n %s ' % self.nproc
 
             except:
                 self.print_log(type='W',msg='Error while defining spice submission command. Running locally.')
@@ -862,6 +869,14 @@ class spice(spice_common):
                             except KeyError:
                                 self.print_log(type='E', msg='Invalid ioname %s for iofile %s' % (key, name))
                         self.iofile_bundle.Members[name].Data=data
+                elif val.iotype=='psfascii_pss' or val.iotype=='psfascii_pac':
+                    if first:
+                        self.iofile_bundle.Members[name].read() #read() should use psf_utils
+                        first=False
+                    try:
+                        self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()]
+                    except KeyError:
+                        self.print_log(type='E',msg='Invalid ioname %s for iofile %s' % (val.ionames[0], name))
                 else:
                     self.iofile_bundle.Members[name].read()
             elif val.dir.lower()=='output':
@@ -876,6 +891,9 @@ class spice(spice_common):
         self.print_log(type='I', msg="Running external command %s" %(self.spicecmd) )
         if os.system(self.spicecmd) > 0:
             self.print_log(type='E', msg="Simulator (%s) returned non-zero exit code." % (self.model))
+            # Check if the simulation has failed (if the variable does not exist,
+            # everything is OK.
+            self.spice_error=True 
 
     def run_plotprogram(self):
         ''' Starting a parallel process for waveform viewer program.
@@ -947,14 +965,33 @@ class spice(spice_common):
             self.print_log(type='W',msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting power consumptions.')
 
+    def read_stb_result(self):
+        ''' Internally called function to read the PSF output files
+        '''
+        self.spice_simulator.read_stb_result()
+
+    def read_noise_result(self):
+        """ Internally called function to read the PSF output files
+            TODO: Implement for Eldo as well.
+
+        """
+        self.spice_simulator.read_noise_result()
+
+
     def read_oppts(self):
         """ Internally called function to read the DC operating points of the circuit
             TODO: Implement for Eldo as well.
 
         """
-
         self.spice_simulator.read_oppts()
 
+    def read_sparams(self):
+        ''' Internally called function to read S-parameter simulation results.
+        
+        Currently supported only for Spectre.
+        '''
+        self.spice_simulator.read_sp_result(read_type='sparams')
+        self.spice_simulator.read_sp_result(read_type='sprobes')
 
     @property
     def spice_tb(self):
@@ -981,6 +1018,20 @@ class spice(spice_common):
     def spice_tb(self, value):
             self._spice_tb = value
 
+    @property
+    def spice_ports(self):
+        """
+        Dictionary mapping port names to corresponding port objects.
+        """
+        if not hasattr(self, '_spice_ports'):
+            self._spice_ports={}
+        return self._spice_ports
+
+    @spice_ports.setter
+    def spice_ports(self, val):
+        self._spice_ports=val
+
+
     def run_spice(self):
         """Externally called function to execute spice simulation.
 
@@ -994,6 +1045,8 @@ class spice(spice_common):
                 # default execution
                 self.extract_powers()
                 self.read_oppts()
+                self.read_sparams()
+                self.read_noise_result()
                 ###
                 self._write_state()
             else:
@@ -1014,6 +1067,9 @@ class spice(spice_common):
             # default execution
             self.extract_powers()
             self.read_oppts()
+            self.read_sparams()
+            self.read_noise_result()
+            self.read_stb_result()
             ###
             # Save entity state
             if self.save_state:

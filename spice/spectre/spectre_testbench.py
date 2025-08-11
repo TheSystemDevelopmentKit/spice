@@ -3,7 +3,7 @@
 Spectre Testbench
 =================
 
-Simulators sepecific testbench generation class for Spectre.
+Simulators specific testbench generation class for Spectre.
 
 """
 import os
@@ -99,7 +99,7 @@ class spectre_testbench(testbench_common):
                     else:
                         self._libcmd += 'include "%s" section=%s\n' % (files[0], corner)
             except:
-                self.print_log(type='W',msg='Global TheSDK variable SPECTRELIBPATH not set.')
+                self.print_log(type='W',msg='Global TheSDK variable SPECTRELIBFILE not set.')
                 self._libcmd = "// Spectre device models (undefined)\n"
                 self._libcmd += "//include " + libfile + " " + corner + "\n"
             self._libcmd += 'tempOption options temp=%s\n' % str(temp)
@@ -110,6 +110,25 @@ class spectre_testbench(testbench_common):
     @libcmd.deleter
     def libcmd(self,value):
         self._libcmd=None
+
+    
+    @property
+    def portsrcstr(self):
+        """
+        Port source defintions parsed from from self.parent.spice_ports
+        """
+        if not hasattr(self, '_portsrcstr'):
+            self._portsrcstr = f"{self.parent.spice_simulator.commentchar} Port sources \n"
+            for name,port in self.parent.spice_ports.items():
+                self.portsrcstr += f"{name} ({port.pos} {port.neg}) port num={port.num} r={port.res} x={port.reactance} type={port.type} freq={port.freq} mag={port.mag} pacmag={port.mag} dc={port.dc}\n"
+        return self._portsrcstr
+    @portsrcstr.setter
+    def portsrcstr(self, val):
+        self._portsrcstr=val
+    @portsrcstr.deleter
+    def portsrcstr(self, val):
+        self._portsrcstr=None
+
 
     @property
     def dcsourcestr(self):
@@ -198,6 +217,51 @@ class spectre_testbench(testbench_common):
                 if val.mc:
                     self._simcmdstr += 'mc montecarlo donominal=no variations=all %snumruns=1 {\n' \
                             % ('' if val.mc_seed is None else 'seed=%d '%val.mc_seed)
+                sweepstr_above='' # Commands above and below actual simulation command
+                sweepstr_below=''
+                if not len(val.sweep)==0: # This is a sweep analysis
+                    self.parent.extracts.Members.update({'sweeps_ran' : {}})
+                    if self.parent.distributed_run:
+                        distributestr = 'distribute=lsf numprocesses=%d' % self.parent.num_processes
+                    else:
+                        distributestr = ''
+                    if len(val.subcktname)!=0: # Sweep subckt parameter
+                        length=len(val.subcktname)
+                        if any(len(lst)!=length for lst in [val.sweep,val.swpstart,val.swpstop,val.swpstep]):
+                            self.print_log(type='F',
+                                    msg="Mismatch in length of simulation parameters. \n \
+                                            Ensure that sweep points and subcircuit names have the same number of elements")
+                            for i in range(len(val.subcktname)):
+                                sweepstr_above+='Sweep%d sweep param=%s sub=%s start=%s stop=%s step=%s %s { \n' \
+                                        % (i, val.sweep[i], val.subcktname[i], val.swpstart[i], val.swpstop[i], val.swpstep[i], distributestr)
+                    elif len(val.devname) != 0: # Sweep device parameter
+                        length=len(val.devname)
+                        if any(len(lst) != length for lst in [val.sweep, val.swpstart, val.swpstop, val.swpstep]):
+                            self.print_log(type='F',
+                                    msg="Mismatch in length of simulation parameters.\n \
+                                            Ensure that sweep points and device names have the same number of elements!")
+                        for i in range(len(val.devname)):
+                            sweepstr_above+='Sweep%d sweep param=%s dev=%s start=%s stop=%s step=%s %s { \n' \
+                                    % (i, val.sweep[i], val.devname[i], val.swpstart[i], val.swpstop[i], val.swpstep[i], distributestr)
+                    else: # Sweep top-level netlist parameter
+                        length=len(val.sweep)
+                        if any(len(lst) != length for lst in [val.swpstart, val.swpstop, val.swpstep]):
+                            if len(val.swpvalues) != length:
+                                self.print_log(type='F',
+                                        msg="Mismatch in length of simulation parametrs.\n \
+                                                Ensure that sweep points and parameter names have the same number of elements!")
+                        for i in range(len(val.sweep)):
+                            if len(val.swpvalues)!=0:
+                                sweepstr_above+='Sweep%d sweep param=%s values=%s %s { \n' \
+                                        % (i, val.sweep[i], np.array2string(val.swepvalues[i]).replace('\n',''), distributestr)
+                                # Link sweep indexes to parameters to help output reading
+                                self.parent.extracts.Members['sweeps_ran'].update({i : {'param': val.sweep[i], 'values':val.swpvalues[i]}})
+                            else:
+                                sweepstr_above='Sweep%d sweep param=%s start=%s stop=%s step=%s %s { \n' \
+                                        % (i, val.sweep[i], val.swpstart[i], val.swpstop[i], val.swpstep[i], distributestr)
+                    # Closing brackets
+                    for j in range(i, -1,-1):
+                        sweepstr_below+='}\n'
                 if str(sim).lower() == 'tran':
                     simtime = val.tstop if val.tstop is not None else self._trantime
                     if val.tstop is None:
@@ -227,39 +291,10 @@ class spectre_testbench(testbench_common):
                     self._simcmdstr += '\n\n' 
 
                 elif str(sim).lower() == 'dc':
-                    if len(val.sweep) == 0: # This is not a sweep analysis
-                        self._simcmdstr+='oppoint dc\n\n'
-                    else:
-                        if self.parent.distributed_run:
-                            distributestr = 'distribute=lsf numprocesses=%d' % self.parent.num_processes 
-                        else:
-                            distributestr = ''
-                        if len(val.subcktname) != 0: # Sweep subckt parameter
-                            length=len(val.subcktname)
-                            if any(len(lst) != length for lst in [val.sweep, val.swpstart, val.swpstop, val.swpstep]):
-                                self.print_log(type='F', msg='Mismatch in length of simulation parameters.\nEnsure that sweep points and subcircuit names have the same number of elements!')
-                            for i in range(len(val.subcktname)):
-                                self._simcmdstr+='Sweep%d sweep param=%s sub=%s start=%s stop=%s step=%s %s { \n' \
-                                    % (i, val.sweep[i], val.subcktname[i], val.swpstart[i], val.swpstop[i], val.swpstep[i], distributestr)
-                        elif len(val.devname) != 0: # Sweep device parameter
-                            length=len(val.devname)
-                            if any(len(lst) != length for lst in [val.sweep, val.swpstart, val.swpstop, val.swpstep]):
-                                self.print_log(type='F', msg='Mismatch in length of simulation parameters.\nEnsure that sweep points and device names have the same number of elements!')
-                            for i in range(len(val.devname)):
-                                self._simcmdstr+='Sweep%d sweep param=%s dev=%s start=%s stop=%s step=%s %s { \n' \
-                                    % (i, val.sweep[i], val.devname[i], val.swpstart[i], val.swpstop[i], val.swpstep[i], distributestr)
-                        else: # Sweep top-level netlist parameter
-                            length=len(val.sweep)
-                            if any(len(lst) != length for lst in [val.swpstart, val.swpstop, val.swpstep]):
-                                self.print_log(type='F', msg='Mismatch in length of simulation parameters.\nEnsure that sweep points and parameter names have the same number of elements!')
-                            for i in range(len(val.sweep)):
-                                self._simcmdstr+='Sweep%d sweep param=%s start=%s stop=%s step=%s %s { \n' \
-                                    % (i, val.sweep[i], val.swpstart[i], val.swpstop[i], val.swpstep[i], distributestr)
-                        self._simcmdstr+='oppoint dc\n'
-                        # Closing brackets
-                        for j in range(i, -1, -1):
-                            self._simcmdstr+='}\n'
-                        self._simcmdstr+='\n'
+                    self._simcmdstr+=sweepstr_above
+                    self._simcmdstr+='oppoint dc\n'
+                    self._simcmdstr+=sweepstr_below
+                    self._simcmdstr+='\n'
                 elif str(sim).lower() == 'ac':
                     if val.fscale.lower()=='log':
                         if val.fpoints != 0:
@@ -281,10 +316,90 @@ class spectre_testbench(testbench_common):
                             (sim,str(val.fmin),str(val.fmax),pts_str)
                     self._simcmdstr += '\n\n'
 
+                elif str(sim).lower() == 'pz':
+                    pnode = val.pnode
+                    nnode = val.nnode
+                    iprobe = val.iprobe
+                    freq = val.freq
+                    self._simcmdstr += 'PZ_analysis (%s %s) %s iprobe=%s' % \
+                            (pnode,nnode,sim,iprobe)
+                    if not freq==None:
+                        self._simcmdstr += ' freq=%s' %(freq)
+                    self._simcmdstr += '\n\n'
+                elif str(sim).lower() == 'sp':
+                    if val.fscale.lower()=='log':
+                        if val.fpoints != 0:
+                            pts_str='log=%d' % val.fpoints
+                        elif val.fstepsize != 0:
+                            pts_str='dec=%d' % val.fstepsize
+                        else:
+                            self.print_log(type='F', msg='Set either fpoints or fstepsize for SP simulation!')
+                    elif val.fscale.lower()=='lin':
+                        if val.fpoints != 0:
+                            pts_str='lin=%d' % val.fpoints
+                        elif val.fstepsize != 0:
+                            pts_str='step=%d' % val.fstepsize
+                        else:
+                            self.print_log(type='F', msg='Set either fpoints or fstepsize for SP simulation!')
+                    self._simcmdstr += sweepstr_above
+                    if val.sprobes in [None, '']:
+                        self._sprobes=''
+                    else:
+                        self._sprobes=f'sprobes=[{val.sprobes}]'
+                    # TODO: Works currently with assumption of 2 ports, implement support
+                    # for higher number of ports.
+                    self._simcmdstr += f'SPanalysis sp ports=[{" ".join(self.parent.spice_ports.keys())}] {self._sprobes} start={val.fmin} stop={val.fmax} {pts_str} file=\"{self.parent.name}.s2p\" datafmt=touchstone datatype=realimag paramtype=s\n'
+                    self._simcmdstr += sweepstr_below
+                    self._simcmdstr += '\n'
+                elif str(sim).lower() == 'noise':
+                    if len(val.nodes)==0:
+                        self.print_log(type='F', msg='Nodes list is empty. Set the nodes for noise simulation!')
+                    if val.fmin==None:
+                        self.print_log(type='F', msg='Fmin must be given for noise simulation')
+                    if val.fmax==None:
+                        self.print_log(type='F', msg='Fmax must be given for noise simulation')
+                    if val.iprobe==None:
+                        self.print_log(type='F', msg='Iprobe must be given for noise simulation')
+                    for node in val.nodes:
+                        self._simcmdstr += f'noise_analysis_{node} {node} 0 noise start={val.fmin} stop={val.fmax} iprobe={val.iprobe} \n'
+                elif str(sim).lower() == 'pac':
+                    if val.fc==None:
+                        self.print_log(type='F', msg='fc must be given for PAC simulation')
+                    if val.fsig==None:
+                        self.print_log(type='F', msg='fsig must be given for PAC simulation')
+                    if val.fmax==None:
+                        self.print_log(type='F', msg='Fmax must be given for PAC simulation')
+                    if val.harmonics==None:
+                        self.print_log(type='F', msg='Harmonics must be defined for PAC simulation')
+                    self._simcmdstr += f'Initial_analysis pss fund={val.fc} outputtype=freq maxacfreq={val.fmax} harms={val.harmonics}\n'
+                    self._simcmdstr += f'PAC_analysis pac values=[{val.fsig}] maxsideband={val.harmonics}'
+                elif str(sim).lower() == 'pss':
+                    if val.fc==None:
+                        self.print_log(type='F', msg='fc must be given for PSS simulation')
+                    if val.fsig==None:
+                        self.print_log(type='F', msg='fsig must be given for PSS simulation')
+                    if val.fmax==None:
+                        self.print_log(type='F', msg='Fmax must be given for PSS simulation')
+                    if val.harmonics==None:
+                        self.print_log(type='F', msg='Harmonics must be defined for PSS simulation')
+                    self._simcmdstr += f'PSS_analysis pss fund={val.fsig} outputtype=freq maxacfreq={val.fmax} harms={val.harmonics}'
+
+                elif str(sim).lower() == 'stb':
+                    if val.fmin==None:
+                        self.print_log(type='F', msg='fmin must be given for stb simulation')
+                    if val.fmax==None:
+                        self.print_log(type='F', msg='fmax must be given for stb simulation')
+                    if val.probe==None:
+                        self.print_log(type='F', msg='probe must be given for stb simulation')
+                    if val.fstepsize==None:
+                        self.print_log(type='F', msg='fstepsize must be given for stb simulation')
+                    self.simcmdstr += f'STB_analysis stb start={val.fmin} stop={val.fmax} dec={val.fstepsize} probe={val.probe}'
+                
                 else:
                     self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
                 if val.mc:
                     self._simcmdstr += '}\n\n'
+                
             if val.model_info:
                 self._simcmdstr += 'element info what=inst where=rawfile \nmodelParameter info what=models where=rawfile\n\n'
         return self._simcmdstr
@@ -333,6 +448,21 @@ class spectre_testbench(testbench_common):
                     savestr=''
                     plotstr=''
                     first=True
+                    # Parse supply current extractions first, because if there are
+                    # manually probed signals, supply extractions will be placed
+                    # after them in the print file and nothing will work correctly
+                    for name, val in self.dcsources.Members.items():
+                        if val.extract:
+                            supply = '%s%s' % (val.sourcetype.upper(),val.name.upper())
+                            if supply not in self.parent.iofile_eventdict:
+                                self.parent.iofile_eventdict[supply] = None
+                            if first:
+                                savestr += 'save %s:pwr %s:p' % (supply,supply)
+                                plotstr += '.print I(%s)' % (supply)
+                                first=False
+                            else:
+                                savestr += ' %s:pwr %s:p' % (supply,supply)
+                                plotstr += ' I(%s)' % (supply)
                     for name, val in self.iofiles.Members.items():
                         # Output iofile becomes a plot/print command
                         if val.dir.lower()=='out' or val.dir.lower()=='output':
@@ -423,20 +553,6 @@ class spectre_testbench(testbench_common):
                             else:
                                 self.print_log(type='W',msg='Output filetype incorrectly defined.')
 
-                    # Parsing supply currents here as well (I think ngspice
-                    # plots need to be grouped like this)
-                    for name, val in self.dcsources.Members.items():
-                        if val.extract:
-                            supply = '%s%s' % (val.sourcetype.upper(),val.name.upper())
-                            if supply not in self.parent.iofile_eventdict:
-                                self.parent.iofile_eventdict[supply] = None
-                            if first:
-                                savestr += 'save %s:pwr %s:p' % (supply,supply)
-                                plotstr += '.print I(%s)' % (supply)
-                                first=False
-                            else:
-                                savestr += ' %s:pwr %s:p' % (supply,supply)
-                                plotstr += ' I(%s)' % (supply)
                     # Output accumulated save and print statement to plotcmd
                     savestr += '\n'
                     plotstr += '\n'
