@@ -94,7 +94,12 @@ class spectre(spice_common):
         """str : Simulator execution command
             (Default: 'ngspice')
         """
-        return 'spectre -64 +lqtimeout=0 ++aps=%s' %(self.errpreset)
+        simcmd='spectre -64 +lqtimeout=0'
+        if self.aps:
+            simcmd+=f' ++aps={self.errpreset}'
+        else:
+            simcmd+=f' +preset={self.errpreset}'
+        return simcmd
     @property
     def dcsource_declaration(self):
         """str : DC source declaration
@@ -144,39 +149,73 @@ class spectre(spice_common):
     @property
     def plflag_simcmd_prefix(self):
         """
+        For APS version of Spectre:
         Simulator specific prefix for enabling postlayout optimization
         Postfix comes from self.plflag (user defined)
+
+        Not used in Spectre X
         """
         if not hasattr(self, '_plflag_simcmd_prefix'):
-            self._plflag_simcmd_prefix="+postlayout"
+            if self.aps:
+                self._plflag_simcmd_prefix="+postlayout"
+            else:
+                self._plflag_simcmd_prefix=""
         return self._plflag_simcmd_prefix
 
     @property
     def plflag(self):
         '''
+        For APS version of Spectre:
         Postlayout simulation accuracy/RC reduction flag.
         See: https://community.cadence.com/cadence_blogs_8/b/cic/posts/spectre-optimizing-spectre-aps-performance
+
+        Not used in Spectre X
         '''
         if not hasattr(self, '_plflag'):
-            self._plflag=f"=upa"
+            if self.aps:
+                self._plflag=f"=upa"
+            else:
+                self._plflag=f""
         return self._plflag
 
     @plflag.setter
     def plflag(self, val):
-        if val in ["upa", "hpa"]:
-            self._plflag=f'={val}'
-        elif val=='':
-            self._plflag=''
-        else:
-            self.print_log(type='W', msg='Unsupported postlayout flag: %s' % val)
+        if aps:
+            if val in ["upa", "hpa"]:
+                self._plflag=f'={val}'
+            elif val=='':
+                self._plflag=''
+            else:
+                self.print_log(type='W', msg='Unsupported postlayout flag: %s' % val)
+
+
+    @property
+    def aps(self):
+        '''
+        Internally controlled variable. The APS / X selection is done based on the
+        used errpreset (see its documentation for further details).
+
+        Use APS version of Spectre? If False, X is used.
+        '''
+        if not hasattr(self, '_aps'):
+            self._aps=True
+        return self._aps
+    @aps.setter
+    def aps(self, val):
+        self._aps=val
 
     @property
     def errpreset(self):
         """ String
-
+        
+        For APS version of Spectre:
         Global accuracy parameter for Spectre simulations. Options include
         'liberal', 'moderate' and 'conservative', in order of rising accuracy.
         You can set this by accesssing spice langmodule
+
+        For Spectre X:
+        Global accuracy parameter for Spectre simulations. Options include
+        'CX', 'AX', 'MX', 'LX', 'VX'
 
         Example
         -------
@@ -184,10 +223,14 @@ class spectre(spice_common):
 
         """
         if not hasattr(self,'_errpreset'):
-            self._errpreset='moderate'
+            self._errpreset = 'moderate'
         return self._errpreset
     @errpreset.setter
     def errpreset(self,value):
+        if value in ['CX', 'AX', 'MX', 'LX', 'VX']:
+            self.aps=False
+        else:
+            self.aps=True
         self._errpreset=value
 
     @property
