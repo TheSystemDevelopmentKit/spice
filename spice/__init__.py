@@ -826,10 +826,13 @@ class spice(spice_common):
         """
         output_iotypes = np.array([val.iotype.lower() for val in self.iofile_bundle.Members.values() \
                 if val.dir.lower() in ['out', 'output']])
-        output_dtypes = np.array([val.datatype.lower() for val in self.iofile_bundle.Members.values() \
-                if val.dir.lower() in ['out', 'output']])
         # If there is atleast one complex type output, we need to spesify datatype as 'complex' for read_output_file
         # currently, read_output_file assumes that if one is complex, all of the outputs should be complex.
+        output_dtypes = np.array([val.datatype.lower() for val in self.iofile_bundle.Members.values() \
+                if val.dir.lower() in ['out', 'output']])
+        # For spectre, we need to check if we are using psf output format
+        psfflag = self.use_psf and self.model == 'spectre' 
+
         has_complex_types = np.any(output_dtypes == 'complex') 
         # Determine if output file has to be read
         has_event_output = np.any(output_iotypes == 'event')
@@ -843,8 +846,11 @@ class spice(spice_common):
                 if val.dir.lower() in ['out', 'output']]
             if len(set(files)) > 1:
                 self.print_log(type='F', msg='not all outputs have the same file!')
-            self.read_output_file(files[0], dtype=dtype)
-            self.check_output_accuracy() # Time stamps are common to all, need to do only once
+            if psfflag: # Spectre specific PSF output file handling
+                self.spice_simulator.read_psf_outputs(files[0], dtype)
+            else:
+                self.read_output_file(files[0], dtype=dtype)
+                self.check_output_accuracy() # Time stamps are common to all, need to do only once
 
         first = True
         for name, val in self.iofile_bundle.Members.items():
@@ -953,6 +959,8 @@ class spice(spice_common):
                 # Read transient power consumption of the extracted source
                 if val.extract and val.sourcetype.lower() == 'v':
                     sourcename = '%s%s' % (val.sourcetype.upper(),val.name.upper())
+                    if self.use_psf:
+                        sourcename += ':p'.upper()
                     if sourcename in self.iofile_eventdict:
                         arr = self.iofile_eventdict[sourcename]
                         if val.ext_start is not None:
@@ -1010,6 +1018,24 @@ class spice(spice_common):
         '''
         self.spice_simulator.read_sp_result(read_type='sparams')
         self.spice_simulator.read_sp_result(read_type='sprobes')
+
+
+    @property
+    def use_psf(self):
+        """
+        Use PSF output file format. For Spectre only.
+        """
+        if not hasattr(self, '_use_psf'):
+            self._use_psf=False
+        return self._use_psf
+
+    @use_psf.setter
+    def use_psf(self, val):
+        if self.model != 'spectre':
+            self.print_log(type='W', msg=f'use_psf flag is unsupported for simulator {self.model}')
+        else:
+            self._use_psf=val
+
 
     @property
     def spice_tb(self):

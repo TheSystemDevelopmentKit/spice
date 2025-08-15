@@ -294,6 +294,99 @@ class spectre(spice_common):
 
         return self._spicecmd
 
+    @property
+    def tran_analysis_name(self):
+        """
+        Name of analysis for transient simulations. Used to identify results if psfascii is enabled.
+        """
+        if not hasattr(self, '_tran_analysis_name'):
+            self._tran_analysis_name="TRAN_analysis"
+        return self._tran_analysis_name
+
+    @tran_analysis_name.setter
+    def tran_analysis_name(self, val):
+        self._tran_analysis_name=val
+
+    @property
+    def ac_analysis_name(self):
+        """
+        Name of analysis for AC simulations. Used to identify results if psfascii is enabled.
+        """
+        if not hasattr(self, '_ac_analysis_name'):
+            self._ac_analysis_name="AC_analysis"
+        return self._ac_analysis_name
+
+    @ac_analysis_name.setter
+    def ac_analysis_name(self, val):
+        self._ac_analysis_name=val
+
+    @property
+    def pz_analysis_name(self):
+        """
+        Name of analysis for pole-zero analysis. Used to identify results if psfascii is enabled.
+        """
+        if not hasattr(self, '_pz_analysis_name'):
+            self._pz_analysis_name="PZ_analysis"
+        return self._pz_analysis_name
+
+    @pz_analysis_name.setter
+    def pz_analysis_name(self, val):
+        self._pz_analysis_name=val
+
+    @property
+    def pac_analysis_name(self):
+        """
+        Name of analysis for PAC analysis. Used to identify results if psfascii is enabled.
+        """
+        if not hasattr(self, '_pac_analysis_name'):
+            self._pac_analysis_name="PAC_analysis"
+        return self._pac_analysis_name
+
+    @pac_analysis_name.setter
+    def pac_analysis_name(self, val):
+        self._pac_analysis_name=val
+
+    @property
+    def sp_analysis_name(self):
+        """
+        Name of analysis for Sparameter analysis. Used to identify results if psfascii is enabled.
+        """
+        if not hasattr(self, '_sp_analysis_name'):
+            self._sp_analysis_name="SP_analysis"
+        return self._sp_analysis_name
+
+    @sp_analysis_name.setter
+    def sp_analysis_name(self, val):
+        self._sp_analysis_name=val
+
+    @property
+    def noise_analysis_name(self):
+        """
+        Name of analysis for noise analysis. Used to identify results if psfascii is enabled.
+        """
+        if not hasattr(self, '_noise_analysis_name'):
+            self._noise_analysis_name="noise_analysis"
+        return self._noise_analysis_name
+
+    @noise_analysis_name.setter
+    def noise_analysis_name(self, val):
+        self._noise_analysis_name=val
+
+    @property
+    def pss_analysis_name(self):
+        """
+        Name of analysis for periodic steady-state (PSS) analysis. Used to identify results if psfascii is enabled.
+        """
+        if not hasattr(self, '_pss_analysis_name'):
+            self._pss_analysis_name="PSS_analysis"
+        return self._pss_analysis_name
+
+    @pss_analysis_name.setter
+    def pss_analysis_name(self, val):
+        self._pss_analysis_name=val
+
+
+
     def run_plotprogram(self):
         ''' Starting a parallel process for waveform viewer program.
 
@@ -642,6 +735,24 @@ class spectre(spice_common):
                         'value':sweeps_ran_dict[level]['values'][v],
                         read_type:result}})
         return rd, fileptr
+
+    def read_psf_outputs(self, file, dtype):
+        '''
+        Function to read outputs from PSF file.
+        Currently assumes that we are reading in transient results.
+        '''
+        if not os.path.isfile(file):
+            self.print_log(type='F', msg=f'Something went wrong with running the simulation! PSF output file at {file} does not exist!')
+        try:
+            psf=psfu.PSF(file)
+        except:
+            self.print_log(type='W', msg=traceback.format_exc())
+            self.print_log(type='F', msg=f'Failed reading PSF file at {file}!')
+        sweep=psf.get_sweep()
+        abscissa = sweep.abscissa
+        for signal in psf.all_signals():
+            tmpdata = np.vstack((sweep.abscissa, psf.get_signal(signal.name).ordinate)).T
+            self.parent.iofile_eventdict[signal.name.upper()]=tmpdata
 
     def read_oppts(self):
         """ Internally called function to read the DC operating points of the circuit

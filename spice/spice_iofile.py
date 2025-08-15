@@ -154,7 +154,6 @@ class spice_iofile(iofile):
             self.pos=kwargs.get('pos', None)
             self.neg=kwargs.get('neg', None)
             self.strobe=kwargs.get('strobe', False)
-            self.psfasciiflag=kwargs.get('psfasciiflag', False)
         except:
             self.print_log(type='F', msg="spice IO file definition failed.")
 
@@ -171,12 +170,14 @@ class spice_iofile(iofile):
         self._file = []
         for ioname in self.ionames:
             if self.dir == 'out':
-                if self.psfasciiflag:
-                    #ANALYSIS NAME HARDCODED
+                if self.parent.use_psf:
                     if self.iotype=='psfascii_pss':
-                        filename = 'tb_%s.raw/*PSS_analysis.fd.pss' % (self.parent.name) #return filename with wildcard for possible sweep (-> several files)
+                        filename = 'tb_%s.raw/*%s.fd.pss' % (self.parent.name, self.parent.spice_simulator.pss_analysis_name) #return filename with wildcard for possible sweep (-> several files)
                     elif self.iotype=='psfascii_pac':
-                        filename = 'tb_%s.raw/PAC_analysis.*.pac' % (self.parent.name) #return filename with wildcard for possible sweep (-> several files)
+                        filename = 'tb_%s.raw/%s.*.pac' % (self.parent.name, self.parent.spice_simulator.pac_analysis_name) #return filename with wildcard for possible sweep (-> several files)
+                    elif self.iotype in ['event', 'time', 'sample']: # Support for other iotypes, typically read in from transient
+                        filename = 'tb_%s.raw/%s.tran.tran' % (self.parent.name, self.parent.spice_simulator.tran_analysis_name) #return filename with wildcard for possible sweep (-> several files)
+
                 else:
                     filename = 'tb_%s.print' % (self.parent.name)
             else:
@@ -304,7 +305,6 @@ class spice_iofile(iofile):
         Function to read files associated with this spice_iofile.
         """
         if self.iotype=='psfascii_pss' or self.iotype=='psfascii_pac':
-            self.psfasciiflag=True
             if not self.parent.model=='spectre':
                 self.print_log(type='F', msg='Only spectre supported for psfascii outputs')
             else:
