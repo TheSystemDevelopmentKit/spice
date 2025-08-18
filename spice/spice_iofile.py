@@ -176,7 +176,13 @@ class spice_iofile(iofile):
                     elif self.iotype=='psfascii_pac':
                         filename = 'tb_%s.raw/%s.*.pac' % (self.parent.name, self.parent.spice_simulator.pac_analysis_name) #return filename with wildcard for possible sweep (-> several files)
                     elif self.iotype in ['event', 'time', 'sample']: # Support for other iotypes, typically read in from transient
-                        filename = 'tb_%s.raw/%s.tran.tran' % (self.parent.name, self.parent.spice_simulator.tran_analysis_name) #return filename with wildcard for possible sweep (-> several files)
+                        if 'ac' in self.parent.spice_tb.simcmds.Members.keys():
+                            analysis_name = self.parent.spice_simulator.ac_analysis_name  
+                            simtype = 'ac' 
+                        else: # Transient
+                            analysis_name = self.parent.spice_simulator.tran_analysis_name
+                            simtype = 'tran.tran' # This has to be twice for some reason
+                        filename = 'tb_%s.raw/%s.%s' % (self.parent.name, analysis_name,simtype) #return filename with wildcard for possible sweep (-> several files)
 
                 else:
                     filename = 'tb_%s.print' % (self.parent.name)
