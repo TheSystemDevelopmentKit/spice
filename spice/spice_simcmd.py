@@ -244,6 +244,9 @@ class spice_simcmd(thesdk):
         if self.sim == 'pz' and self.parent.model=='spectre':
             self.print_log(type='I', msg='Saving results in human-readable format (requirement for PZ simulation)!')
             self.parent.spiceoptions.update({'rawfmt': 'psfascii'})
+        if self.parent.use_psf:
+            self.print_log(type='I', msg='Saving results in human-readable format (requirement when using PSF output file)!')
+            self.parent.spiceoptions.update({'rawfmt': 'psfbin'})
         if len(self.subcktname) != 0 and len(self.devname) != 0:
             self.print_log(type='F', msg='Cannot specify subckt sweep and device sweep in the same simcmd instance!')
         if self.strobeperiod and self.strobedelay:

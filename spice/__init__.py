@@ -1180,3 +1180,20 @@ class spice(spice_common):
     def errpreset(self,value):
         self.spice_simulator.errpreset=value
 
+    @property
+    def analysis_type(self):
+        """
+        str: type of analysis specified in the testbench.
+        """
+        if not hasattr(self, '_analysis_type'):
+            analyses = [key for key in self.simcmd_bundle.Members.keys()]
+            if len(analyses) != 1:
+                if len(analyses) < 1:
+                    self.print_log(type='W', msg='No analysis type specified! Did you forget to instantiate spice_simcmd object?')
+                    self._analysis_type = ''
+                else:
+                    self.print_log(type='E', msg='Multiple analyses types specified! Reading output results will most likely fail!')
+                    self._analysis_type = analyses[0]
+            else:
+                self._analysis_type = analyses[0]
+        return self._analysis_type

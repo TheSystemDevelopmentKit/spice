@@ -9,6 +9,7 @@ Initially written by Okko Järvinen, 2019
 import os
 import sys
 import subprocess
+import libpsf
 import pandas as pd
 from collections import defaultdict
 from abc import *
@@ -744,15 +745,14 @@ class spectre(spice_common):
         if not os.path.isfile(file):
             self.print_log(type='F', msg=f'Something went wrong with running the simulation! PSF output file at {file} does not exist!')
         try:
-            psf=psfu.PSF(file)
+            psf = libpsf.PSFDataSet(file)
         except:
             self.print_log(type='W', msg=traceback.format_exc())
-            self.print_log(type='F', msg=f'Failed reading PSF file at {file}!')
-        sweep=psf.get_sweep()
-        abscissa = sweep.abscissa
-        for signal in psf.all_signals():
-            tmpdata = np.vstack((sweep.abscissa, psf.get_signal(signal.name).ordinate)).T
-            self.parent.iofile_eventdict[signal.name.upper()]=tmpdata
+            self.print_log(type='F', msg=f'Failed reading PSF file at {file}! Is the rawfmt = psfbin?')
+        abscissa = psf.get_sweep_values()
+        for signal in psf.get_signal_names():
+            tmpdata = np.vstack((abscissa, psf.get_signal(signal))).T
+            self.parent.iofile_eventdict[signal.upper()]=tmpdata
 
     def read_oppts(self):
         """ Internally called function to read the DC operating points of the circuit
