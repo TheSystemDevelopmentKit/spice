@@ -181,7 +181,6 @@ class spice_iofile(iofile):
                             filename = 'tb_%s.raw/%s.ac.ac' % (self.parent.name, self.parent.spice_simulator.ac_analysis_name) #return filename with wildcard for possible sweep (-> several files)
                         elif analysis.lower() == 'tran':
                             filename = 'tb_%s.raw/%s.tran.tran' % (self.parent.name, self.parent.spice_simulator.tran_analysis_name) #return filename with wildcard for possible sweep (-> several files)
-    
                 else:
                     filename = 'tb_%s.print' % (self.parent.name)
             else:
