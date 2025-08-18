@@ -178,7 +178,7 @@ class spice_iofile(iofile):
                     elif self.iotype in ['event', 'time', 'sample']: # Support for other iotypes, typically read in from transient
                         analysis = self.parent.analysis_type
                         if analysis.lower() == 'ac':
-                            filename = 'tb_%s.raw/%s.ac.ac' % (self.parent.name, self.parent.spice_simulator.ac_analysis_name) #return filename with wildcard for possible sweep (-> several files)
+                            filename = 'tb_%s.raw/%s.ac' % (self.parent.name, self.parent.spice_simulator.ac_analysis_name) #return filename with wildcard for possible sweep (-> several files)
                         elif analysis.lower() == 'tran':
                             filename = 'tb_%s.raw/%s.tran.tran' % (self.parent.name, self.parent.spice_simulator.tran_analysis_name) #return filename with wildcard for possible sweep (-> several files)
                 else:
