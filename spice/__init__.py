@@ -1043,9 +1043,10 @@ class spice(spice_common):
                 self.runname = self.load_state
                 self.read_spice_outputs()
                 self.connect_spice_outputs()
+                if self.analysis_type == 'tran':
+                    self.extract_powers()
                 # Are these really something to be part of
                 # default execution
-                self.extract_powers()
                 self.read_oppts()
                 self.read_sparams()
                 self.read_noise_result()
@@ -1065,9 +1066,10 @@ class spice(spice_common):
             self.execute_spice_sim()
             self.read_spice_outputs()
             self.connect_spice_outputs()
+            if self.analysis_type == 'tran':
+                self.extract_powers()
             # Are these really something to be part of
             # default execution
-            self.extract_powers()
             self.read_oppts()
             self.read_sparams()
             self.read_noise_result()
