@@ -386,6 +386,35 @@ class spectre(spice_common):
     def pss_analysis_name(self, val):
         self._pss_analysis_name=val
 
+    @property
+    def strobe_indices(self):
+        """
+        Internally set list of indices corresponding to time,amplitude pairs
+        whose time value of is a multiple of the strobeperiod (see spice_simcmd).
+        """
+        if not hasattr(self,'_strobe_indices'):
+            self._strobe_indices=[]
+        return self._strobe_indices
+
+    @strobe_indices.setter
+    def strobe_indices(self,val):
+        if isinstance(val, list) or isinstance(val, np.ndarray):
+            self._strobe_indices=val
+        else:
+            self.print_log(type='W', msg='Cannot set strobe_indices to be of type: %s' % type(val))
+
+    @property
+    def is_strobed(self):
+        '''
+        Check if simulation was strobed or not
+        '''
+        if not hasattr(self, '_is_strobed'):
+            self._is_strobed=False
+            for simtype, simcmd in self.parent.simcmd_bundle.Members.items():
+                if simtype=='tran':
+                    if simcmd.strobeperiod:
+                        self._is_strobed=True
+        return self._is_strobed
 
 
     def run_plotprogram(self):
@@ -959,6 +988,13 @@ class spectre(spice_common):
             self.read_psf_outputs(file, dtype)
         else:
             self.read_print_file_outputs(file, dtype)
+        # Finally, check if strobing has been applied and filter if it is
+        if self.is_strobed:
+            for name, val in self.parent.iofile_bundle.Members.items():
+                if val.dir.lower()=='out' or val.dir.lower()=='output':
+                    if val.iotype=='event':
+                        for ioname in val.ionames:
+                            self.parent.iofile_eventdict[ioname.upper()] = self.filter_strobed(val.name, ioname)
 
     def parse_io_from_file(self,filepath,start,stop,dtype,labels,queue):
         """ Parse specific lines from a spectre print file.
@@ -1028,3 +1064,63 @@ class spectre(spice_common):
                 queue.put(stack)
             else:
                 return stack
+
+    def filter_strobed(self,key,ioname):
+        """
+        Helper function to read in the strobed simulation results. Only for spectre.
+
+        TODO:
+        this is because the strobeoutput
+        parameter for some reason still outputs
+        all the data points, even when it is in mode
+        strobeonly
+        If solution is found to this later from simulator
+        remove this.
+        """
+        if len(self.strobe_indices)==0:
+            tvals=self.parent.iofile_eventdict[ioname.upper()][:,0]
+            maxtime = np.max(tvals)
+            mintime = np.min(tvals)
+            for simulationcommand, simulationoption in self.parent.simcmd_bundle.Members.items():
+                strobeperiod = simulationoption.strobeperiod
+                strobedelay = simulationoption.strobedelay
+                skipstart = simulationoption.skipstart
+            if not skipstart:
+                skipstart=0
+            if not strobedelay:
+                strobedelay=0
+            strobetimestamps = np.arange(mintime,maxtime,strobeperiod)+strobedelay+skipstart
+            self.strobe_indices=np.zeros(len(strobetimestamps)) # indexes to take the values
+            seg=min(300, len(strobetimestamps)) # length of a segment in the for loop (how many samples at a time)
+            idxmin=0
+            l=len(strobetimestamps)
+            nseg=l//seg # number of segments, rounded down (how many loops required)
+            idxmax=0
+            i = 0
+            for i in np.arange(1,nseg):
+                idxmax=(i-1)*seg+np.argmin(abs(tvals[(i-1)*seg:]-strobetimestamps[i*seg])) # find index of the received signal which corresponds to the largest value in reference
+                ind=idxmin+abs(strobetimestamps[seg*(i-1):seg*(i),None]-tvals[None,idxmin:idxmax]).argmin(axis=-1) # take index for the seg's values
+                idxmin=idxmax
+                self.strobe_indices[seg*(i-1):seg*i]=ind  
+            # again just in case that the loop does not overflow to take the final samples into account
+            idxmax=len(tvals)-1
+            ind=idxmin+abs(strobetimestamps[seg*(i):,None]-tvals[None,idxmin:idxmax]).argmin(axis=-1)
+            idxmin=idxmax
+            self.strobe_indices[seg*(i):]=ind
+            self.strobe_indices=self.strobe_indices.astype(int)
+            if self.parent.iofile_bundle.Members[key].strobe:
+                new_array =self.parent.iofile_eventdict[ioname.upper()][self.strobe_indices]
+                if len(strobetimestamps)!=len(new_array):
+                    self.print_log(type='W',
+                            msg='Oh no, something went wrong while reading the strobeperiod data')
+                    self.print_log(type='W',
+                            msg='Check data lenghts!')
+            else:
+                new_array =self.parent.iofile_eventdict[ioname.upper()]
+        else: # We already know the strobe indices, use them!
+            if self.parent.iofile_bundle.Members[key].strobe:
+                new_array =self.parent.iofile_eventdict[ioname.upper()][self.strobe_indices]
+            else:
+                new_array =self.parent.iofile_eventdict[ioname.upper()]
+        return new_array
+

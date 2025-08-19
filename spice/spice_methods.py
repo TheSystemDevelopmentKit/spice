@@ -19,62 +19,9 @@ class spice_methods(metaclass=abc.ABCMeta):
 
     def filter_strobed(self, key,ioname):
         """
-        Helper function to read in the strobed simulation results. Only for spectre.
-
-        TODO:
-        this is because the strobeoutput
-        parameter for some reason still outputs
-        all the data points, even when it is in mode
-        strobeonly
-        If solution is found to this later from simulator
-        remove this.
+        RELOCATED TO SPECTRE SPECIFIC FILES spice/spectre/spectre.py
         """
-        if len(self.strobe_indices)==0:
-            tvals=self.iofile_eventdict[ioname.upper()][:,0]
-            maxtime = np.max(tvals)
-            mintime = np.min(tvals)
-            for simulationcommand, simulationoption in self.simcmd_bundle.Members.items():
-                strobeperiod = simulationoption.strobeperiod
-                strobedelay = simulationoption.strobedelay
-                skipstart = simulationoption.skipstart
-            if not skipstart:
-                skipstart=0
-            if not strobedelay:
-                strobedelay=0
-            strobetimestamps = np.arange(mintime,maxtime,strobeperiod)+strobedelay+skipstart
-            self.strobe_indices=np.zeros(len(strobetimestamps)) # indexes to take the values
-            seg=min(300, len(strobetimestamps)) # length of a segment in the for loop (how many samples at a time)
-            idxmin=0
-            l=len(strobetimestamps)
-            nseg=l//seg # number of segments, rounded down (how many loops required)
-            idxmax=0
-            i = 0
-            for i in np.arange(1,nseg):
-                idxmax=(i-1)*seg+np.argmin(abs(tvals[(i-1)*seg:]-strobetimestamps[i*seg])) # find index of the received signal which corresponds to the largest value in reference
-                ind=idxmin+abs(strobetimestamps[seg*(i-1):seg*(i),None]-tvals[None,idxmin:idxmax]).argmin(axis=-1) # take index for the seg's values
-                idxmin=idxmax
-                self.strobe_indices[seg*(i-1):seg*i]=ind  
-            # again just in case that the loop does not overflow to take the final samples into account
-            idxmax=len(tvals)-1
-            ind=idxmin+abs(strobetimestamps[seg*(i):,None]-tvals[None,idxmin:idxmax]).argmin(axis=-1)
-            idxmin=idxmax
-            self.strobe_indices[seg*(i):]=ind
-            self.strobe_indices=self.strobe_indices.astype(int)
-            if self.iofile_bundle.Members[key].strobe:
-                new_array =self.iofile_eventdict[ioname.upper()][self.strobe_indices]
-                if len(strobetimestamps)!=len(new_array):
-                    self.print_log(type='W',
-                            msg='Oh no, something went wrong while reading the strobeperiod data')
-                    self.print_log(type='W',
-                            msg='Check data lenghts!')
-            else:
-                new_array =self.iofile_eventdict[ioname.upper()]
-        else: # We already know the strobe indices, use them!
-            if self.iofile_bundle.Members[key].strobe:
-                new_array =self.iofile_eventdict[ioname.upper()][self.strobe_indices]
-            else:
-                new_array =self.iofile_eventdict[ioname.upper()]
-        return new_array
+        self.print_log(type='O', msg='Function filter_strobed has been relocated to spectre-specific files. Please call self.spice_simulator.filter_strobed!')
 
     def check_output_accuracy(self):
         '''
