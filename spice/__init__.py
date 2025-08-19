@@ -842,8 +842,8 @@ class spice(spice_common):
 
         if read_output_file: # First things first, read in the results from the simulation, regardless of iotype
             dtype = 'complex' if has_complex_types else 'float'
-            files = [val.file[0] for val in self.iofile_bundle.Members.values() \
-                if val.dir.lower() in ['out', 'output']]
+            files = list(set([val.file[0] for val in self.iofile_bundle.Members.values() \
+                if val.dir.lower() in ['out', 'output']]))
             for file in files:
                 self.spice_simulator.read_output_file(file, dtype)
 
