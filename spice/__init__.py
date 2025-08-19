@@ -850,45 +850,7 @@ class spice(spice_common):
         first = True
         for name, val in self.iofile_bundle.Members.items():
             if val.dir.lower()=='out' or val.dir.lower()=='output':
-                if val.iotype=='event':
-                    if len(val.ionames) == 1:
-                        try:
-                            if self.model == 'spectre':
-                                if self.is_strobed:
-                                    self.iofile_bundle.Members[name].Data=self.filter_strobed(val.name,val.ionames[0])
-                                else:
-                                    self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()]
-                            else:
-                                self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()]
-                        except KeyError:
-                            self.print_log(type='E',msg='Invalid ioname %s for iofile %s' % (val.ionames[0], name))
-                    else: # Iofile is a bus?
-                        data=[]
-                        for i, key in enumerate(val.ionames):
-                            try:
-                                if i == 0:
-                                    # Parse the first member of bus
-                                    if self.model == 'spectre':
-                                        if self.is_strobed:
-                                            data=self.filter_strobed(val.name, key)
-                                        else:
-                                            data=self.iofile_eventdict[key.upper()]
-                                    else:
-                                        data=self.iofile_eventdict[key.upper()]
-                                else:
-                                    # Next members are concatenated to array
-                                    if self.model == 'spectre' and self.is_strobed:
-                                        next=self.filter_strobed(val.name, key)
-                                    else:
-                                        next=self.iofile_eventdict[key.upper()]
-                                    try:
-                                        data=np.r_['1', data, next]
-                                    except ValueError:
-                                        self.print_log(type='W',msg='Invalid dimensions for concatenating arrays for IO %s!' % name)
-                            except KeyError:
-                                self.print_log(type='E', msg='Invalid ioname %s for iofile %s' % (key, name))
-                        self.iofile_bundle.Members[name].Data=data
-                elif val.iotype=='psfascii_pss' or val.iotype=='psfascii_pac':
+                if val.iotype=='psfascii_pss' or val.iotype=='psfascii_pac':
                     if first:
                         self.iofile_bundle.Members[name].read() #read() should use psf_utils
                         first=False
@@ -897,7 +859,7 @@ class spice(spice_common):
                     except KeyError:
                         self.print_log(type='E',msg='Invalid ioname %s for iofile %s' % (val.ionames[0], name))
                 else:
-                    self.iofile_bundle.Members[name].read()
+                    self.iofile_bundle.Members[name].read() 
             elif val.dir.lower()=='output':
                 self.print_log(type='F', 
                     msg='Direction indicator for %s of should be \'out\' and you are the one to fix your code.' 

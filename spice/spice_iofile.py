@@ -307,7 +307,18 @@ class spice_iofile(iofile):
         """
         Function to read files associated with this spice_iofile.
         """
-        if self.iotype=='psfascii_pss' or self.iotype=='psfascii_pac':
+        if self.iotype == 'event':
+            for i, ioname in enumerate(self.ionames):
+                if i == 0:
+                    data = self.parent.iofile_eventdict[ioname.upper()]
+                else:
+                    next = self.parent.iofile_eventdict[ioname.upper()]
+                    try:
+                        data=np.r_['1', data, next]
+                    except ValueError:
+                        self.print_log(type='W',msg='Invalid dimensions for concatenating arrays for IO %s!' % ioname)
+            self.Data = data
+        elif self.iotype=='psfascii_pss' or self.iotype=='psfascii_pac':
             if not self.parent.model=='spectre':
                 self.print_log(type='F', msg='Only spectre supported for psfascii outputs')
             else:
