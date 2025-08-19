@@ -120,7 +120,10 @@ class spectre_testbench(testbench_common):
         if not hasattr(self, '_portsrcstr'):
             self._portsrcstr = f"{self.parent.spice_simulator.commentchar} Port sources \n"
             for name,port in self.parent.spice_ports.items():
-                self.portsrcstr += f"{name} ({port.pos} {port.neg}) port num={port.num} r={port.res} x={port.reactance} type={port.type} freq={port.freq} mag={port.mag} pacmag={port.mag} dc={port.dc}\n"
+                if port.mag is not None:
+                    self.portsrcstr += f"{name} ({port.pos} {port.neg}) port num={port.num} r={port.res} x={port.reactance} type={port.type} freq={port.freq} mag={port.mag} pacmag={port.mag} dc={port.dc}\n"
+                else:
+                    self.portsrcstr += f"{name} ({port.pos} {port.neg}) port num={port.num} r={port.res} x={port.reactance} type={port.type} freq={port.freq} dbm={port.dbm} pacdbm={port.dbm} dc={port.dc}\n"
         return self._portsrcstr
     @portsrcstr.setter
     def portsrcstr(self, val):
