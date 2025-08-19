@@ -844,9 +844,8 @@ class spice(spice_common):
             dtype = 'complex' if has_complex_types else 'float'
             files = [val.file[0] for val in self.iofile_bundle.Members.values() \
                 if val.dir.lower() in ['out', 'output']]
-            if len(set(files)) > 1:
-                self.print_log(type='F', msg='not all outputs have the same file!')
-            self.spice_simulator.read_output_file(files[0], dtype)
+            for file in files:
+                self.spice_simulator.read_output_file(file, dtype)
 
         first = True
         for name, val in self.iofile_bundle.Members.items():
