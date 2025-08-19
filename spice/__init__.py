@@ -846,11 +846,7 @@ class spice(spice_common):
                 if val.dir.lower() in ['out', 'output']]
             if len(set(files)) > 1:
                 self.print_log(type='F', msg='not all outputs have the same file!')
-            if psfflag: # Spectre specific PSF output file handling
-                self.spice_simulator.read_psf_outputs(files[0], dtype)
-            else:
-                self.read_output_file(files[0], dtype=dtype)
-                self.check_output_accuracy() # Time stamps are common to all, need to do only once
+            self.spice_simulator.read_output_file(files[0], dtype)
 
         first = True
         for name, val in self.iofile_bundle.Members.items():

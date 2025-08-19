@@ -285,3 +285,23 @@ class eldo(spice_common):
             self.print_log(type='W', msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting DC operating points.')
 
+    def read_output_file(self, file, dtype):
+        '''
+        Interfacing function to read in results from an output file
+        '''
+        with open(file,'r') as f:
+            for line in f.readlines():
+                if line.startswith('# TIME') or line.startswith('# FREQ'):
+                    header = line.replace('# ','').replace('\n','').split(' ')
+                    break
+        arr = np.genfromtxt(file)
+        if len(header) != len(arr[0,:]):
+            self.print_log(type='E', msg='Signal name and array column mismatch while reading event outputs.')
+        for col_idx,sname in enumerate(header[1:]):
+            label=label_match.search(sname)
+            if label:
+                label = label.group(1)
+                # Add to the event dictionary
+                self.iofile_eventdict[label.upper()]=np.hstack((arr[:,0].reshape(-1,1),arr[:,col_idx+1].reshape(-1,1))).reshape(-1,2)
+            else:
+                self.print_log(type='W', msg='Label format mismatch with \'%s\'.' %  (label))
