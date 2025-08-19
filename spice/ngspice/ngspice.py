@@ -347,6 +347,7 @@ class ngspice(spice_common):
         '''
         Interfacing function to read in results from an output file
         '''
+        label_match=re.compile(r'\(([^)]+)\)')
         os.system('sync %s' % self.parent.spicesimpath)
         block_count=subprocess.check_output('grep -n \"time\|freq\" %s | sed \'s/^\([0-9]\+\):/\\1|/\'' % file, shell=True).decode('utf-8')
         if not block_count: 
