@@ -238,15 +238,15 @@ class spice_simcmd(thesdk):
         if hasattr(self.parent,'simcmd_bundle'):
             # This limits it to 1 of each simulation type. Is this ok?
             self.parent.simcmd_bundle.new(name=self.sim,val=self)
-        if (self.sim == 'dc' or self.sim=='sp' or self.sim=='pac' or self.sim=='pss' or self.sim=='stb') and self.parent.model=='spectre':
+        if self.sim in ['dc', 'sp' , 'stb', 'pz', 'noise'] and self.parent.model=='spectre':
             self.print_log(type='I', msg='Saving results in human-readable format (requirement for DC, S-parameter, PSS, PAC, stb and noise simulations)!')
             self.parent.spiceoptions.update({'rawfmt': 'psfascii'})
-        if self.sim == 'pz' and self.parent.model=='spectre':
-            self.print_log(type='I', msg='Saving results in human-readable format (requirement for PZ simulation)!')
-            self.parent.spiceoptions.update({'rawfmt': 'psfascii'})
-        if self.parent.use_psf:
-            self.print_log(type='I', msg='Saving results in human-readable format (requirement when using PSF output file)!')
+        elif self.sim == 'pss' or self.sim == 'pac':
             self.parent.spiceoptions.update({'rawfmt': 'psfbin'})
+        elif self.parent.use_psf:
+            self.parent.spiceoptions.update({'rawfmt': 'psfbin'})
+        else: # Use whatever format the user desires
+            pass
         if len(self.subcktname) != 0 and len(self.devname) != 0:
             self.print_log(type='F', msg='Cannot specify subckt sweep and device sweep in the same simcmd instance!')
         if self.strobeperiod and self.strobedelay:

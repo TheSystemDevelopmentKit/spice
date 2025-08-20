@@ -981,21 +981,72 @@ class spectre(spice_common):
             self.print_log(type='W', msg=traceback.format_exc())
             self.print_log(type='W',msg='Something went wrong while extracting DC operating points.')
 
+    def read_pac_results(self, file):
+        '''
+        '''
+        pdb.set_trace()
+        files = glob.glob(file) #filepath with wildcard -> list of filepath strings 
+        if len(files)>1: #if True, a sweep was run
+            # Sort based on sweep index?
+            files = sorted(files, key=lambda x: int(x.split('.')[2])) #glob doesn't return files in aplhabetical order
+        os.system('sync %s' % self.parent.spicesimpath) #Why this?
+        for file in files:
+            psf = libpsf.PSFDataSet(file)
+            sweep=psf.get_sweep_values()
+            for signal in psf.get_signal_names():
+                tmpdata=np.vstack((sweep,
+                   psf.get_signal(signal))).T
+                if signal.upper() in self.parent.iofile_eventdict.keys():
+                   # If given signal is already present, append to it io
+                    if type(self.parent.iofile_eventdict[signal.upper()]) == np.ndarray: # 
+                        data = self.parent.iofile_eventdict[signal.upper()]
+                        self.parent.iofile_eventdict[signal.upper()] = np.vstack((data, tmpdata))
+                    else:
+                        self.parent.iofile_eventdict[signal.upper()]=tmpdata
+                else:
+                    self.parent.iofile_eventdict[signal.upper()]=tmpdata
+
+    def read_pss_results(self, file):
+        '''
+        '''
+        files = glob.glob(file) #filepath with wildcard -> list of filepath strings 
+        if len(files)>1: #if True, a sweep was run
+            files = sorted(files) #glob doesn't return files in aplhabetical order
+        os.system('sync %s' % self.parent.spicesimpath) #Why this?
+        for file in files:
+            psf = libpsf.PSFDataSet(file)
+            sweep=psf.get_sweep_values()
+            for signal in psf.get_signal_names():
+                tmpdata=np.vstack((sweep, psf.get_signal(signal))).T
+                if signal.upper() in self.parent.iofile_eventdict: #first sweep index is added in else below
+                    if type(self.parent.iofile_eventdict[signal.upper()]) == np.ndarray: # 
+                        self.parent.iofile_eventdict[signal.upper()]=np.insert( self.parent.iofile_eventdict[signal.upper()], len(self.parent.iofile_eventdict[signal.upper()][0,:]-1), tmpdata[:,1], axis=1) #Add sweep iteration's result as new column to io
+                    else:
+                        self.parent.iofile_eventdict[signal.upper()]=tmpdata
+                else:
+                    self.parent.iofile_eventdict[signal.upper()]=tmpdata
+
+
     def read_output_file(self, file, dtype):
         '''
-        Interfacing function to read in results from an output file
+        Interfacing function to read in results from a Spectre output file
         '''
-        if self.parent.use_psf:
-            self.read_psf_outputs(file, dtype)
-        else:
-            self.read_print_file_outputs(file, dtype)
-        # Finally, check if strobing has been applied and filter if it is
-        if self.is_strobed:
-            for name, val in self.parent.iofile_bundle.Members.items():
-                if val.dir.lower()=='out' or val.dir.lower()=='output':
-                    if val.iotype=='event':
-                        for ioname in val.ionames:
-                            self.parent.iofile_eventdict[ioname.upper()] = self.filter_strobed(val.name, ioname)
+        if self.parent.analysis_type == 'pac':
+            self.read_pac_results(file) 
+        elif self.parent.analysis_type == 'pss':
+            self.read_pss_results(file) 
+        else: # Transient, AC
+            if self.parent.use_psf:
+                self.read_psf_outputs(file, dtype)
+            else:
+                self.read_print_file_outputs(file, dtype)
+            # Finally, check if strobing has been applied and filter if it is
+            if self.is_strobed:
+                for name, val in self.parent.iofile_bundle.Members.items():
+                    if val.dir.lower()=='out' or val.dir.lower()=='output':
+                        if val.iotype=='event':
+                            for ioname in val.ionames:
+                                self.parent.iofile_eventdict[ioname.upper()] = self.filter_strobed(val.name, ioname)
 
     def parse_io_from_file(self,filepath,start,stop,dtype,labels,queue):
         """ Parse specific lines from a spectre print file.

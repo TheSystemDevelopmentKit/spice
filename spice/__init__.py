@@ -850,16 +850,7 @@ class spice(spice_common):
         first = True
         for name, val in self.iofile_bundle.Members.items():
             if val.dir.lower()=='out' or val.dir.lower()=='output':
-                if val.iotype=='psfascii_pss' or val.iotype=='psfascii_pac':
-                    if first:
-                        self.iofile_bundle.Members[name].read() #read() should use psf_utils
-                        first=False
-                    try:
-                        self.iofile_bundle.Members[name].Data=self.iofile_eventdict[val.ionames[0].upper()]
-                    except KeyError:
-                        self.print_log(type='E',msg='Invalid ioname %s for iofile %s' % (val.ionames[0], name))
-                else:
-                    self.iofile_bundle.Members[name].read() 
+                self.iofile_bundle.Members[name].read() 
             elif val.dir.lower()=='output':
                 self.print_log(type='F', 
                     msg='Direction indicator for %s of should be \'out\' and you are the one to fix your code.' 
