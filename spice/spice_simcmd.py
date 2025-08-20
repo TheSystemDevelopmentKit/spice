@@ -238,10 +238,10 @@ class spice_simcmd(thesdk):
         if hasattr(self.parent,'simcmd_bundle'):
             # This limits it to 1 of each simulation type. Is this ok?
             self.parent.simcmd_bundle.new(name=self.sim,val=self)
-        if self.sim in ['dc', 'sp' , 'stb', 'pz', 'noise'] and self.parent.model=='spectre':
-            self.print_log(type='I', msg='Saving results in human-readable format (requirement for DC, S-parameter, PSS, PAC, stb and noise simulations)!')
+        if self.sim in ['dc', 'sp' , 'stb', 'pz'] and self.parent.model=='spectre':
+            self.print_log(type='I', msg='Saving results in human-readable format (requirement for DC, S-parameter, stb and PZ simulations)!')
             self.parent.spiceoptions.update({'rawfmt': 'psfascii'})
-        elif self.sim == 'pss' or self.sim == 'pac':
+        elif self.sim == 'pss' or self.sim == 'pac' or self.sim=='noise':
             self.parent.spiceoptions.update({'rawfmt': 'psfbin'})
         elif self.parent.use_psf:
             self.parent.spiceoptions.update({'rawfmt': 'psfbin'})
