@@ -984,7 +984,6 @@ class spectre(spice_common):
     def read_pac_results(self, file):
         '''
         '''
-        pdb.set_trace()
         files = glob.glob(file) #filepath with wildcard -> list of filepath strings 
         if len(files)>1: #if True, a sweep was run
             # Sort based on sweep index?
