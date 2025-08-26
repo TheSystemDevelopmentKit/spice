@@ -216,7 +216,7 @@ class spectre(spice_common):
 
         For Spectre X:
         Global accuracy parameter for Spectre simulations. Options include
-        'CX', 'AX', 'MX', 'LX', 'VX'
+        'cx', 'ax', 'mx', 'lx', 'vx'
 
         Example
         -------
@@ -228,7 +228,7 @@ class spectre(spice_common):
         return self._errpreset
     @errpreset.setter
     def errpreset(self,value):
-        if value in ['CX', 'AX', 'MX', 'LX', 'VX']:
+        if value in ['cx', 'ax', 'mx', 'lx', 'vx']:
             self.aps=False
         else:
             self.aps=True
