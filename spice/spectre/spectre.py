@@ -9,7 +9,6 @@ Initially written by Okko Järvinen, 2019
 import os
 import sys
 import subprocess
-import libpsf
 import pandas as pd
 from collections import defaultdict
 from abc import *
@@ -774,14 +773,36 @@ class spectre(spice_common):
         if not os.path.isfile(file):
             self.print_log(type='F', msg=f'Something went wrong with running the simulation! PSF output file at {file} does not exist!')
         try:
-            psf = libpsf.PSFDataSet(file)
+            libpsf=False
+            if 'ascii' in self.parent.spiceoptions['rawfmt']:
+                # Use PSF utils, known to be slow, but probably most reliable
+                psf=psfu.PSF(file)
+                sweep=psf.get_sweep()
+                abscissa = sweep.abscissa
+                signals = psf.all_signals()
+            elif 'bin' in self.parent.spiceoptions['rawfmt']:
+                # libpsf (has problems, might crash with large number of samples,
+                # or not downloadable for newer versions of Python at the moment)
+                import libpsf
+                psf = libpsf.PSFDataSet(file)
+                abscissa = psf.get_sweep_values()
+                signals = psf.get_signal_names()
+                libpsf=True
+            else:
+                self.print_log(type='F', 
+                        msg=f'Invalid raw format option ({self.parent.spiceoptions["rawfmt"]}) with use_psf')
         except:
             self.print_log(type='W', msg=traceback.format_exc())
-            self.print_log(type='F', msg=f'Failed reading PSF file at {file}! Is the rawfmt = psfbin?')
-        abscissa = psf.get_sweep_values()
-        for signal in psf.get_signal_names():
-            tmpdata = np.vstack((abscissa, psf.get_signal(signal))).T
-            self.parent.iofile_eventdict[signal.upper()]=tmpdata
+            self.print_log(type='F', msg=f'Failed reading PSF file at {file}! Is the rawfmt psfascii or psfbin?')
+        for signal in signals:
+            if libpsf:
+                command = psf.get_signal(signal)
+                sig_name = signal.upper()
+            else:
+                command = psf.get_signal(f'{signal.name}').ordinate 
+                sig_name = signal.name
+            tmpdata = np.vstack((abscissa, command)).T
+            self.parent.iofile_eventdict[sig_name]=tmpdata
 
     def read_print_file_outputs(self, file, dtype):
         '''
@@ -990,11 +1011,13 @@ class spectre(spice_common):
             files = sorted(files, key=lambda x: int(x.split('.')[2])) #glob doesn't return files in aplhabetical order
         os.system('sync %s' % self.parent.spicesimpath) #Why this?
         for file in files:
-            psf = libpsf.PSFDataSet(file)
-            sweep=psf.get_sweep_values()
-            for signal in psf.get_signal_names():
-                tmpdata=np.vstack((sweep,
-                   psf.get_signal(signal))).T
+            # Use PSF utils
+            psf=psfu.PSF(file)
+            sweep=psf.get_sweep()
+            abscissa = sweep.abscissa
+            for signal in psf.all_signals():
+                tmpdata=np.vstack((abscissa,
+                   psf.get_signal(f'{signal.name}').ordinate)).T
                 if signal.upper() in self.parent.iofile_eventdict.keys():
                    # If given signal is already present, append to it io
                     if type(self.parent.iofile_eventdict[signal.upper()]) == np.ndarray: # 
@@ -1013,10 +1036,12 @@ class spectre(spice_common):
             files = sorted(files) #glob doesn't return files in aplhabetical order
         os.system('sync %s' % self.parent.spicesimpath) #Why this?
         for file in files:
-            psf = libpsf.PSFDataSet(file)
-            sweep=psf.get_sweep_values()
+            # Use PSF utils
+            psf=psfu.PSF(file)
+            sweep=psf.get_sweep()
             for signal in psf.get_signal_names():
-                tmpdata=np.vstack((sweep, psf.get_signal(signal))).T
+                tmpdata=np.vstack((sweep.abscissa,
+                    psf.get_signal(f'{signal.name}').ordinate)).T
                 if signal.upper() in self.parent.iofile_eventdict: #first sweep index is added in else below
                     if type(self.parent.iofile_eventdict[signal.upper()]) == np.ndarray: # 
                         self.parent.iofile_eventdict[signal.upper()]=np.insert( self.parent.iofile_eventdict[signal.upper()], len(self.parent.iofile_eventdict[signal.upper()][0,:]-1), tmpdata[:,1], axis=1) #Add sweep iteration's result as new column to io

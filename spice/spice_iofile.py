@@ -23,7 +23,6 @@ import pandas as pd
 from numpy import genfromtxt
 import traceback
 from bitstring import BitArray
-import psf_utils as psfu
 import glob
 
 class spice_iofile(iofile):
