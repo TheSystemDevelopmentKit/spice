@@ -180,7 +180,7 @@ class spectre(spice_common):
 
     @plflag.setter
     def plflag(self, val):
-        if aps:
+        if self.aps:
             if val in ["upa", "hpa"]:
                 self._plflag=f'={val}'
             elif val=='':
