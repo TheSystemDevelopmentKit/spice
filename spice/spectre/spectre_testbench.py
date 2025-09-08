@@ -564,6 +564,9 @@ class spectre_testbench(testbench_common):
                     self._plotcmd += '.option ingold 2\n'
                     # Format the output to same "table", 15 bits per column
                     self._plotcmd += '.option co=%d\n' % (self.num_cols)
+                    if not self.parent.use_psf:
+                        # Write the outputs to a .print file
+                        self._plotcmd += '.option print_mode=print\n'
                     self._plotcmd += plotstr
                     self._plotcmd += 'simulator lang=spectre\n'
         return self._plotcmd
