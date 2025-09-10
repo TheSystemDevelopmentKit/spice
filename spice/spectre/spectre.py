@@ -1297,20 +1297,20 @@ class spectre(spice_common):
                 tmpdata = np.vstack(
                     (abscissa, psf.get_signal(f"{signal.name}").ordinate)
                 ).T
-                if signal.upper() in self.parent.iofile_eventdict.keys():
+                if signal.name.upper() in self.parent.iofile_eventdict.keys():
                     # If given signal is already present, append to it io
                     if (
-                        type(self.parent.iofile_eventdict[signal.upper()])
+                        type(self.parent.iofile_eventdict[signal.name.upper()])
                         == np.ndarray
                     ):  #
-                        data = self.parent.iofile_eventdict[signal.upper()]
-                        self.parent.iofile_eventdict[signal.upper()] = (
+                        data = self.parent.iofile_eventdict[signal.name.upper()]
+                        self.parent.iofile_eventdict[signal.name.upper()] = (
                             np.vstack((data, tmpdata))
                         )
                     else:
-                        self.parent.iofile_eventdict[signal.upper()] = tmpdata
+                        self.parent.iofile_eventdict[signal.name.upper()] = tmpdata
                 else:
-                    self.parent.iofile_eventdict[signal.upper()] = tmpdata
+                    self.parent.iofile_eventdict[signal.name.upper()] = tmpdata
 
     def read_pss_results(self, file):
         """ """
