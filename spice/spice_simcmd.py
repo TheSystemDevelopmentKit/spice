@@ -284,13 +284,20 @@ class spice_simcmd(thesdk):
             self.parent.spiceoptions.update({"rawfmt": "psfascii"})
         elif (
             self.parent.use_psf
-            and "psf" not in self.parent.spiceoptions["rawfmt"]
         ):
-            self.print_log(
-                type="W",
-                msg="use_psf is True, but the rawformat is not defined, use psfbin as default.",
-            )
-            self.parent.spiceoptions.update({"rawfmt": "psfbin"})
+            default = "psfascii"
+            if "rawfmt" not in self.parent.spiceoptions.keys():
+                self.print_log(
+                    type="W",
+                    msg=f"use_psf is True, but the rawformat is not defined, use {default} as default.",
+                )
+                self.parent.spiceoptions.update({"rawfmt": default})
+            elif "psf" not in self.parent.spiceoptions["rawfmt"]:
+                self.print_log(
+                    type="W",
+                    msg=f"use_psf is True, but the rawformat is not defined, use {default} as default.",
+                )
+                self.parent.spiceoptions.update({"rawfmt": default})
         else:  # Use whatever format the user desires
             pass
         if len(self.subcktname) != 0 and len(self.devname) != 0:
