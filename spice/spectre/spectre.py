@@ -1326,23 +1326,23 @@ class spectre(spice_common):
             # Use PSF utils
             psf = psfu.PSF(file)
             sweep = psf.get_sweep()
-            for signal in psf.get_signal_names():
+            for signal in psf.all_signals():
                 tmpdata = np.vstack(
                     (sweep.abscissa, psf.get_signal(f"{signal.name}").ordinate)
                 ).T
                 if (
-                    signal.upper() in self.parent.iofile_eventdict
+                    signal.name.upper() in self.parent.iofile_eventdict
                 ):  # first sweep index is added in else below
                     if (
-                        type(self.parent.iofile_eventdict[signal.upper()])
+                        type(self.parent.iofile_eventdict[signal.name.upper()])
                         == np.ndarray
                     ):  #
-                        self.parent.iofile_eventdict[signal.upper()] = (
+                        self.parent.iofile_eventdict[signal.name.upper()] = (
                             np.insert(
-                                self.parent.iofile_eventdict[signal.upper()],
+                                self.parent.iofile_eventdict[signal.name.upper()],
                                 len(
                                     self.parent.iofile_eventdict[
-                                        signal.upper()
+                                        signal.name.upper()
                                     ][0, :]
                                     - 1
                                 ),
@@ -1351,9 +1351,9 @@ class spectre(spice_common):
                             )
                         )  # Add sweep iteration's result as new column to io
                     else:
-                        self.parent.iofile_eventdict[signal.upper()] = tmpdata
+                        self.parent.iofile_eventdict[signal.name.upper()] = tmpdata
                 else:
-                    self.parent.iofile_eventdict[signal.upper()] = tmpdata
+                    self.parent.iofile_eventdict[signal.name.upper()] = tmpdata
 
     def read_output_file(self, file, dtype):
         """
