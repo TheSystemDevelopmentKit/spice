@@ -16,7 +16,7 @@ import subprocess
 import multiprocessing
 from time import sleep
 import pdb
-from abc import *
+import abc
 from thesdk import *
 from thesdk.iofile import iofile
 import numpy as np
