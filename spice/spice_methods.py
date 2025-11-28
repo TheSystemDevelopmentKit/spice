@@ -17,7 +17,7 @@ import multiprocessing
 from thesdk import traceback 
 
 
-class spice_methods(metaclass=ABCMeta):
+class spice_methods(metaclass=abc.ABCMeta):
 
     def filter_strobed(self, key, ioname):
         """
