@@ -4,9 +4,12 @@
 DIR=$( cd `dirname $0` && pwd )
 SUBMODULES="\
 "
+if [ -d "${DIR}/.githooks" ]; then
+    git config --local core.hooksPath .githooks/
+fi
 
 git submodule sync
-for mod in $SUBMODULES; do 
+for mod in $SUBMODULES; do
     git submodule update --init $mod
     cd ${mod}
     if [ -f ./init_submodules.sh ]; then
