@@ -325,10 +325,14 @@ class spice_iofile(iofile):
                         # This is Spectre vector file syntax
                         outfile.write("radix %s\n" % ("1 " * buswidth))
                         outfile.write("io i\n")
-                        ioname = self.ionames[i] if ':' not in self.ionames[i] else self.ionames[i].replace("<","<[").replace(">", "]>")
-                        outfile.write(
-                            f"vname {ioname}\n"
+                        ioname = (
+                            self.ionames[i]
+                            if ":" not in self.ionames[i]
+                            else self.ionames[i]
+                            .replace("<", "<[")
+                            .replace(">", "]>")
                         )
+                        outfile.write(f"vname {ioname}\n")
                         outfile.write("tunit ns\n")
                         outfile.write(f"period {1e9/float(self.rs)}\n")
                         outfile.write(f"trise {float(self.trise)*1e9}\n")

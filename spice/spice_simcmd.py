@@ -282,14 +282,9 @@ class spice_simcmd(thesdk):
                 msg="Saving results in human-readable format (requirement for DC, S-parameter, stb and PZ simulations)!",
             )
             self.parent.spiceoptions.update({"rawfmt": "psfascii"})
-        elif (
-            self.sim in ["noise"]
-            and self.parent.model == "spectre"
-        ):
+        elif self.sim in ["noise"] and self.parent.model == "spectre":
             self.parent.spiceoptions.update({"rawfmt": "psfbin"})
-        elif (
-            self.parent.use_psf
-        ):
+        elif self.parent.use_psf:
             default = "psfascii"
             if "rawfmt" not in self.parent.spiceoptions.keys():
                 self.print_log(

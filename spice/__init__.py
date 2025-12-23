@@ -586,9 +586,9 @@ class spice(spice_common):
                 else:
                     if self.interactive_spice:
                         if not self.distributed_run:
-                            self._spice_submission = thesdk.GLOBALS[
-                                "LSFINTERACTIVE"
-                            ] + " "
+                            self._spice_submission = (
+                                thesdk.GLOBALS["LSFINTERACTIVE"] + " "
+                            )
                         else:  # Spectre LSF doesn't support interactive queues
                             self.print_log(
                                 type="W",

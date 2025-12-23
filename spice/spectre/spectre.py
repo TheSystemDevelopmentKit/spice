@@ -1308,7 +1308,9 @@ class spectre(spice_common):
                             np.vstack((data, tmpdata))
                         )
                     else:
-                        self.parent.iofile_eventdict[signal.name.upper()] = tmpdata
+                        self.parent.iofile_eventdict[signal.name.upper()] = (
+                            tmpdata
+                        )
                 else:
                     self.parent.iofile_eventdict[signal.name.upper()] = tmpdata
 
@@ -1339,7 +1341,9 @@ class spectre(spice_common):
                     ):  #
                         self.parent.iofile_eventdict[signal.name.upper()] = (
                             np.insert(
-                                self.parent.iofile_eventdict[signal.name.upper()],
+                                self.parent.iofile_eventdict[
+                                    signal.name.upper()
+                                ],
                                 len(
                                     self.parent.iofile_eventdict[
                                         signal.name.upper()
@@ -1351,7 +1355,9 @@ class spectre(spice_common):
                             )
                         )  # Add sweep iteration's result as new column to io
                     else:
-                        self.parent.iofile_eventdict[signal.name.upper()] = tmpdata
+                        self.parent.iofile_eventdict[signal.name.upper()] = (
+                            tmpdata
+                        )
                 else:
                     self.parent.iofile_eventdict[signal.name.upper()] = tmpdata
 
