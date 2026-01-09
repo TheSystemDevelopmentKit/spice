@@ -9,10 +9,11 @@ Initially written by Marko Kosunen, 2021
 """
 
 import os
-import sys
-from abc import *
-from thesdk import *
-from spice.spice_common import *
+import re
+import pandas as pd
+import subprocess
+import multiprocessing
+from spice.spice_common import spice_common
 import numpy as np
 
 
@@ -31,7 +32,7 @@ class ngspice(spice_common):
     """
 
     def __init__(self, parent=None, **kwargs):
-        if parent == None:
+        if parent is None:
             self.print_log(type="F", msg="Parent of simulator module not given")
         else:
             self.parent = parent
