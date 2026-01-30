@@ -214,9 +214,17 @@ class spectre_testbench(testbench_common):
         if not hasattr(self,'_simcmdstr'):
             self._simcmdstr = "%s Simulation commands\n" % self.parent.spice_simulator.commentchar
             for sim, val in self.simcmds.Members.items():
+                mc_dut_string = ''
+                if val.mc_duts:
+                    mc_dut_string += 'dut=['
+                    for dut in val.mc_duts:
+                        mc_dut_string += dut
+                        mc_dut_string += ','
+                    mc_dut_string = mc_dut_string[:-1]
+                    mc_dut_string += ']'
                 if val.mc:
-                    self._simcmdstr += 'mc montecarlo donominal=no variations=all %snumruns=1 {\n' \
-                            % ('' if val.mc_seed is None else 'seed=%d '%val.mc_seed)
+                    self._simcmdstr += 'mc montecarlo donominal=no variations=all %snumruns=1 %s {\n' \
+                            % ('' if val.mc_seed is None else 'seed=%d '%val.mc_seed, mc_dut_string)
                 sweepstr_above='' # Commands above and below actual simulation command
                 sweepstr_below=''
                 if not len(val.sweep)==0: # This is a sweep analysis

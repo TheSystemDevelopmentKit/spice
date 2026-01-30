@@ -208,6 +208,7 @@ class spice_simcmd(thesdk):
             self.cmin = kwargs.get('cmin',None)
             self.mc = kwargs.get('mc',False)
             self.mc_seed = kwargs.get('mc_seed',None)
+            self.mc_duts = kwargs.get('mc_duts',None)
             self.model_info = kwargs.get('model_info', False)
             self.step = kwargs.get('step', None)
             self.maxstep = kwargs.get('maxstep', None)
