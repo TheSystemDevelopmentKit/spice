@@ -314,13 +314,22 @@ class spectre_testbench(testbench_common):
                 % self.parent.spice_simulator.commentchar
             )
             for sim, val in self.simcmds.Members.items():
+                mc_dut_string = ''
+                if val.mc_duts:
+                    mc_dut_string += 'dut=['
+                    for dut in val.mc_duts:
+                        mc_dut_string += dut
+                        mc_dut_string += ','
+                    mc_dut_string = mc_dut_string[:-1]
+                    mc_dut_string += ']'
                 if val.mc:
                     self._simcmdstr += (
-                        "mc montecarlo donominal=no variations=all %snumruns=1 {\n"
+                        "mc montecarlo donominal=no variations=all %snumruns=1 %s {\n"
                         % (
                             ""
                             if val.mc_seed is None
-                            else "seed=%d " % val.mc_seed
+                            else "seed=%d " % val.mc_seed,
+                            mc_dut_string
                         )
                     )
                 sweepstr_above = (
@@ -431,7 +440,7 @@ class spectre_testbench(testbench_common):
                                     }
                                 )
                             else:
-                                sweepstr_above = (
+                                sweepstr_above += (
                                     "Sweep%d sweep param=%s start=%s stop=%s step=%s %s { \n"
                                     % (
                                         i,
@@ -678,7 +687,6 @@ class spectre_testbench(testbench_common):
                             msg="fstepsize must be given for stb simulation",
                         )
                     self.simcmdstr += f"STB_analysis stb start={val.fmin} stop={val.fmax} dec={val.fstepsize} probe={val.probe}"
-
                 else:
                     self.print_log(
                         type="E",
