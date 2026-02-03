@@ -6,6 +6,7 @@ Spectre Testbench
 Simulators specific testbench generation class for Spectre.
 
 """
+
 import os
 import sys
 import subprocess
@@ -23,46 +24,71 @@ from functools import reduce
 import textwrap
 from datetime import datetime
 
+
 class spectre_testbench(testbench_common):
     def __init__(self, parent=None, **kwargs):
-        ''' Executes init of testbench_common, thus having the same attributes and 
+        """Executes init of testbench_common, thus having the same attributes and
         parameters.
 
         Parameters
         ----------
             **kwargs :
                See module testbench_common
-        
-        '''
-        super().__init__(parent=parent,**kwargs)
+
+        """
+        super().__init__(parent=parent, **kwargs)
 
     # Generating spice options string
     @property
     def options(self):
         """String
-        
+
         Spice options string parsed from self.spiceoptions -dictionary in the
         parent entity.
         """
-        if not hasattr(self,'_options'):
-            self._options = "%s Options\n" % self.parent.spice_simulator.commentchar
-            if self.parent.postlayout and 'savefilter' not in self.parent.spiceoptions:
-                self.print_log(type='I', msg='Consider using option savefilter=rc for post-layout netlists to reduce output file size!')
-            if self.parent.postlayout and 'save' not in self.parent.spiceoptions:
-                self.print_log(type='I', msg='Consider using option save=none and specifiying saves with plotlist for post-layout netlists to reduce output file size!')
-            i=0
-            for optname,optval in self.parent.spiceoptions.items():
-                self._options += "Option%d " % i # spectre options need unique names
-                i+=1
+        if not hasattr(self, "_options"):
+            self._options = (
+                "%s Options\n" % self.parent.spice_simulator.commentchar
+            )
+            if (
+                self.parent.postlayout
+                and "savefilter" not in self.parent.spiceoptions
+            ):
+                self.print_log(
+                    type="I",
+                    msg="Consider using option savefilter=rc for post-layout netlists to reduce output file size!",
+                )
+            if (
+                self.parent.postlayout
+                and "save" not in self.parent.spiceoptions
+            ):
+                self.print_log(
+                    type="I",
+                    msg="Consider using option save=none and specifiying saves with plotlist for post-layout netlists to reduce output file size!",
+                )
+            i = 0
+            for optname, optval in self.parent.spiceoptions.items():
+                self._options += (
+                    "Option%d " % i
+                )  # spectre options need unique names
+                i += 1
                 if optval != "":
-                    self._options += self.parent.spice_simulator.option + ' ' + optname + "=" + optval + "\n"
+                    self._options += (
+                        self.parent.spice_simulator.option
+                        + " "
+                        + optname
+                        + "="
+                        + optval
+                        + "\n"
+                    )
                 else:
                     self._options += ".option " + optname + "\n"
 
         return self._options
+
     @options.setter
-    def options(self,value):
-        self._options=value
+    def options(self, value):
+        self._options = value
 
     @property
     def libcmd(self):
@@ -70,84 +96,121 @@ class spectre_testbench(testbench_common):
         the parent entity, as well as 'ELDOLIBFILE' or 'SPECTRELIBFILE' global
         variables in TheSDK.config.
         """
-        if not hasattr(self,'_libcmd'):
+        if not hasattr(self, "_libcmd"):
             libfile = ""
             corner = "top_tt"
             temp = "27"
-            for optname,optval in self.parent.spicecorner.items():
+            for optname, optval in self.parent.spicecorner.items():
                 if optname == "temp":
                     temp = optval
                 if optname == "corner":
                     corner = optval
             try:
-                libfile = thesdk.GLOBALS['SPECTRELIBFILE']
-                if libfile == '':
+                libfile = thesdk.GLOBALS["SPECTRELIBFILE"]
+                if libfile == "":
                     raise ValueError
                 else:
                     self._libcmd = "// Spectre device models\n"
-                    files = libfile.split(',')
-                    if len(files)>1:
-                        if isinstance(corner,list) and len(files) == len(corner):
-                            for path,corn in zip(files,corner):
+                    files = libfile.split(",")
+                    if len(files) > 1:
+                        if isinstance(corner, list) and len(files) == len(
+                            corner
+                        ):
+                            for path, corn in zip(files, corner):
                                 if not isinstance(corn, list):
                                     corn = [corn]
                                 for c in corn:
-                                    self._libcmd += 'include "%s" section=%s\n' % (path,c)
+                                    self._libcmd += (
+                                        'include "%s" section=%s\n' % (path, c)
+                                    )
                         else:
-                            self.print_log(type='W',msg='Multiple entries in SPECTRELIBFILE but spicecorner wasn\'t a list or contained different number of elements!')
-                            self._libcmd += 'include "%s" section=%s\n' % (files[0], corner)
+                            self.print_log(
+                                type="W",
+                                msg="Multiple entries in SPECTRELIBFILE but spicecorner wasn't a list or contained different number of elements!",
+                            )
+                            self._libcmd += 'include "%s" section=%s\n' % (
+                                files[0],
+                                corner,
+                            )
                     else:
-                        self._libcmd += 'include "%s" section=%s\n' % (files[0], corner)
+                        self._libcmd += 'include "%s" section=%s\n' % (
+                            files[0],
+                            corner,
+                        )
             except:
-                self.print_log(type='W',msg='Global TheSDK variable SPECTRELIBFILE not set.')
+                self.print_log(
+                    type="W",
+                    msg="Global TheSDK variable SPECTRELIBFILE not set.",
+                )
                 self._libcmd = "// Spectre device models (undefined)\n"
                 self._libcmd += "//include " + libfile + " " + corner + "\n"
-            self._libcmd += 'tempOption options temp=%s\n' % str(temp)
+            self._libcmd += "tempOption options temp=%s\n" % str(temp)
         return self._libcmd
-    @libcmd.setter
-    def libcmd(self,value):
-        self._libcmd=value
-    @libcmd.deleter
-    def libcmd(self,value):
-        self._libcmd=None
 
-    
+    @libcmd.setter
+    def libcmd(self, value):
+        self._libcmd = value
+
+    @libcmd.deleter
+    def libcmd(self, value):
+        self._libcmd = None
+
     @property
     def portsrcstr(self):
         """
         Port source defintions parsed from from self.parent.spice_ports
         """
-        if not hasattr(self, '_portsrcstr'):
-            self._portsrcstr = f"{self.parent.spice_simulator.commentchar} Port sources \n"
-            for name,port in self.parent.spice_ports.items():
-                self.portsrcstr += f"{name} ({port.pos} {port.neg}) port num={port.num} r={port.res} x={port.reactance} type={port.type} freq={port.freq} mag={port.mag} pacmag={port.mag} dc={port.dc}\n"
+        if not hasattr(self, "_portsrcstr"):
+            self._portsrcstr = (
+                f"{self.parent.spice_simulator.commentchar} Port sources \n"
+            )
+            for name, port in self.parent.spice_ports.items():
+                if port.mag is not None:
+                    self.portsrcstr += f"{name} ({port.pos} {port.neg}) port num={port.num} r={port.res} x={port.reactance} type={port.type} freq={port.freq} mag={port.mag} pacmag={port.mag} dc={port.dc}\n"
+                else:
+                    self.portsrcstr += f"{name} ({port.pos} {port.neg}) port num={port.num} r={port.res} x={port.reactance} type={port.type} freq={port.freq} dbm={port.dbm} pacdbm={port.dbm} dc={port.dc}\n"
         return self._portsrcstr
+
     @portsrcstr.setter
     def portsrcstr(self, val):
-        self._portsrcstr=val
+        self._portsrcstr = val
+
     @portsrcstr.deleter
     def portsrcstr(self, val):
-        self._portsrcstr=None
-
+        self._portsrcstr = None
 
     @property
     def dcsourcestr(self):
         """str : DC source definitions parsed from spice_dcsource objects instantiated
         in the parent entity.
         """
-        if not hasattr(self,'_dcsourcestr'):
-            self._dcsourcestr = "%s DC sources\n" % self.parent.spice_simulator.commentchar
+        if not hasattr(self, "_dcsourcestr"):
+            self._dcsourcestr = (
+                "%s DC sources\n" % self.parent.spice_simulator.commentchar
+            )
             for name, val in self.dcsources.Members.items():
                 value = val.value
-                supply = '%s%s' % (val.sourcetype.upper(),val.name.upper())
+                supply = "%s%s" % (val.sourcetype.upper(), val.name.upper())
                 if val.ramp == 0:
-                    self._dcsourcestr += "%s %s %s %s%s\n" % \
-                            (supply,self.esc_bus(val.pos),self.esc_bus(val.neg),\
-                            ('%ssource dc=' % val.sourcetype.lower()),value)
+                    self._dcsourcestr += "%s %s %s %s%s\n" % (
+                        supply,
+                        self.esc_bus(val.pos),
+                        self.esc_bus(val.neg),
+                        ("%ssource dc=" % val.sourcetype.lower()),
+                        value,
+                    )
                 else:
-                    self._dcsourcestr += "%s %s %s %s type=pulse val0=0 val1=%s rise=%g\n" % \
-                            (supply,self.esc_bus(val.pos),self.esc_bus(val.neg),\
-                            ('%ssource' % val.sourcetype.lower()),value,val.ramp)
+                    self._dcsourcestr += (
+                        "%s %s %s %s type=pulse val0=0 val1=%s rise=%g\n"
+                        % (
+                            supply,
+                            self.esc_bus(val.pos),
+                            self.esc_bus(val.neg),
+                            ("%ssource" % val.sourcetype.lower()),
+                            value,
+                            val.ramp,
+                        )
+                    )
         return self._dcsourcestr
 
     @property
@@ -155,64 +218,101 @@ class spectre_testbench(testbench_common):
         """str : Input signal definitions parsed from spice_iofile objects instantiated
         in the parent entity.
         """
-        if not hasattr(self,'_inputsignals'):
-            self._inputsignals = "%s Input signals\n" % self.parent.spice_simulator.commentchar
+        if not hasattr(self, "_inputsignals"):
+            self._inputsignals = (
+                "%s Input signals\n" % self.parent.spice_simulator.commentchar
+            )
             for name, val in self.iofiles.Members.items():
                 # Input file becomes a source
-                if val.dir.lower()=='in' or val.dir.lower()=='input':
+                if val.dir.lower() == "in" or val.dir.lower() == "input":
                     # Event signals are analog
-                    if val.iotype.lower()=='event':
+                    if val.iotype.lower() == "event":
                         for i in range(len(val.ionames)):
                             # Finding the max time instant
                             try:
-                                maxtime = val.Data[-1,0]
+                                maxtime = val.Data[-1, 0]
                             except TypeError:
-                                self.print_log(type='F', msg='Input data not assinged to IO %s! Terminating.' % name)
+                                self.print_log(
+                                    type="F",
+                                    msg="Input data not assinged to IO %s! Terminating."
+                                    % name,
+                                )
                             if float(self._trantime) < float(maxtime):
                                 self._trantime_name = name
                                 self._trantime = maxtime
                             # Adding the source
                             if val.pos and val.neg:
-                                self._inputsignals += "%s%s %s %s %ssource type=pwl file=\"%s\"\n" % \
-                                        (val.sourcetype.upper(),self.esc_bus(val.name.lower()),
-                                        self.esc_bus(val.pos), self.esc_bus(val.neg),val.sourcetype.lower(),val.file[i])
+                                self._inputsignals += (
+                                    '%s%s %s %s %ssource type=pwl file="%s"\n'
+                                    % (
+                                        val.sourcetype.upper(),
+                                        self.esc_bus(val.name.lower()),
+                                        self.esc_bus(val.pos),
+                                        self.esc_bus(val.neg),
+                                        val.sourcetype.lower(),
+                                        val.file[i],
+                                    )
+                                )
                             else:
-                                self._inputsignals += "%s%s %s 0 %ssource type=pwl file=\"%s\"\n" % \
-                                        (val.sourcetype.upper(),self.esc_bus(val.name.lower()),
-                                        self.esc_bus(val.ionames[i]),val.sourcetype.lower(),val.file[i])
+                                self._inputsignals += (
+                                    '%s%s %s 0 %ssource type=pwl file="%s"\n'
+                                    % (
+                                        val.sourcetype.upper(),
+                                        self.esc_bus(val.name.lower()),
+                                        self.esc_bus(val.ionames[i]),
+                                        val.sourcetype.lower(),
+                                        val.file[i],
+                                    )
+                                )
                     # Sample signals are digital
                     # Presumably these are already converted to bitstrings
-                    elif val.iotype.lower()=='sample':
+                    elif val.iotype.lower() == "sample":
                         for i in range(len(val.ionames)):
                             # This is a lazy way to handle non-list val.Data
                             try:
-                                if float(self._trantime) < len(val.Data)/val.rs:
-                                    self._trantime = len(val.Data)/val.rs
+                                if (
+                                    float(self._trantime)
+                                    < len(val.Data) / val.rs
+                                ):
+                                    self._trantime = len(val.Data) / val.rs
                                     self._trantime_name = name
                             except:
                                 pass
-                            self._inputsignals += 'vec_include "%s"\n' % val.file[i]
+                            self._inputsignals += (
+                                'vec_include "%s"\n' % val.file[i]
+                            )
                     else:
-                        self.print_log(type='F',msg='Input type \'%s\' undefined.' % val.iotype)
+                        self.print_log(
+                            type="F",
+                            msg="Input type '%s' undefined." % val.iotype,
+                        )
 
             if self._trantime == 0:
                 self._trantime = "UNDEFINED"
-                self.print_log(type='I',msg='Transient time could not be inferred from input signals. Make sure to provide tstop argument to spice_simcmd.')
+                self.print_log(
+                    type="I",
+                    msg="Transient time could not be inferred from input signals. Make sure to provide tstop argument to spice_simcmd.",
+                )
         return self._inputsignals
+
     @inputsignals.setter
-    def inputsignals(self,value):
-        self._inputsignals=value
+    def inputsignals(self, value):
+        self._inputsignals = value
+
     @inputsignals.deleter
-    def inputsignals(self,value):
-        self._inputsignals=None
+    def inputsignals(self, value):
+        self._inputsignals = None
 
     @property
     def simcmdstr(self):
         """str : Simulation command definition parsed from spice_simcmd object
         instantiated in the parent entity.
         """
-        if not hasattr(self,'_simcmdstr'):
-            self._simcmdstr = "%s Simulation commands\n" % self.parent.spice_simulator.commentchar
+        if not hasattr(self, "_simcmdstr"):
+            self._simcmdstr = (
+                "%s Simulation commands\n"
+                % self.parent.spice_simulator.commentchar
+            )
             for sim, val in self.simcmds.Members.items():
                 mc_dut_string = ''
                 if val.mc_duts:
@@ -223,199 +323,390 @@ class spectre_testbench(testbench_common):
                     mc_dut_string = mc_dut_string[:-1]
                     mc_dut_string += ']'
                 if val.mc:
-                    self._simcmdstr += 'mc montecarlo donominal=no variations=all %snumruns=1 %s {\n' \
-                            % ('' if val.mc_seed is None else 'seed=%d '%val.mc_seed, mc_dut_string)
-                sweepstr_above='' # Commands above and below actual simulation command
-                sweepstr_below=''
-                if not len(val.sweep)==0: # This is a sweep analysis
-                    self.parent.extracts.Members.update({'sweeps_ran' : {}})
+                    self._simcmdstr += (
+                        "mc montecarlo donominal=no variations=all %snumruns=1 %s {\n"
+                        % (
+                            ""
+                            if val.mc_seed is None
+                            else "seed=%d " % val.mc_seed,
+                            mc_dut_string
+                        )
+                    )
+                sweepstr_above = (
+                    ""  # Commands above and below actual simulation command
+                )
+                sweepstr_below = ""
+                if not len(val.sweep) == 0:  # This is a sweep analysis
+                    self.parent.extracts.Members.update({"sweeps_ran": {}})
                     if self.parent.distributed_run:
-                        distributestr = 'distribute=lsf numprocesses=%d' % self.parent.num_processes
+                        distributestr = (
+                            "distribute=lsf numprocesses=%d"
+                            % self.parent.num_processes
+                        )
                     else:
-                        distributestr = ''
-                    if len(val.subcktname)!=0: # Sweep subckt parameter
-                        length=len(val.subcktname)
-                        if any(len(lst)!=length for lst in [val.sweep,val.swpstart,val.swpstop,val.swpstep]):
-                            self.print_log(type='F',
-                                    msg="Mismatch in length of simulation parameters. \n \
-                                            Ensure that sweep points and subcircuit names have the same number of elements")
+                        distributestr = ""
+                    if len(val.subcktname) != 0:  # Sweep subckt parameter
+                        length = len(val.subcktname)
+                        if any(
+                            len(lst) != length
+                            for lst in [
+                                val.sweep,
+                                val.swpstart,
+                                val.swpstop,
+                                val.swpstep,
+                            ]
+                        ):
+                            self.print_log(
+                                type="F",
+                                msg="Mismatch in length of simulation parameters. \n \
+                                            Ensure that sweep points and subcircuit names have the same number of elements",
+                            )
                             for i in range(len(val.subcktname)):
-                                sweepstr_above+='Sweep%d sweep param=%s sub=%s start=%s stop=%s step=%s %s { \n' \
-                                        % (i, val.sweep[i], val.subcktname[i], val.swpstart[i], val.swpstop[i], val.swpstep[i], distributestr)
-                    elif len(val.devname) != 0: # Sweep device parameter
-                        length=len(val.devname)
-                        if any(len(lst) != length for lst in [val.sweep, val.swpstart, val.swpstop, val.swpstep]):
-                            self.print_log(type='F',
-                                    msg="Mismatch in length of simulation parameters.\n \
-                                            Ensure that sweep points and device names have the same number of elements!")
+                                sweepstr_above += (
+                                    "Sweep%d sweep param=%s sub=%s start=%s stop=%s step=%s %s { \n"
+                                    % (
+                                        i,
+                                        val.sweep[i],
+                                        val.subcktname[i],
+                                        val.swpstart[i],
+                                        val.swpstop[i],
+                                        val.swpstep[i],
+                                        distributestr,
+                                    )
+                                )
+                    elif len(val.devname) != 0:  # Sweep device parameter
+                        length = len(val.devname)
+                        if any(
+                            len(lst) != length
+                            for lst in [
+                                val.sweep,
+                                val.swpstart,
+                                val.swpstop,
+                                val.swpstep,
+                            ]
+                        ):
+                            self.print_log(
+                                type="F",
+                                msg="Mismatch in length of simulation parameters.\n \
+                                            Ensure that sweep points and device names have the same number of elements!",
+                            )
                         for i in range(len(val.devname)):
-                            sweepstr_above+='Sweep%d sweep param=%s dev=%s start=%s stop=%s step=%s %s { \n' \
-                                    % (i, val.sweep[i], val.devname[i], val.swpstart[i], val.swpstop[i], val.swpstep[i], distributestr)
-                    else: # Sweep top-level netlist parameter
-                        length=len(val.sweep)
-                        if any(len(lst) != length for lst in [val.swpstart, val.swpstop, val.swpstep]):
+                            sweepstr_above += (
+                                "Sweep%d sweep param=%s dev=%s start=%s stop=%s step=%s %s { \n"
+                                % (
+                                    i,
+                                    val.sweep[i],
+                                    val.devname[i],
+                                    val.swpstart[i],
+                                    val.swpstop[i],
+                                    val.swpstep[i],
+                                    distributestr,
+                                )
+                            )
+                    else:  # Sweep top-level netlist parameter
+                        length = len(val.sweep)
+                        if any(
+                            len(lst) != length
+                            for lst in [val.swpstart, val.swpstop, val.swpstep]
+                        ):
                             if len(val.swpvalues) != length:
-                                self.print_log(type='F',
-                                        msg="Mismatch in length of simulation parametrs.\n \
-                                                Ensure that sweep points and parameter names have the same number of elements!")
+                                self.print_log(
+                                    type="F",
+                                    msg="Mismatch in length of simulation parametrs.\n \
+                                                Ensure that sweep points and parameter names have the same number of elements!",
+                                )
                         for i in range(len(val.sweep)):
-                            if len(val.swpvalues)!=0:
-                                sweepstr_above+='Sweep%d sweep param=%s values=%s %s { \n' \
-                                        % (i, val.sweep[i], np.array2string(val.swepvalues[i]).replace('\n',''), distributestr)
+                            if len(val.swpvalues) != 0:
+                                sweepstr_above += (
+                                    "Sweep%d sweep param=%s values=%s %s { \n"
+                                    % (
+                                        i,
+                                        val.sweep[i],
+                                        np.array2string(
+                                            val.swepvalues[i]
+                                        ).replace("\n", ""),
+                                        distributestr,
+                                    )
+                                )
                                 # Link sweep indexes to parameters to help output reading
-                                self.parent.extracts.Members['sweeps_ran'].update({i : {'param': val.sweep[i], 'values':val.swpvalues[i]}})
+                                self.parent.extracts.Members[
+                                    "sweeps_ran"
+                                ].update(
+                                    {
+                                        i: {
+                                            "param": val.sweep[i],
+                                            "values": val.swpvalues[i],
+                                        }
+                                    }
+                                )
                             else:
-                                sweepstr_above+='Sweep%d sweep param=%s start=%s stop=%s step=%s %s { \n' \
-                                        % (i, val.sweep[i], val.swpstart[i], val.swpstop[i], val.swpstep[i], distributestr)
+                                sweepstr_above += (
+                                    "Sweep%d sweep param=%s start=%s stop=%s step=%s %s { \n"
+                                    % (
+                                        i,
+                                        val.sweep[i],
+                                        val.swpstart[i],
+                                        val.swpstop[i],
+                                        val.swpstep[i],
+                                        distributestr,
+                                    )
+                                )
                     # Closing brackets
-                    for j in range(i, -1,-1):
-                        sweepstr_below+='}\n'
-                if str(sim).lower() == 'tran':
-                    simtime = val.tstop if val.tstop is not None else self._trantime
+                    for j in range(i, -1, -1):
+                        sweepstr_below += "}\n"
+                if str(sim).lower() == "tran":
+                    simtime = (
+                        val.tstop if val.tstop is not None else self._trantime
+                    )
                     if val.tstop is None:
-                        self.print_log(type='D',msg='Inferred transient duration is %g s from \'%s\'.' % (simtime,self._trantime_name))
-                    #TODO initial conditions
-                    self._simcmdstr += 'TRAN_analysis %s pstep=%s stop=%s %s ' % \
-                            (sim,str(val.tprint),str(simtime),'UIC' if val.uic else '')
+                        self.print_log(
+                            type="D",
+                            msg="Inferred transient duration is %g s from '%s'."
+                            % (simtime, self._trantime_name),
+                        )
+                    # TODO initial conditions
+                    self._simcmdstr += (
+                        "TRAN_analysis %s pstep=%s stop=%s %s "
+                        % (
+                            sim,
+                            str(val.tprint),
+                            str(simtime),
+                            "UIC" if val.uic else "",
+                        )
+                    )
                     if val.noise:
-                        if val.seed==0:
-                            self.print_log(type='W',msg='Spectre disables noise if seed=0.')
-                        self._simcmdstr += 'trannoisemethod=default noisefmin=%s noisefmax=%s %s ' % \
-                                (str(val.fmin),str(val.fmax),'noiseseed=%d'%(val.seed) if val.seed is not None else '')
+                        if val.seed == 0:
+                            self.print_log(
+                                type="W",
+                                msg="Spectre disables noise if seed=0.",
+                            )
+                        self._simcmdstr += (
+                            "trannoisemethod=default noisefmin=%s noisefmax=%s %s "
+                            % (
+                                str(val.fmin),
+                                str(val.fmax),
+                                (
+                                    "noiseseed=%d" % (val.seed)
+                                    if val.seed is not None
+                                    else ""
+                                ),
+                            )
+                        )
                     if val.method is not None:
-                        self._simcmdstr += 'method=%s ' %  (str(val.method))
+                        self._simcmdstr += "method=%s " % (str(val.method))
                     if val.cmin is not None:
-                        self._simcmdstr += 'cmin=%s ' %  (str(val.cmin))
+                        self._simcmdstr += "cmin=%s " % (str(val.cmin))
                     if val.maxstep is not None:
-                        self._simcmdstr += 'maxstep=%s ' % (str(val.maxstep))
+                        self._simcmdstr += "maxstep=%s " % (str(val.maxstep))
                     if val.step is not None:
-                        self._simcmdstr += 'step=%s ' % (str(val.step))
+                        self._simcmdstr += "step=%s " % (str(val.step))
                     if val.strobeperiod is not None:
-                        self._simcmdstr += 'strobeperiod=%s strobeoutput=strobeonly ' % (str(val.strobeperiod))
+                        self._simcmdstr += (
+                            "strobeperiod=%s strobeoutput=strobeonly "
+                            % (str(val.strobeperiod))
+                        )
                     if val.strobedelay is not None:
-                        self._simcmdstr += 'strobedelay=%s' % (str(val.strobedelay))
+                        self._simcmdstr += "strobedelay=%s" % (
+                            str(val.strobedelay)
+                        )
                     if val.skipstart is not None:
-                        self._simcmdstr += 'skipstart=%s' % (str(val.skipstart))
-                    self._simcmdstr += '\n\n' 
+                        self._simcmdstr += "skipstart=%s" % (str(val.skipstart))
+                    self._simcmdstr += "\n\n"
 
-                elif str(sim).lower() == 'dc':
-                    self._simcmdstr+=sweepstr_above
-                    self._simcmdstr+='oppoint dc\n'
-                    self._simcmdstr+=sweepstr_below
-                    self._simcmdstr+='\n'
-                elif str(sim).lower() == 'ac':
-                    if val.fscale.lower()=='log':
+                elif str(sim).lower() == "dc":
+                    self._simcmdstr += sweepstr_above
+                    self._simcmdstr += "oppoint dc\n"
+                    self._simcmdstr += sweepstr_below
+                    self._simcmdstr += "\n"
+                elif str(sim).lower() == "ac":
+                    if val.fscale.lower() == "log":
                         if val.fpoints != 0:
-                            pts_str='log=%d' % val.fpoints
+                            pts_str = "log=%d" % val.fpoints
                         elif val.fstepsize != 0:
-                            pts_str='dec=%d' % val.fstepsize
+                            pts_str = "dec=%d" % val.fstepsize
                         else:
-                            self.print_log(type='F', msg='Set either fpoints or fstepsize for AC simulation!')
-                    elif val.fscale.lower()=='lin':
+                            self.print_log(
+                                type="F",
+                                msg="Set either fpoints or fstepsize for AC simulation!",
+                            )
+                    elif val.fscale.lower() == "lin":
                         if val.fpoints != 0:
-                            pts_str='lin=%d' % val.fpoints
+                            pts_str = "lin=%d" % val.fpoints
                         elif val.fstepsize != 0:
-                            pts_str='step=%d' % val.fstepsize
+                            pts_str = "step=%d" % val.fstepsize
                         else:
-                            self.print_log(type='F', msg='Set either fpoints or fstepsize for AC simulation!')
+                            self.print_log(
+                                type="F",
+                                msg="Set either fpoints or fstepsize for AC simulation!",
+                            )
                     else:
-                        self.print_log(type='F', msg='Unsupported frequency scale %s for AC simulation!' % val.fscale)
-                    self._simcmdstr += 'AC_analysis %s start=%s stop=%s %s' % \
-                            (sim,str(val.fmin),str(val.fmax),pts_str)
-                    self._simcmdstr += '\n\n'
+                        self.print_log(
+                            type="F",
+                            msg="Unsupported frequency scale %s for AC simulation!"
+                            % val.fscale,
+                        )
+                    self._simcmdstr += "AC_analysis %s start=%s stop=%s %s" % (
+                        sim,
+                        str(val.fmin),
+                        str(val.fmax),
+                        pts_str,
+                    )
+                    self._simcmdstr += "\n\n"
 
-                elif str(sim).lower() == 'pz':
+                elif str(sim).lower() == "pz":
                     pnode = val.pnode
                     nnode = val.nnode
                     iprobe = val.iprobe
                     freq = val.freq
-                    self._simcmdstr += 'PZ_analysis (%s %s) %s iprobe=%s' % \
-                            (pnode,nnode,sim,iprobe)
-                    if not freq==None:
-                        self._simcmdstr += ' freq=%s' %(freq)
-                    self._simcmdstr += '\n\n'
-                elif str(sim).lower() == 'sp':
-                    if val.fscale.lower()=='log':
+                    self._simcmdstr += "PZ_analysis (%s %s) %s iprobe=%s" % (
+                        pnode,
+                        nnode,
+                        sim,
+                        iprobe,
+                    )
+                    if not freq == None:
+                        self._simcmdstr += " freq=%s" % (freq)
+                    self._simcmdstr += "\n\n"
+                elif str(sim).lower() == "sp":
+                    if val.fscale.lower() == "log":
                         if val.fpoints != 0:
-                            pts_str='log=%d' % val.fpoints
+                            pts_str = "log=%d" % val.fpoints
                         elif val.fstepsize != 0:
-                            pts_str='dec=%d' % val.fstepsize
+                            pts_str = "dec=%d" % val.fstepsize
                         else:
-                            self.print_log(type='F', msg='Set either fpoints or fstepsize for SP simulation!')
-                    elif val.fscale.lower()=='lin':
+                            self.print_log(
+                                type="F",
+                                msg="Set either fpoints or fstepsize for SP simulation!",
+                            )
+                    elif val.fscale.lower() == "lin":
                         if val.fpoints != 0:
-                            pts_str='lin=%d' % val.fpoints
+                            pts_str = "lin=%d" % val.fpoints
                         elif val.fstepsize != 0:
-                            pts_str='step=%d' % val.fstepsize
+                            pts_str = "step=%d" % val.fstepsize
                         else:
-                            self.print_log(type='F', msg='Set either fpoints or fstepsize for SP simulation!')
+                            self.print_log(
+                                type="F",
+                                msg="Set either fpoints or fstepsize for SP simulation!",
+                            )
                     self._simcmdstr += sweepstr_above
-                    if val.sprobes in [None, '']:
-                        self._sprobes=''
+                    if val.sprobes in [None, ""]:
+                        self._sprobes = ""
                     else:
-                        self._sprobes=f'sprobes=[{val.sprobes}]'
+                        self._sprobes = f"sprobes=[{val.sprobes}]"
                     # TODO: Works currently with assumption of 2 ports, implement support
                     # for higher number of ports.
-                    self._simcmdstr += f'SPanalysis sp ports=[{" ".join(self.parent.spice_ports.keys())}] {self._sprobes} start={val.fmin} stop={val.fmax} {pts_str} file=\"{self.parent.name}.s2p\" datafmt=touchstone datatype=realimag paramtype=s\n'
+                    self._simcmdstr += f'SPanalysis sp ports=[{" ".join(self.parent.spice_ports.keys())}] {self._sprobes} start={val.fmin} stop={val.fmax} {pts_str} file="{self.parent.name}.s2p" datafmt=touchstone datatype=realimag paramtype=s\n'
                     self._simcmdstr += sweepstr_below
-                    self._simcmdstr += '\n'
-                elif str(sim).lower() == 'noise':
-                    if len(val.nodes)==0:
-                        self.print_log(type='F', msg='Nodes list is empty. Set the nodes for noise simulation!')
-                    if val.fmin==None:
-                        self.print_log(type='F', msg='Fmin must be given for noise simulation')
-                    if val.fmax==None:
-                        self.print_log(type='F', msg='Fmax must be given for noise simulation')
-                    if val.iprobe==None:
-                        self.print_log(type='F', msg='Iprobe must be given for noise simulation')
+                    self._simcmdstr += "\n"
+                elif str(sim).lower() == "noise":
+                    if len(val.nodes) == 0:
+                        self.print_log(
+                            type="F",
+                            msg="Nodes list is empty. Set the nodes for noise simulation!",
+                        )
+                    if val.fmin == None:
+                        self.print_log(
+                            type="F",
+                            msg="Fmin must be given for noise simulation",
+                        )
+                    if val.fmax == None:
+                        self.print_log(
+                            type="F",
+                            msg="Fmax must be given for noise simulation",
+                        )
+                    if val.iprobe == None:
+                        self.print_log(
+                            type="F",
+                            msg="Iprobe must be given for noise simulation",
+                        )
                     for node in val.nodes:
-                        self._simcmdstr += f'noise_analysis_{node} {node} 0 noise start={val.fmin} stop={val.fmax} iprobe={val.iprobe} \n'
-                elif str(sim).lower() == 'pac':
-                    if val.fc==None:
-                        self.print_log(type='F', msg='fc must be given for PAC simulation')
-                    if val.fsig==None:
-                        self.print_log(type='F', msg='fsig must be given for PAC simulation')
-                    if val.fmax==None:
-                        self.print_log(type='F', msg='Fmax must be given for PAC simulation')
-                    if val.harmonics==None:
-                        self.print_log(type='F', msg='Harmonics must be defined for PAC simulation')
-                    self._simcmdstr += f'Initial_analysis pss fund={val.fc} outputtype=freq maxacfreq={val.fmax} harms={val.harmonics}\n'
-                    self._simcmdstr += f'PAC_analysis pac values=[{val.fsig}] maxsideband={val.harmonics}'
-                elif str(sim).lower() == 'pss':
-                    # if val.fc==None:
-                    #     self.print_log(type='F', msg='fc must be given for PSS simulation')
-                    if val.fsig==None:
-                        self.print_log(type='F', msg='fsig must be given for PSS simulation')
-                    if val.fmax==None:
-                        self.print_log(type='F', msg='Fmax must be given for PSS simulation')
-                    if val.harmonics==None:
-                        self.print_log(type='F', msg='Harmonics must be defined for PSS simulation')
-                    self._simcmdstr += f'PSS_analysis pss fund={val.fsig} outputtype=freq maxacfreq={val.fmax} harms={val.harmonics}'
+                        self._simcmdstr += f"noise_analysis_{node} {node} 0 noise start={val.fmin} stop={val.fmax} iprobe={val.iprobe} \n"
+                elif str(sim).lower() == "pac":
+                    if val.fc == None:
+                        self.print_log(
+                            type="F", msg="fc must be given for PAC simulation"
+                        )
+                    if val.fsig == None:
+                        self.print_log(
+                            type="F",
+                            msg="fsig must be given for PAC simulation",
+                        )
+                    if val.fmax == None:
+                        self.print_log(
+                            type="F",
+                            msg="Fmax must be given for PAC simulation",
+                        )
+                    if val.harmonics == None:
+                        self.print_log(
+                            type="F",
+                            msg="Harmonics must be defined for PAC simulation",
+                        )
+                    self._simcmdstr += f"Initial_analysis pss fund={val.fc} outputtype=freq maxacfreq={val.fmax} harms={val.harmonics}\n"
+                    self._simcmdstr += f"PAC_analysis pac values=[{val.fsig}] maxsideband={val.harmonics} freqaxis=out"
+                elif str(sim).lower() == "pss":
+                    if val.fc == None:
+                        self.print_log(
+                            type="F", msg="fc must be given for PSS simulation"
+                        )
+                    if val.fsig == None:
+                        self.print_log(
+                            type="F",
+                            msg="fsig must be given for PSS simulation",
+                        )
+                    if val.fmax == None:
+                        self.print_log(
+                            type="F",
+                            msg="Fmax must be given for PSS simulation",
+                        )
+                    if val.harmonics == None:
+                        self.print_log(
+                            type="F",
+                            msg="Harmonics must be defined for PSS simulation",
+                        )
+                    self._simcmdstr += f"PSS_analysis pss fund={val.fsig} outputtype=freq maxacfreq={val.fmax} harms={val.harmonics}"
 
-                elif str(sim).lower() == 'stb':
-                    if val.fmin==None:
-                        self.print_log(type='F', msg='fmin must be given for stb simulation')
-                    if val.fmax==None:
-                        self.print_log(type='F', msg='fmax must be given for stb simulation')
-                    if val.probe==None:
-                        self.print_log(type='F', msg='probe must be given for stb simulation')
-                    if val.fstepsize==None:
-                        self.print_log(type='F', msg='fstepsize must be given for stb simulation')
-                    self.simcmdstr += f'STB_analysis stb start={val.fmin} stop={val.fmax} dec={val.fstepsize} probe={val.probe} mode=CM'
-                
+                elif str(sim).lower() == "stb":
+                    if val.fmin == None:
+                        self.print_log(
+                            type="F",
+                            msg="fmin must be given for stb simulation",
+                        )
+                    if val.fmax == None:
+                        self.print_log(
+                            type="F",
+                            msg="fmax must be given for stb simulation",
+                        )
+                    if val.probe == None:
+                        self.print_log(
+                            type="F",
+                            msg="probe must be given for stb simulation",
+                        )
+                    if val.fstepsize == None:
+                        self.print_log(
+                            type="F",
+                            msg="fstepsize must be given for stb simulation",
+                        )
+                    self.simcmdstr += f"STB_analysis stb start={val.fmin} stop={val.fmax} dec={val.fstepsize} probe={val.probe}"
                 else:
-                    self.print_log(type='E',msg='Simulation type \'%s\' not yet implemented.' % str(sim))
+                    self.print_log(
+                        type="E",
+                        msg="Simulation type '%s' not yet implemented."
+                        % str(sim),
+                    )
                 if val.mc:
-                    self._simcmdstr += '}\n\n'
+                    self._simcmdstr += "}\n\n"
+
             if val.model_info:
-                self._simcmdstr += 'element info what=inst where=rawfile \nmodelParameter info what=models where=rawfile\n\n'
+                self._simcmdstr += "element info what=inst where=rawfile \nmodelParameter info what=models where=rawfile\n\n"
         return self._simcmdstr
+
     @simcmdstr.setter
-    def simcmdstr(self,value):
-        self._simcmdstr=value
+    def simcmdstr(self, value):
+        self._simcmdstr = value
+
     @simcmdstr.deleter
-    def simcmdstr(self,value):
-        self._simcmdstr=None
+    def simcmdstr(self, value):
+        self._simcmdstr = None
 
     @property
     def plotcmd(self):
@@ -424,191 +715,296 @@ class spectre_testbench(testbench_common):
 
         """
 
-        if not hasattr(self,'_plotcmd'):
-            self._plotcmd = "" 
+        if not hasattr(self, "_plotcmd"):
+            self._plotcmd = ""
             for name, val in self.simcmds.Members.items():
                 # Manual probes
-                if len(val.plotlist) > 0 and name.lower() != 'dc':
-                    self._plotcmd = "%s Manually probed signals\n" % self.parent.spice_simulator.commentchar
-                    self._plotcmd += 'save ' 
+                if len(val.plotlist) > 0 and name.lower() != "dc":
+                    self._plotcmd = (
+                        "%s Manually probed signals\n"
+                        % self.parent.spice_simulator.commentchar
+                    )
+                    self._plotcmd += "save "
 
                     for i in val.plotlist:
                         self._plotcmd += self.esc_bus(i) + " "
                     self._plotcmd += "\n\n"
-                #DC probes
-                if len(val.plotlist) > 0 and name.lower() == 'dc':
-                    self._plotcmd = "%s DC operating points to be captured:\n" % self.parent.spice_simulator.commentchar
-                    self._plotcmd += 'save ' 
+                # DC probes
+                if len(val.plotlist) > 0 and name.lower() == "dc":
+                    self._plotcmd = (
+                        "%s DC operating points to be captured:\n"
+                        % self.parent.spice_simulator.commentchar
+                    )
+                    self._plotcmd += "save "
 
                     for i in val.plotlist:
                         self._plotcmd += self.esc_bus(i, esc_colon=False) + " "
                     if val.excludelist != []:
-                        self._plotcmd += 'exclude=[ '
+                        self._plotcmd += "exclude=[ "
                         for i in val.excludelist:
-                            self._plotcmd += i + ' '
-                        self._plotcmd += ']'
+                            self._plotcmd += i + " "
+                        self._plotcmd += "]"
                     self._plotcmd += "\n\n"
 
-                if name.lower() == 'tran' or name.lower() == 'ac' :
-                    self._plotcmd += "%s Output signals\n" % self.parent.spice_simulator.commentchar
+                if name.lower() == "tran" or name.lower() == "ac":
+                    self._plotcmd += (
+                        "%s Output signals\n"
+                        % self.parent.spice_simulator.commentchar
+                    )
                     # Parsing output iofiles
-                    savestr=''
-                    plotstr=''
-                    first=True
+                    savestr = ""
+                    plotstr = ""
+                    first = True
                     # Parse supply current extractions first, because if there are
                     # manually probed signals, supply extractions will be placed
                     # after them in the print file and nothing will work correctly
                     for name, val in self.dcsources.Members.items():
                         if val.extract:
-                            supply = '%s%s' % (val.sourcetype.upper(),val.name.upper())
+                            supply = "%s%s" % (
+                                val.sourcetype.upper(),
+                                val.name.upper(),
+                            )
                             if supply not in self.parent.iofile_eventdict:
                                 self.parent.iofile_eventdict[supply] = None
                             if first:
-                                savestr += 'save %s:pwr %s:p' % (supply,supply)
-                                plotstr += '.print I(%s)' % (supply)
-                                first=False
+                                savestr += "save %s:pwr %s:p" % (supply, supply)
+                                plotstr += ".print I(%s)" % (supply)
+                                first = False
                             else:
-                                savestr += ' %s:pwr %s:p' % (supply,supply)
-                                plotstr += ' I(%s)' % (supply)
+                                savestr += " %s:pwr %s:p" % (supply, supply)
+                                plotstr += " I(%s)" % (supply)
                     for name, val in self.iofiles.Members.items():
                         # Output iofile becomes a plot/print command
-                        if val.dir.lower()=='out' or val.dir.lower()=='output':
-                            if val.iotype=='event':
+                        if (
+                            val.dir.lower() == "out"
+                            or val.dir.lower() == "output"
+                        ):
+                            if val.iotype == "event":
                                 for i in range(len(val.ionames)):
                                     signame = self.esc_bus(val.ionames[i])
                                     if first:
-                                        savestr += 'save %s' % signame
-                                        if val.datatype.lower() == 'complex':
-                                            plotstr += '.print %sr(%s) %si(%s)' % \
-                                                    (val.sourcetype, val.ionames[i], val.sourcetype, val.ionames[i])
+                                        savestr += "save %s" % signame
+                                        if val.datatype.lower() == "complex":
+                                            plotstr += (
+                                                ".print %sr(%s) %si(%s)"
+                                                % (
+                                                    val.sourcetype,
+                                                    val.ionames[i],
+                                                    val.sourcetype,
+                                                    val.ionames[i],
+                                                )
+                                            )
                                         else:
-                                            plotstr += '.print %s(%s)' % (val.sourcetype, val.ionames[i])
-                                        first=False
+                                            plotstr += ".print %s(%s)" % (
+                                                val.sourcetype,
+                                                val.ionames[i],
+                                            )
+                                        first = False
                                     else:
-                                        if val.datatype.lower() == 'complex':
-                                            if f'{val.sourcetype}({val.ionames[i]})' not in plotstr.split(' '):
-                                                savestr += ' %s' % signame
-                                                plotstr += ' %sr(%s) %si(%s)' % \
-                                                        (val.sourcetype, val.ionames[i], val.sourcetype, val.ionames[i])
+                                        if val.datatype.lower() == "complex":
+                                            if (
+                                                f"{val.sourcetype}({val.ionames[i]})"
+                                                not in plotstr.split(" ")
+                                            ):
+                                                savestr += " %s" % signame
+                                                plotstr += (
+                                                    " %sr(%s) %si(%s)"
+                                                    % (
+                                                        val.sourcetype,
+                                                        val.ionames[i],
+                                                        val.sourcetype,
+                                                        val.ionames[i],
+                                                    )
+                                                )
                                         else:
-                                            if f'{val.sourcetype}({val.ionames[i]})' not in plotstr.split(' '):
-                                                savestr += ' %s' % signame
-                                                plotstr += ' %s(%s)' % (val.sourcetype, val.ionames[i])
-                            elif val.iotype=='sample':
+                                            if (
+                                                f"{val.sourcetype}({val.ionames[i]})"
+                                                not in plotstr.split(" ")
+                                            ):
+                                                savestr += " %s" % signame
+                                                plotstr += " %s(%s)" % (
+                                                    val.sourcetype,
+                                                    val.ionames[i],
+                                                )
+                            elif val.iotype == "sample":
                                 for i in range(len(val.ionames)):
                                     # Checking the given trigger(s)
-                                    if isinstance(val.trigger,list):
+                                    if isinstance(val.trigger, list):
                                         if len(val.trigger) == len(val.ionames):
                                             trig = val.trigger[i]
                                         else:
                                             trig = val.trigger[0]
-                                            self.print_log(type='W',
-                                                    msg='%d triggers given for %d ionames. Using the first trigger for all ionames.' 
-                                                    % (len(val.trigger),len(val.ionames)))
+                                            self.print_log(
+                                                type="W",
+                                                msg="%d triggers given for %d ionames. Using the first trigger for all ionames."
+                                                % (
+                                                    len(val.trigger),
+                                                    len(val.ionames),
+                                                ),
+                                            )
                                     else:
                                         trig = val.trigger
                                     # Extracting the bus width
                                     signame = val.ionames[i]
-                                    busstart,busstop,buswidth,busrange = self.parent.get_buswidth(signame)
-                                    signame = signame.replace('<',' ').replace('>',' ').replace('[',' ').replace(']',' ').replace(':',' ').split(' ')
+                                    busstart, busstop, buswidth, busrange = (
+                                        self.parent.get_buswidth(signame)
+                                    )
+                                    signame = (
+                                        signame.replace("<", " ")
+                                        .replace(">", " ")
+                                        .replace("[", " ")
+                                        .replace("]", " ")
+                                        .replace(":", " ")
+                                        .split(" ")
+                                    )
                                     # If not already, add the respective trigger signal voltage to iofile_eventdict
                                     if trig not in self.parent.iofile_eventdict:
-                                        self.parent.iofile_eventdict[trig] = None
+                                        self.parent.iofile_eventdict[trig] = (
+                                            None
+                                        )
                                         if first:
-                                            savestr += 'save %s' % self.esc_bus(trig)
-                                            plotstr += '.print v(%s)' % (trig)
-                                            first=False
+                                            savestr += "save %s" % self.esc_bus(
+                                                trig
+                                            )
+                                            plotstr += ".print v(%s)" % (trig)
+                                            first = False
                                         else:
-                                            savestr += ' %s' % self.esc_bus(trig) 
-                                            plotstr += ' v(%s)' % (trig)
+                                            savestr += " %s" % self.esc_bus(
+                                                trig
+                                            )
+                                            plotstr += " v(%s)" % (trig)
                                     for j in busrange:
-                                        if buswidth == 1 and '<' not in val.ionames[i]:
+                                        if (
+                                            buswidth == 1
+                                            and "<" not in val.ionames[i]
+                                        ):
                                             bitname = signame[0]
                                         else:
-                                            bitname = '%s<%d>' % (signame[0],j)
+                                            bitname = "%s<%d>" % (signame[0], j)
                                         # If not already, add the bit voltage to iofile_eventdict
-                                        if bitname not in self.parent.iofile_eventdict:
-                                            self.parent.iofile_eventdict[bitname] = None
+                                        if (
+                                            bitname
+                                            not in self.parent.iofile_eventdict
+                                        ):
+                                            self.parent.iofile_eventdict[
+                                                bitname
+                                            ] = None
                                             if first:
-                                                savestr += 'save %s' % self.esc_bus(bitname)
-                                                plotstr += '.print %s(%s)' % (val.sourcetype, bitname)
-                                                first=False
+                                                savestr += (
+                                                    "save %s"
+                                                    % self.esc_bus(bitname)
+                                                )
+                                                plotstr += ".print %s(%s)" % (
+                                                    val.sourcetype,
+                                                    bitname,
+                                                )
+                                                first = False
                                             else:
-                                                savestr += ' %s' % self.esc_bus(bitname)
-                                                plotstr += ' %s(%s)' % (val.sourcetype, bitname)
-                            elif val.iotype=='time':
+                                                savestr += " %s" % self.esc_bus(
+                                                    bitname
+                                                )
+                                                plotstr += " %s(%s)" % (
+                                                    val.sourcetype,
+                                                    bitname,
+                                                )
+                            elif val.iotype == "time":
                                 # For time IOs, the node voltage is saved as
                                 # event and the time information is later
                                 # parsed in Python
                                 for i in range(len(val.ionames)):
                                     signame = self.esc_bus(val.ionames[i])
                                     # Check if this same node was already saved as event type
-                                    if val.ionames[i] not in self.parent.iofile_eventdict:
+                                    if (
+                                        val.ionames[i]
+                                        not in self.parent.iofile_eventdict
+                                    ):
                                         # Requested node was not saved as event
                                         # -> add to eventdict + save to output database
-                                        self.parent.iofile_eventdict[val.ionames[i]] = None
+                                        self.parent.iofile_eventdict[
+                                            val.ionames[i]
+                                        ] = None
                                         if first:
-                                            savestr += 'save %s' % signame
-                                            plotstr += '.print %s(%s)' % (val.sourcetype, val.ionames[i])
-                                            first=False
+                                            savestr += "save %s" % signame
+                                            plotstr += ".print %s(%s)" % (
+                                                val.sourcetype,
+                                                val.ionames[i],
+                                            )
+                                            first = False
                                         else:
-                                            savestr += ' %s' % signame
-                                            plotstr += ' %s(%s)' % (val.sourcetype, val.ionames[i])
-                            elif val.iotype=='vsample':
-                                self.print_log(type='O',msg='IO type \'vsample\' is obsolete. Please use type \'sample\' and set ioformat=\'volt\'.')
-                                self.print_log(type='F',msg='Please do it now :)')
+                                            savestr += " %s" % signame
+                                            plotstr += " %s(%s)" % (
+                                                val.sourcetype,
+                                                val.ionames[i],
+                                            )
+                            elif val.iotype == "vsample":
+                                self.print_log(
+                                    type="O",
+                                    msg="IO type 'vsample' is obsolete. Please use type 'sample' and set ioformat='volt'.",
+                                )
+                                self.print_log(
+                                    type="F", msg="Please do it now :)"
+                                )
                             else:
-                                self.print_log(type='W',msg='Output filetype incorrectly defined.')
+                                self.print_log(
+                                    type="W",
+                                    msg="Output filetype incorrectly defined.",
+                                )
 
                     # Output accumulated save and print statement to plotcmd
-                    savestr += '\n'
-                    plotstr += '\n'
+                    savestr += "\n"
+                    plotstr += "\n"
                     self._plotcmd += savestr
-                    self._plotcmd += 'simulator lang=spice\n'
-                    self._plotcmd += '.option ingold 2\n'
+                    self._plotcmd += "simulator lang=spice\n"
+                    self._plotcmd += ".option ingold 2\n"
                     # Format the output to same "table", 15 bits per column
-                    self._plotcmd += '.option co=%d\n' % (self.num_cols)
+                    self._plotcmd += ".option co=%d\n" % (self.num_cols)
+                    if not self.parent.use_psf:
+                        # Write the outputs to a .print file
+                        self._plotcmd += ".option print_mode=print\n"
                     self._plotcmd += plotstr
-                    self._plotcmd += 'simulator lang=spectre\n'
+                    self._plotcmd += "simulator lang=spectre\n"
         return self._plotcmd
+
     @plotcmd.setter
-    def plotcmd(self,value):
-        self._plotcmd=value
+    def plotcmd(self, value):
+        self._plotcmd = value
+
     @plotcmd.deleter
-    def plotcmd(self,value):
-        self._plotcmd=None
+    def plotcmd(self, value):
+        self._plotcmd = None
 
     @property
     def num_cols(self):
-        '''
+        """
         Number of columns in the output file, when using Spectre.
         Each signal takes 1 column (unless it is complex, then two).
         Each column is 15 bit wide, hence number of columns is multiplied by 15.
-        '''
-        if not hasattr(self, '_num_cols'):
-            self._num_cols=0
+        """
+        if not hasattr(self, "_num_cols"):
+            self._num_cols = 0
             # If power is extracted, it adds current line
             for name, val in self.dcsources.Members.items():
-                if val.extract: 
+                if val.extract:
                     self._num_cols += 1
             for name, val in self.iofiles.Members.items():
-                if val.dir.lower() == 'out':
+                if val.dir.lower() == "out":
                     for io_name in val.ionames:
-                        num_addition=2 if val.datatype.lower()=='complex' else 1
-                        pattern=re.compile('<[0-9]+:[0-9]+>')
+                        num_addition = (
+                            2 if val.datatype.lower() == "complex" else 1
+                        )
+                        pattern = re.compile("<[0-9]+:[0-9]+>")
                         if pattern.search(io_name):
-                            start=io_name.split('<')[1]
-                            start=start.split(':')
-                            lower=start[0]
-                            higher=start[1].split('>')[0]
-                            add=abs(int(higher)-int(lower))+1
-                            self._num_cols += num_addition*add 
+                            start = io_name.split("<")[1]
+                            start = start.split(":")
+                            lower = start[0]
+                            higher = start[1].split(">")[0]
+                            add = abs(int(higher) - int(lower)) + 1
+                            self._num_cols += num_addition * add
                         else:
-                            self._num_cols += num_addition 
+                            self._num_cols += num_addition
         self._num_cols *= 15
         return self._num_cols
 
     @num_cols.setter
     def num_cols(self, val):
-        self._num_cols=val
-
+        self._num_cols = val

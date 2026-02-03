@@ -12,11 +12,12 @@ Initially written by Okko Järvinen, 9.1.2020
 
 import os
 import sys
-from abc import * 
+from abc import *
 from thesdk import *
 from thesdk.iofile import iofile
 import numpy as np
 import pandas as pd
+
 
 class spice_dcsource(thesdk):
     """
@@ -26,7 +27,7 @@ class spice_dcsource(thesdk):
 
     Attributes
     ----------
-    parent : object 
+    parent : object
         The parent object initializing the spice_dcsource instance. Default
         None.
     name : str
@@ -77,32 +78,34 @@ class spice_dcsource(thesdk):
 
     @property
     def _classfile(self):
-        return os.path.dirname(os.path.realpath(__file__)) + "/"+__name__
+        return os.path.dirname(os.path.realpath(__file__)) + "/" + __name__
 
-    def __init__(self,parent,**kwargs):
-        try:  
+    def __init__(self, parent, **kwargs):
+        try:
             self.parent = parent
-            self.sourcetype=kwargs.get('sourcetype','V')
-            self.name=kwargs.get('name','sourcename')
-            self.pos=kwargs.get('pos','POSNODE')
-            self.neg=kwargs.get('neg','NEGNODE')
-            self.value=kwargs.get('value',0)
-            self.paramname=kwargs.get('paramname', None)
-            self.extract=kwargs.get('extract',False)
-            self.ext_start=kwargs.get('ext_start',None)
-            self.ext_stop=kwargs.get('ext_stop',None)
-            self.noise=kwargs.get('noise',True)
-            self.ramp=kwargs.get('ramp',0)
+            self.sourcetype = kwargs.get("sourcetype", "V")
+            self.name = kwargs.get("name", "sourcename")
+            self.pos = kwargs.get("pos", "POSNODE")
+            self.neg = kwargs.get("neg", "NEGNODE")
+            self.value = kwargs.get("value", 0)
+            self.paramname = kwargs.get("paramname", None)
+            self.extract = kwargs.get("extract", False)
+            self.ext_start = kwargs.get("ext_start", None)
+            self.ext_stop = kwargs.get("ext_stop", None)
+            self.noise = kwargs.get("noise", True)
+            self.ramp = kwargs.get("ramp", 0)
         except:
-            self.print_log(type='F', msg="Spice DC source definition failed.")
+            self.print_log(type="F", msg="Spice DC source definition failed.")
         # This enables e.g. DC sweeps
-        if isinstance(self.paramname, str): # Parameterized source
-            if isinstance(self.paramname, str): # Cannot use string as default value, parameter value set by sweep
-                self.parent.spiceparameters.update({self.paramname: '0'})
+        if isinstance(self.paramname, str):  # Parameterized source
+            if isinstance(
+                self.paramname, str
+            ):  # Cannot use string as default value, parameter value set by sweep
+                self.parent.spiceparameters.update({self.paramname: "0"})
             else:
-                self.parent.spiceparameters.update({self.paramname:self.value})
-        if hasattr(self.parent,'dcsource_bundle'):
-            self.parent.dcsource_bundle.new(name=self.name,val=self)
+                self.parent.spiceparameters.update({self.paramname: self.value})
+        if hasattr(self.parent, "dcsource_bundle"):
+            self.parent.dcsource_bundle.new(name=self.name, val=self)
 
     @property
     def ext_file(self):
@@ -111,10 +114,14 @@ class spice_dcsource(thesdk):
         Optional filepath for extracted transient current when
         self.extract=True.
         """
-        if not hasattr(self,'_ext_file'):
-            self._ext_file = '%s/tb_%s.print' % (self.parent.simpath,self.parent.name)
+        if not hasattr(self, "_ext_file"):
+            self._ext_file = "%s/tb_%s.print" % (
+                self.parent.simpath,
+                self.parent.name,
+            )
         return self._ext_file
+
     @ext_file.setter
-    def ext_file(self,val):
-        self._ext_file=val
+    def ext_file(self, val):
+        self._ext_file = val
         return self._ext_file
