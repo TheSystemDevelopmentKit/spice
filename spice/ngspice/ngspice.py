@@ -363,10 +363,33 @@ class ngspice(spice_common):
 
     def read_noise_result(self, **kwargs):
         """Internally called function to read the noise simulation results"""
-        if "noise" in self.parent.simcmd_bundle.Members.keys():
+        try:
+            if "noise" in self.parent.simcmd_bundle.Members.keys():
+                self.extracts.Members.update({'noise': {}})
+                path = os.path.join(
+                    self.parent.spicesimpath,
+                    "tb_%s.raw" % self.parent.name,
+                )
+                files = glob.glob(path)
+                onoise = []
+                inoise = []
+                freq = []
+
+                if len(files) > 0:
+                    with open(files[0], "r") as f:
+                        for line in f:
+                            values = line.split()
+                            freq.append(float(values[0]))
+                            onoise.append(values[1])
+                            inoise.append(values[3])
+            self.extracts.Members['noise'].update({"onoise_spectrum": onoise})
+            self.extracts.Members['noise'].update({"inoise_spectrum": inoise})
+            self.extracts.Members['noise'].update({"frequency": freq})
+        except:
+            self.print_log(type="W", msg=traceback.format_exc())
             self.print_log(
-                type="F",
-                msg="Noise analysis unsupported for %s" % (self.parent.model),
+                type="W",
+                msg="Something went wrong while extracting results of noise simulation.",
             )
         return None, None
 

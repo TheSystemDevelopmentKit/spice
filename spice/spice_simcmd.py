@@ -154,6 +154,9 @@ class spice_simcmd(thesdk):
         For Spectre only! If true, print model parameters to raw-file.
     maxstep : float
         Maximum time step Spectre simulator will use during transient analysis
+    noisesrc: string
+        Name of an independent source to which ngspice refers noise to (in .noise simulations).
+        Defaul: None. 
     step: float
         According to Spectre: minimum time step used by the simulator solely to maintain the aesthetics of the computed waveforms.
     strobeperiod: float
@@ -224,6 +227,7 @@ class spice_simcmd(thesdk):
             self.iprobe = kwargs.get("iprobe", None)
             self.probe = kwargs.get("probe", None)
             self.harmonics = kwargs.get("harmonics", None)
+            self.noisesrc = kwargs.get("noisesrc", None)
             # Make list, if they are not already
             self.sweep = (
                 kwargs.get("sweep", [])

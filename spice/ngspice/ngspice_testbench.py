@@ -498,7 +498,7 @@ class ngspice_testbench(testbench_common):
                             type="F",
                             msg="Fmax must be given for noise simulation",
                         )
-                    if val.noisesrc== None:
+                    if val.noisesrc == None:
                         self.print_log(
                             type="F",
                             msg="noisesrc must be given for noise simulation",
@@ -781,6 +781,11 @@ class ngspice_testbench(testbench_common):
                         self._plotcmd += (" NF NFmin\n")
                     else:
                         self._plotcmd += ("\n")
+                if name.lower() == "noise":
+                    self._plotcmd += ".control\n"
+                    self._plotcmd += "save onoise_spectrum inoise_spectrum\nrun\n"
+                    printfile=val.parent.spicetbsrc.split('.spice')[0]+'.raw'
+                    self._plotcmd += ("wrdata %s " % (printfile) + "onoise_spectrum inoise_spectrum\n")
             self._plotcmd += ".endc\n"
         return self._plotcmd
 
