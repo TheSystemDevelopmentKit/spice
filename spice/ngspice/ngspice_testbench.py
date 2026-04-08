@@ -110,10 +110,14 @@ class ngspice_testbench(testbench_common):
         Port source defintions parsed from from self.parent.spice_ports
         """
         if not hasattr(self, "_portsrcstr"):
-            self.portsrcstr = ""
-            self.print_log(
-                type="W", msg="Port support not yet implemented for ngspice!"
+            self._portsrcstr = (
+                f"{self.parent.spice_simulator.commentchar} Port sources \n"
             )
+            for name, port in self.parent.spice_ports.items():
+                if port.res is not None:
+                    self.portsrcstr += f"{name} {port.pos} {port.neg} dc 0 ac 1 portnum {port.num} z0 {port.res}\n"
+                else:
+                    self.portsrcstr += f"{name} {port.pos} {port.neg} dc 0 ac 1 portnum {port.num} \n"
         return self._portsrcstr
 
     @portsrcstr.setter
@@ -765,6 +769,18 @@ class ngspice_testbench(testbench_common):
                                 val.ext_file,
                                 supply,
                             )
+                if name.lower() == "sp":
+                    self._plotcmd += ".control\n"
+                    self._plotcmd += "run\n"
+                    printfile=val.parent.spicetbsrc.split('.spice')[0]+'.raw'
+                    self._plotcmd += ("wrdata %s " % (printfile))
+                    srange = range(1, len(self.parent.spice_ports)+1)
+                    sp = [f'S_{i}_{j}' for i in srange for j in srange]
+                    self._plotcmd += (' '.join(sp))
+                    if self.parent.noise:
+                        self._plotcmd += (" NF NFmin\n")
+                    else:
+                        self._plotcmd += ("\n")
             self._plotcmd += ".endc\n"
         return self._plotcmd
 

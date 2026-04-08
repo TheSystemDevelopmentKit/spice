@@ -18,7 +18,6 @@ import numpy as np
 import traceback
 import glob
 
-
 class ngspice(spice_common):
     """This class is used as instance in simulatormodule property of
     spice class. Contains language dependent definitions.
@@ -279,10 +278,87 @@ class ngspice(spice_common):
     def read_sp_result(self, **kwargs):
         """Internally called function to read the S-parameter simulation results"""
         read_type = kwargs.get("read_type")
-        if "sp" in self.parent.simcmd_bundle.Members.keys():
+        try:
+            if "sp" in self.parent.simcmd_bundle.Members.keys():
+                self.extracts.Members.update({read_type: {}})
+                sweep = False
+                # For distributed runs
+                if self.parent.distributed_run:
+                    # TODO: check functionality and implement
+                    self.print_log(
+                        type="F",
+                        msg=f"Distributed runs not currently supported for \
+                                    S-parameter analyses.",
+                    )
+                    path = os.path.join(
+                        self.parent.spicesimpath,
+                        "tb_%s.raw" % self.parent.name,
+                        "[0-9]*",
+                    )
+                else:
+                    path = os.path.join(
+                        self.parent.spicesimpath,
+                        "tb_%s.raw" % self.parent.name,
+                    )
+                # Sort files such that the sweeps are in correct order.
+                if sweep:
+                    num_sweeps = len(val.sweep)
+                    files = glob.glob(path)
+                    for i in range(num_sweeps):
+                        files = sorted(files, key=lambda x: self.sorter(x, i))
+                    if len(files) > 0:
+                        rd, fileptr = self.create_nested_sweepresult_dict(
+                            0,
+                            0,
+                            self.extracts.Members["sweeps_ran"],
+                            files,
+                            read_type,
+                        )
+                else:
+                    files = glob.glob(path)
+                    if len(files) > 1:  # This should not happen
+                        self.print_log(
+                            type="W",
+                            msg="S-parameter analysis was not a sweep, but for \
+                                        some reason multiple output files were found. \
+                                        results may be in wrong order!",
+                        )
+                    srange = range(1, len(self.parent.spice_ports)+1)
+                    sp = [f's{i}{j}' for i in srange for j in srange]
+                    result = {}
+
+                    if len(files) > 0:
+                        with open(files[0], "r") as f:
+                            for line in f:
+                                values = line.split()
+                                frequency = float(values[0])
+                                real = [float(v) for v in values[1::3]]
+                                imag = [float(v) for v in values[2::3]]
+                                if self.parent.noise:
+                                    nfmin = complex(real.pop(), imag.pop())
+                                    nf = complex(real.pop(), imag.pop())
+                                if len(real)==len(sp):
+                                    if sp[0] not in result:
+                                        for i in range(len(sp)):
+                                            result[sp[i]]=[frequency, complex(real[i]+imag[i])]
+                                        if self.parent.noise:
+                                            result['NF']=[frequency, nf]
+                                            result['NFmin']=[frequency, nfmin]
+                                    else:
+                                        for i in range(len(sp)):
+                                            result[sp[i]]=np.vstack([result[sp[i]],[frequency, complex(real[i]+imag[i])]])
+                                        if self.parent.noise:
+                                            result['NF']=np.vstack([result['NF'],[frequency, nf]])
+                                            result['NFmin']=np.vstack([result['NFmin'],[frequency, nfmin]])
+                    rd = {
+                        0: {"param": "nosweep", "value": 0, read_type: result}
+                    }
+                self.extracts.Members[read_type].update({"results": rd})
+        except:
+            self.print_log(type="W", msg=traceback.format_exc())
             self.print_log(
                 type="W",
-                msg="S-Parameters unsupported for %s" % (self.parent.model),
+                msg="Something went wrong while extracting S-parameters",
             )
 
     def read_noise_result(self, **kwargs):
