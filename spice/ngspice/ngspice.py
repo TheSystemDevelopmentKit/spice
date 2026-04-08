@@ -15,6 +15,8 @@ import subprocess
 import multiprocessing
 from spice.spice_common import spice_common
 import numpy as np
+import traceback
+import glob
 
 
 class ngspice(spice_common):
@@ -69,7 +71,8 @@ class ngspice(spice_common):
     @property
     def cmdfile_ext(self):
         """str : Extension of the command file"""
-        return ".ngcir"
+#        return ".ngcir"
+        return ".spice"
 
     @property
     def resultfile_ext(self):
@@ -313,18 +316,112 @@ class ngspice(spice_common):
         """Internally called function to read the DC operating points of the circuit"""
 
         try:
-            if (
-                "dc" in self.parent.simcmd_bundle.Members.keys()
-            ):  # Unsupported model
-                self.print_log(
-                    type="F",
-                    msg="DC analysis unsupported for %s" % (self.parent.model),
-                )
-                raise Exception(
-                    "DC optpoint extraction not supported for Eldo."
-                )
+            if "dc" in self.parent.simcmd_bundle.Members.keys():
+                self.extracts.Members.update({"oppts": {}})
+                # TODO: SWEEP AND MC NOT VERIFIED
+                sweep = False
+                # Get dc simulation file name
+                for name, val in self.parent.simcmd_bundle.Members.items():
+                    mc = val.mc
+                    if name == "dc":
+                        fname = ""
+                        if len(val.sweep) != 0:
+                            for i in range(0, len(val.sweep)):
+                                sweep = True
+                                fname += "Sweep%d-[0-9]*_" % i
+                            if mc:
+                                fname += "mc_oppoint.dc"
+                            else:
+                                fname += "oppoint.dc"
+                        else:
+                            if mc:
+                                fname = "mc_oppoint*.dc"
+                            else:
+                                fname = "oppoint*.dc"
+                        break
+                # For distributed runs
+                if self.parent.distributed_run:
+                    path = os.path.join(
+                        self.parent.spicesimpath,
+                        "tb_%s.raw" % self.parent.name,
+                        "[0-9]*",
+                        fname,
+                    )
+                else:
+                    path = os.path.join(
+                        self.parent.spicesimpath,
+                        "tb_%s.raw" % self.parent.name,
+                    )
+                # Sort files so that sweeps are in correct order
+                if sweep:
+                    num_sweeps = len(val.sweep)
+                    files = glob.glob(path)
+                    for i in range(num_sweeps):
+                        files = sorted(files, key=lambda x: self.sorter(x, i))
+                else:
+                    files = glob.glob(path)
+                    if len(files) > 1:  # This shoudln't happen
+                        self.print_log(
+                            type="W",
+                            msg="DC analysis was not a sweep, but multiple output files were found! Results may be in incorrect order!",
+                        )
+                varbegin = "Variables:\n"
+                variables = []
+                valbegin = "Values:\n"
+                values = []
+                parsevars = False
+                parsevals = False
+                for file in files:
+                    with open(file, "r") as f:
+                        for line in f:
+                            # Scan file until unit descriptions end and values start
+                            if (line == varbegin):  
+                                parsevars = True
+                            # Scan values from output until EOF
+                            elif (line != valbegin and parsevars):  
+                                parts = line.split()
+                                if len(parts) >= 3:
+                                    variables.append(parts[1])
+                            elif (parsevals):  
+                                parts = line.split()
+                                if len(parts) >= 2:
+                                    values.append(parts[1])
+                                elif len(parts) == 1:
+                                    values.append(parts[0])
+                            elif line == valbegin:
+                                parsevars = False
+                                parsevals = True
+                for i in range(len(values)):
+                    # Found new device
+                    var = variables[i].replace('(','.').replace(')','.').replace('[','.').replace(']','.').split('.')
+                    if self.parent.name not in variables[i]:
+                        # Currently node voltages are ignored
+                        param = var[0]
+                        dev = ''.join(var[1:])
+
+                    elif '[' in variables[i]:
+                        if self.parent.name in var[1]:
+                            var = var[1:-1]
+                        elif self.parent.name in var[2]:
+                            var = var[2:-2]
+                        dev = '.'.join(var[0:-2])
+                        param = var[-1]
+                    elif '(' in variables[i]:
+                        param = var[0]
+                        dev = '.'.join(var[1:-1])
+
+                    val = float(values[i])
+
+                    if (dev not in self.extracts.Members["oppts"]):  
+                        self.extracts.Members["oppts"].update({dev: {}})
+                    # Found new parameter for device
+                    if (param not in self.extracts.Members["oppts"][dev]):  
+                        self.extracts.Members["oppts"][dev].update({param: [val]})
+                    else:  # Parameter already existed, just append value. This can occur in e.g. sweeps
+                        self.extracts.Members["oppts"][dev][param].append(val)
             else:  # DC analysis not in simcmds, oppts is empty
                 self.extracts.Members.update({"oppts": {}})
+
         except:
             self.print_log(type="W", msg=traceback.format_exc())
             self.print_log(
@@ -523,11 +620,11 @@ class ngspice(spice_common):
                         k
                     ]  # Indexing of line numbers starts from one
                     if k == len(linenumbers) - 1:
-                        stop = numlines - 1
+                        stop = numlines
                     else:
                         stop = (
-                            linenumbers[k + 1] - 6
-                        )  # Previous data column ends 5 rows before start of next one
+                            linenumbers[k + 1] - 1
+                        )
                     nrows = stop - start
                     if nrows < 20e6:
                         self.print_log(
