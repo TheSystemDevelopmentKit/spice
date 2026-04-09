@@ -181,7 +181,7 @@ class spice_iofile(iofile):
         for ioname in self.ionames:
             if self.dir == "out":
                 analysis = self.parent.analysis_type
-                if analysis.lower() == "pss":
+                if analysis.lower() == "pss" and self.parent.simulator!="ngspice":
                     filename = "tb_%s.raw/*%s.fd.pss" % (
                         self.parent.name,
                         self.parent.spice_simulator.pss_analysis_name,

@@ -109,6 +109,8 @@ class spice_simcmd(thesdk):
         Step size of the sweep simulation. Default 10.
     tprint : float or str
         Print interval. Default 1e-12 (same as '1p').
+    tstab: float
+        Stabilization time before finding PSS for Ngspice PSS simulations. Default is 1e-6.
     tstop : float or str
         Transient simulation duration. When not defined, the simulation time is
         the duration of the longest input signal.
@@ -197,6 +199,7 @@ class spice_simcmd(thesdk):
             self.plotlist = kwargs.get("plotlist", [])
             self.excludelist = kwargs.get("excludelist", [])
             self.tprint = kwargs.get("tprint", 1e-12)
+            self.tstab = kwargs.get("tstab", 1e-6)
             self.tstop = kwargs.get("tstop", None)
             self.uic = kwargs.get("uic", False)
             self.noise = kwargs.get("noise", False)
