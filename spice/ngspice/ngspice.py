@@ -380,11 +380,11 @@ class ngspice(spice_common):
                         for line in f:
                             values = line.split()
                             freq.append(float(values[0]))
-                            onoise.append(values[1])
-                            inoise.append(values[3])
+                            onoise.append(float(values[1]))
+                            inoise.append(float(values[3]))
             self.extracts.Members['noise'].update({"onoise_spectrum": onoise})
             self.extracts.Members['noise'].update({"inoise_spectrum": inoise})
-            self.extracts.Members['noise'].update({"frequency": freq})
+            self.extracts.Members['noise'].update({"freq": freq})
         except:
             self.print_log(type="W", msg=traceback.format_exc())
             self.print_log(
