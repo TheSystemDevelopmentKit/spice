@@ -340,13 +340,13 @@ class ngspice(spice_common):
                                 if len(real)==len(sp):
                                     if sp[0] not in result:
                                         for i in range(len(sp)):
-                                            result[sp[i]]=[frequency, complex(real[i]+imag[i])]
+                                            result[sp[i]]=[frequency, complex(real[i],imag[i])]
                                         if self.parent.noise:
                                             result['NF']=[frequency, nf]
                                             result['NFmin']=[frequency, nfmin]
                                     else:
                                         for i in range(len(sp)):
-                                            result[sp[i]]=np.vstack([result[sp[i]],[frequency, complex(real[i]+imag[i])]])
+                                            result[sp[i]]=np.vstack([result[sp[i]],[frequency, complex(real[i],imag[i])]])
                                         if self.parent.noise:
                                             result['NF']=np.vstack([result['NF'],[frequency, nf]])
                                             result['NFmin']=np.vstack([result['NFmin'],[frequency, nfmin]])
