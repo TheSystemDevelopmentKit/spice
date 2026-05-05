@@ -114,10 +114,14 @@ class ngspice_testbench(testbench_common):
                 f"{self.parent.spice_simulator.commentchar} Port sources \n"
             )
             for name, port in self.parent.spice_ports.items():
+                if port.dc is None:
+                    port.dc = 0
+                if port.mag is None:
+                    port.mag = 0
                 if port.res is not None:
-                    self.portsrcstr += f"{name} {port.pos} {port.neg} dc 0 ac 1 portnum {port.num} z0 {port.res}\n"
+                    self.portsrcstr += f"{name} {port.pos} {port.neg} dc {port.dc} ac {port.mag} portnum {port.num} z0 {port.res}\n"
                 else:
-                    self.portsrcstr += f"{name} {port.pos} {port.neg} dc 0 ac 1 portnum {port.num} \n"
+                    self.portsrcstr += f"{name} {port.pos} {port.neg} dc {port.dc} ac {port.mag} portnum {port.num} \n"
         return self._portsrcstr
 
     @portsrcstr.setter
