@@ -383,7 +383,7 @@ class ngspice_testbench(testbench_common):
                         )
                     self._simcmdstr += ".%s %s %s %s\n" % (
                         sim,
-                        str(val.tprint),
+                        str(val.strobeperiod),
                         str(simtime),
                         "uic" if val.uic else "",
                     )
