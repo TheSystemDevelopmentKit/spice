@@ -335,6 +335,8 @@ class ngspice(spice_common):
                                 real = [float(v) for v in values[1::3]]
                                 imag = [float(v) for v in values[2::3]]
                                 if self.parent.noise:
+                                    sopt = complex(real.pop(), imag.pop())
+                                    rn = complex(real.pop(), imag.pop())
                                     nfmin = complex(real.pop(), imag.pop())
                                     nf = complex(real.pop(), imag.pop())
                                 if len(real)==len(sp):
@@ -344,12 +346,16 @@ class ngspice(spice_common):
                                         if self.parent.noise:
                                             result['NF']=[frequency, nf]
                                             result['NFmin']=[frequency, nfmin]
+                                            result['Rn']=[frequency, rn]
+                                            result['SOpt']=[frequency, sopt]
                                     else:
                                         for i in range(len(sp)):
                                             result[sp[i]]=np.vstack([result[sp[i]],[frequency, complex(real[i],imag[i])]])
                                         if self.parent.noise:
                                             result['NF']=np.vstack([result['NF'],[frequency, nf]])
                                             result['NFmin']=np.vstack([result['NFmin'],[frequency, nfmin]])
+                                            result['Rn']=np.vstack([result['Rn'],[frequency, rn]])
+                                            result['SOpt']=np.vstack([result['SOpt'],[frequency, sopt]])
                     rd = {
                         0: {"param": "nosweep", "value": 0, read_type: result}
                     }

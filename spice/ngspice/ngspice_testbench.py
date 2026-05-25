@@ -782,7 +782,7 @@ class ngspice_testbench(testbench_common):
                     sp = [f'S_{i}_{j}' for i in srange for j in srange]
                     self._plotcmd += (' '.join(sp))
                     if self.parent.noise:
-                        self._plotcmd += (" NF NFmin\n")
+                        self._plotcmd += (" NF NFmin Rn SOpt\n")
                     else:
                         self._plotcmd += ("\n")
                 if name.lower() == "noise":
