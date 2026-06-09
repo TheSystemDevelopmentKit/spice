@@ -381,10 +381,10 @@ class ngspice_testbench(testbench_common):
                             msg="Inferred transient duration is %g s from '%s'."
                             % (simtime, self._trantime_name),
                         )
-                    tstop = val.tprint if val.tprint else val.strobeperiod
+                    tstep = val.strobeperiod if val.strobeperiod else val.tprint
                     self._simcmdstr += ".%s %s %s %s\n" % (
                         sim,
-                        str(tstop),
+                        str(tstep),
                         str(simtime),
                         "uic" if val.uic else "",
                     )
