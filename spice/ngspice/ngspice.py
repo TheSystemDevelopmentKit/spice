@@ -70,8 +70,7 @@ class ngspice(spice_common):
     @property
     def cmdfile_ext(self):
         """str : Extension of the command file"""
-#        return ".ngcir"
-        return ".spice"
+        return ".ngcir"
 
     @property
     def resultfile_ext(self):
@@ -480,14 +479,14 @@ class ngspice(spice_common):
                     with open(file, "r") as f:
                         for line in f:
                             # Scan file until unit descriptions end and values start
-                            if (line == varbegin):  
+                            if (line == varbegin):
                                 parsevars = True
                             # Scan values from output until EOF
-                            elif (line != valbegin and parsevars):  
+                            elif (line != valbegin and parsevars):
                                 parts = line.split()
                                 if len(parts) >= 3:
                                     variables.append(parts[1])
-                            elif (parsevals):  
+                            elif (parsevals):
                                 parts = line.split()
                                 if len(parts) >= 2:
                                     values.append(parts[1])
@@ -517,10 +516,10 @@ class ngspice(spice_common):
 
                     val = float(values[i])
 
-                    if (dev not in self.extracts.Members["oppts"]):  
+                    if (dev not in self.extracts.Members["oppts"]):
                         self.extracts.Members["oppts"].update({dev: {}})
                     # Found new parameter for device
-                    if (param not in self.extracts.Members["oppts"][dev]):  
+                    if (param not in self.extracts.Members["oppts"][dev]):
                         self.extracts.Members["oppts"][dev].update({param: [val]})
                     else:  # Parameter already existed, just append value. This can occur in e.g. sweeps
                         self.extracts.Members["oppts"][dev][param].append(val)
