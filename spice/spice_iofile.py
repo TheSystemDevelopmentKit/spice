@@ -25,6 +25,7 @@ from numpy import genfromtxt
 import traceback
 from bitstring import BitArray
 import glob
+import time
 
 
 class spice_iofile(iofile):
@@ -644,12 +645,11 @@ class spice_iofile(iofile):
 
         [TODO] Use kwargs and update outdated docstrings
         """
-        sampled = np.ones((len(trigger), 2)) * np.nan
-        for i in range(len(trigger)):
-            tsamp = trigger[i]
-            closest_idx = np.argmin(np.abs(signal[:, 0] - tsamp))
-            sampled[i, 0] = signal[closest_idx, 0]
-            sampled[i, 1] = signal[closest_idx, 1]
+
+        mids = (signal[:-1,0].astype(float) + signal[1:,0].astype(float)) / 2.0
+        chosen_sorted = np.searchsorted(mids, trigger, side="left")
+        sampled=signal[chosen_sorted,:]
+
         return sampled
 
     def _bin2int(self, binary, big_endian=False, signed=False):
