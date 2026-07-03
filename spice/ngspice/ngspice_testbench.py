@@ -777,7 +777,7 @@ class ngspice_testbench(testbench_common):
                 if name.lower() == "sp":
                     self._plotcmd += ".control\n"
                     self._plotcmd += "run\n"
-                    printfile=val.parent.spicetbsrc.split('.spice')[0]+'.raw'
+                    printfile=val.parent.spicetbsrc.split('.ngcir')[0]+'.raw'
                     self._plotcmd += ("wrdata %s " % (printfile))
                     srange = range(1, len(self.parent.spice_ports)+1)
                     sp = [f'S_{i}_{j}' for i in srange for j in srange]
@@ -789,7 +789,7 @@ class ngspice_testbench(testbench_common):
                 if name.lower() == "noise":
                     self._plotcmd += ".control\n"
                     self._plotcmd += "save onoise_spectrum inoise_spectrum\nrun\n"
-                    printfile=val.parent.spicetbsrc.split('.spice')[0]+'.raw'
+                    printfile=val.parent.spicetbsrc.split('.ngcir')[0]+'.raw'
                     self._plotcmd += ("wrdata %s " % (printfile) + "onoise_spectrum inoise_spectrum\n")
             self._plotcmd += ".endc\n"
         return self._plotcmd
