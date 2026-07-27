@@ -596,7 +596,7 @@ class ngspice_testbench(testbench_common):
                             self._plotcmd += i + " "
                         self._plotcmd += "]"
                     self._plotcmd += "\n\n"
-                    printfile=val.parent.spicetbsrc.split('.spice')[0]+'.raw'
+                    printfile=val.parent.spicetbsrc.split('.ngcir')[0]+'.raw'
                     self._plotcmd += f"op\nset filetype=ascii\nwrite {printfile}\n"
                 if name.lower() == "tran" or name.lower() == "ac":
                     self._plotcmd += (
