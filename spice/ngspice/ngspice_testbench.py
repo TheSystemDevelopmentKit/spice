@@ -397,7 +397,7 @@ class ngspice_testbench(testbench_common):
                         )
 
                 elif str(sim).lower() == "dc":
-                    self._simcmdstr += ".op " 
+                    self._simcmdstr += ".op "
                     self._simcmdstr += "\n\n"
 
                 elif str(sim).lower() == "ac":
@@ -461,13 +461,13 @@ class ngspice_testbench(testbench_common):
                                 type="F",
                                 msg="Set fpoints for SP simulation!",
                             )
-                    self._simcmdstr += f'.sp %s {val.fmin} {val.fmax} ' % (
-                            pts_str,
-                            )
+                    self._simcmdstr += f".sp %s {val.fmin} {val.fmax} " % (
+                        pts_str,
+                    )
                     if val.noise:
-                        self._simcmdstr += '1'
+                        self._simcmdstr += "1"
                     else:
-                        self._simcmdstr += '0'
+                        self._simcmdstr += "0"
                     self._simcmdstr += "\n"
                 elif str(sim).lower() == "noise":
                     if val.fscale.lower() == "log":
@@ -537,7 +537,7 @@ class ngspice_testbench(testbench_common):
                             msg="Harmonics must be defined for PSS simulation",
                         )
                     # TODO: add sciter and steady_coeff
-                    self._simcmdstr += f".pss {val.fsig} {val.tstab} {val.nodes[0]} {val.fpoints} {val.harmonics} " 
+                    self._simcmdstr += f".pss {val.fsig} {val.tstab} {val.nodes[0]} {val.fpoints} {val.harmonics} "
                 # TODO: .PSS .SENS .TF
                 else:
                     self.print_log(
@@ -589,15 +589,21 @@ class ngspice_testbench(testbench_common):
                     self._plotcmd += ".control\n"
                     self._plotcmd += "save all\n save "
                     for i in val.plotlist:
-                        self._plotcmd += "@" + self.esc_bus(i, esc_colon=False) + " "
+                        self._plotcmd += (
+                            "@" + self.esc_bus(i, esc_colon=False) + " "
+                        )
                     if val.excludelist != []:
                         self._plotcmd += "exclude=[ "
                         for i in val.excludelist:
                             self._plotcmd += i + " "
                         self._plotcmd += "]"
                     self._plotcmd += "\n\n"
-                    printfile=val.parent.spicetbsrc.split('.ngcir')[0]+'.raw'
-                    self._plotcmd += f"op\nset filetype=ascii\nwrite {printfile}\n"
+                    printfile = (
+                        val.parent.spicetbsrc.split(".ngcir")[0] + ".raw"
+                    )
+                    self._plotcmd += (
+                        f"op\nset filetype=ascii\nwrite {printfile}\n"
+                    )
                 if name.lower() == "tran" or name.lower() == "ac":
                     self._plotcmd += (
                         "%s Output signals\n"
@@ -777,20 +783,29 @@ class ngspice_testbench(testbench_common):
                 if name.lower() == "sp":
                     self._plotcmd += ".control\n"
                     self._plotcmd += "run\n"
-                    printfile=val.parent.spicetbsrc.split('.ngcir')[0]+'.raw'
-                    self._plotcmd += ("wrdata %s " % (printfile))
-                    srange = range(1, len(self.parent.spice_ports)+1)
-                    sp = [f'S_{i}_{j}' for i in srange for j in srange]
-                    self._plotcmd += (' '.join(sp))
+                    printfile = (
+                        val.parent.spicetbsrc.split(".ngcir")[0] + ".raw"
+                    )
+                    self._plotcmd += "wrdata %s " % (printfile)
+                    srange = range(1, len(self.parent.spice_ports) + 1)
+                    sp = [f"S_{i}_{j}" for i in srange for j in srange]
+                    self._plotcmd += " ".join(sp)
                     if self.parent.noise:
-                        self._plotcmd += (" NF NFmin Rn SOpt\n")
+                        self._plotcmd += " NF NFmin Rn SOpt\n"
                     else:
-                        self._plotcmd += ("\n")
+                        self._plotcmd += "\n"
                 if name.lower() == "noise":
                     self._plotcmd += ".control\n"
-                    self._plotcmd += "save onoise_spectrum inoise_spectrum\nrun\n"
-                    printfile=val.parent.spicetbsrc.split('.ngcir')[0]+'.raw'
-                    self._plotcmd += ("wrdata %s " % (printfile) + "onoise_spectrum inoise_spectrum\n")
+                    self._plotcmd += (
+                        "save onoise_spectrum inoise_spectrum\nrun\n"
+                    )
+                    printfile = (
+                        val.parent.spicetbsrc.split(".ngcir")[0] + ".raw"
+                    )
+                    self._plotcmd += (
+                        "wrdata %s " % (printfile)
+                        + "onoise_spectrum inoise_spectrum\n"
+                    )
             self._plotcmd += ".endc\n"
         return self._plotcmd
 

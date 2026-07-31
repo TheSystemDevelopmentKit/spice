@@ -158,7 +158,7 @@ class spice_simcmd(thesdk):
         Maximum time step Spectre simulator will use during transient analysis
     noisesrc: string
         Name of an independent source to which ngspice refers noise to (in .noise simulations).
-        Defaul: None. 
+        Defaul: None.
     step: float
         According to Spectre: minimum time step used by the simulator solely to maintain the aesthetics of the computed waveforms.
     strobeperiod: float

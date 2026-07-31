@@ -166,10 +166,10 @@ class testbench(testbench_common):
     def copy_dspf(self):
         try:
             for cell in self.parent.dspf:
-                if self.model=='ngspice':
-                    fileformat='pex.spice'
-                elif self.model=='spectre' or self.model=='eldo':
-                    fileformat='pex.dspf'
+                if self.model == "ngspice":
+                    fileformat = "pex.spice"
+                elif self.model == "spectre" or self.model == "eldo":
+                    fileformat = "pex.dspf"
 
                 src = os.path.join(
                     self.parent.spicesrcpath, "%s.%s" % (cell, fileformat)
@@ -204,13 +204,13 @@ class testbench(testbench_common):
                     % self.parent.spice_simulator.commentchar
                 )
                 for cellname in self.parent.dspf:
-                    if self.model=='spectre' or self.model=='eldo':
+                    if self.model == "spectre" or self.model == "eldo":
                         origcellmatch = re.compile(r"DESIGN")
                         dspfpath = "%s/%s.pex.dspf" % (
                             self.parent.spicesimpath,
                             cellname,
                         )
-                    elif self.model=='ngspice':
+                    elif self.model == "ngspice":
                         origcellmatch = re.compile(r".SUBCKT")
                         dspfpath = "%s/%s.pex.spice" % (
                             self.parent.spicesimpath,
@@ -224,9 +224,12 @@ class testbench(testbench_common):
                                 # This mathch only check if there is a DESIGN in dpsf file.
                                 if origcellmatch.search(line) != None:
                                     words = line.split()
-                                    if self.model=='spectre' or self.model=='eldo':
+                                    if (
+                                        self.model == "spectre"
+                                        or self.model == "eldo"
+                                    ):
                                         cellname = words[-1].replace('"', "")
-                                    elif self.model=='ngspice':
+                                    elif self.model == "ngspice":
                                         cellname = words[1]
                                     if (
                                         cellname.lower()
