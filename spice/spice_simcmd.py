@@ -109,6 +109,8 @@ class spice_simcmd(thesdk):
         Step size of the sweep simulation. Default 10.
     tprint : float or str
         Print interval. Default 1e-12 (same as '1p').
+    tstab: float
+        Stabilization time before finding PSS for Ngspice PSS simulations. Default is 1e-6.
     tstop : float or str
         Transient simulation duration. When not defined, the simulation time is
         the duration of the longest input signal.
@@ -154,6 +156,9 @@ class spice_simcmd(thesdk):
         For Spectre only! If true, print model parameters to raw-file.
     maxstep : float
         Maximum time step Spectre simulator will use during transient analysis
+    noisesrc: string
+        Name of an independent source to which ngspice refers noise to (in .noise simulations).
+        Defaul: None.
     step: float
         According to Spectre: minimum time step used by the simulator solely to maintain the aesthetics of the computed waveforms.
     strobeperiod: float
@@ -194,6 +199,7 @@ class spice_simcmd(thesdk):
             self.plotlist = kwargs.get("plotlist", [])
             self.excludelist = kwargs.get("excludelist", [])
             self.tprint = kwargs.get("tprint", 1e-12)
+            self.tstab = kwargs.get("tstab", 1e-6)
             self.tstop = kwargs.get("tstop", None)
             self.uic = kwargs.get("uic", False)
             self.noise = kwargs.get("noise", False)
@@ -224,6 +230,7 @@ class spice_simcmd(thesdk):
             self.iprobe = kwargs.get("iprobe", None)
             self.probe = kwargs.get("probe", None)
             self.harmonics = kwargs.get("harmonics", None)
+            self.noisesrc = kwargs.get("noisesrc", None)
             # Make list, if they are not already
             self.sweep = (
                 kwargs.get("sweep", [])
