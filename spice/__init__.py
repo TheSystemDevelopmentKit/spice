@@ -64,6 +64,7 @@ from spice.spice_port import spice_port
 from spice.ngspice.ngspice import ngspice
 from spice.eldo.eldo import eldo
 from spice.spectre.spectre import spectre
+from spice.vacask.vacask import vacask
 
 
 class spice(spice_common):
@@ -98,6 +99,7 @@ class spice(spice_common):
         :type: ngspice
         :type: eldo
         :type: spectre
+        :type: vacask
 
         """
         if not hasattr(self, "_spice_simulator"):
@@ -107,6 +109,8 @@ class spice(spice_common):
                 self._spice_simulator = eldo(parent=self)
             elif self.model == "spectre":
                 self._spice_simulator = spectre(parent=self)
+            elif self.model == "vacask":
+                self._spice_simulator = vacask(parent=self)
             else:
                 self.print_log(
                     type="F", msg=f"Unsupported simulator: {self.model}"
@@ -116,7 +120,7 @@ class spice(spice_common):
     @property
     def syntaxdict(self):
         """dict : Internally used dictionary for common syntax conversions between
-        Spectre, Eldo, and Ngspice.
+        Spectre, Eldo, Ngspice, and VACASK.
         """
         if not hasattr(self, "_syntaxdict"):
             self._syntaxdict = self.spice_simulator.syntaxdict
@@ -299,8 +303,8 @@ class spice(spice_common):
     def spicecorner(self):
         """dict : Feature for specifying the 'section' of the model library file and
         simulation temperature. The path to model libraries should be set in
-        TheSDK.config as either ELDOLIBFILE, SPECTRELIBFILE or NGSPICELIBFILE
-        variable.
+        TheSDK.config as either ELDOLIBFILE, SPECTRELIBFILE, NGSPICELIBFILE, or
+        VACASKLIBFILE variable.
 
         Example
         -------
@@ -327,7 +331,7 @@ class spice(spice_common):
         """dict : Feature for specifying options for spice simulation. The key is the
         name of the option (as in simulator manual specifies), and the value is
         the value given to said option. Valid key-value pairs can be found from
-        the manual of the simulator (Eldo, Spectre or Ngspice).
+        the manual of the simulator (Eldo, Spectre, Ngspice or VACASK).
 
         Example
         -------
@@ -405,6 +409,8 @@ class spice(spice_common):
         Spectre :  maps to command line parameter '+mt'.
 
         Ngspice :  maps to 'set num_threads=' line in testbench.
+
+        VACASK :  TODO: maps to ??? line in testbench.
 
         """
         if hasattr(self, "_nproc"):

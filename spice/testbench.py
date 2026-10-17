@@ -18,6 +18,7 @@ from spice.testbench_common import testbench_common
 from spice.ngspice.ngspice_testbench import ngspice_testbench
 from spice.eldo.eldo_testbench import eldo_testbench
 from spice.spectre.spectre_testbench import spectre_testbench
+from spice.vacask.vacask_testbench import vacask_testbench
 from spice.spice_module import spice_module
 import pdb
 
@@ -66,7 +67,7 @@ class testbench(testbench_common):
         :type: ngspice_testbench
         :type: eldo_testbench
         :type: spectre_testbench
-
+        :type: vacask_testbench
 
         """
         if not hasattr(self, "_testbench_simulator"):
@@ -80,6 +81,8 @@ class testbench(testbench_common):
                 self._testbench_simulator = spectre_testbench(
                     parent=self.parent
                 )
+            if self.model == "vacask":
+                self._testbench_simulator = vacask_testbench(parent=self.parent)
         return self._testbench_simulator
 
     @property
