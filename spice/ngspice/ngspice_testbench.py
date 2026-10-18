@@ -68,7 +68,7 @@ class ngspice_testbench(testbench_common):
     @property
     def libcmd(self):
         """str : Library inclusion string. Parsed from self.spicecorner -dictionary in
-        the parent entity, as well as 'ELDOLIBFILE' or 'SPECTRELIBFILE' global
+        the parent entity, as well as 'NGSPICELIBFILE', 'ELDOLIBFILE' or 'SPECTRELIBFILE' global
         variables in TheSDK.config.
         """
         if not hasattr(self, "_libcmd"):
@@ -110,10 +110,18 @@ class ngspice_testbench(testbench_common):
         Port source defintions parsed from from self.parent.spice_ports
         """
         if not hasattr(self, "_portsrcstr"):
-            self.portsrcstr = ""
-            self.print_log(
-                type="W", msg="Port support not yet implemented for ngspice!"
+            self._portsrcstr = (
+                f"{self.parent.spice_simulator.commentchar} Port sources \n"
             )
+            for name, port in self.parent.spice_ports.items():
+                if port.dc is None:
+                    port.dc = 0
+                if port.mag is None:
+                    port.mag = 0
+                if port.res is not None:
+                    self.portsrcstr += f"{name} {port.pos} {port.neg} dc {port.dc} ac {port.mag} portnum {port.num} z0 {port.res}\n"
+                else:
+                    self.portsrcstr += f"{name} {port.pos} {port.neg} dc {port.dc} ac {port.mag} portnum {port.num} \n"
         return self._portsrcstr
 
     @portsrcstr.setter
@@ -373,10 +381,10 @@ class ngspice_testbench(testbench_common):
                             msg="Inferred transient duration is %g s from '%s'."
                             % (simtime, self._trantime_name),
                         )
-                    # TODO could this if-else be avoided?
+                    tstep = val.strobeperiod if val.strobeperiod else val.tprint
                     self._simcmdstr += ".%s %s %s %s\n" % (
                         sim,
-                        str(val.tprint),
+                        str(tstep),
                         str(simtime),
                         "uic" if val.uic else "",
                     )
@@ -389,10 +397,9 @@ class ngspice_testbench(testbench_common):
                         )
 
                 elif str(sim).lower() == "dc":
-                    self.print_log(
-                        type="E",
-                        msg="Unsupported model %s." % self.parent.model,
-                    )
+                    self._simcmdstr += ".op "
+                    self._simcmdstr += "\n\n"
+
                 elif str(sim).lower() == "ac":
                     if val.fscale.lower() == "dec":
                         if val.fpoints != 0:
@@ -422,7 +429,116 @@ class ngspice_testbench(testbench_common):
                         val.fmax,
                     )
                     self._simcmdstr += "\n\n"
-
+                elif str(sim).lower() == "pz":
+                    inpnode = val.inpnode
+                    innnode = val.innnode
+                    outpnode = val.outpnode
+                    outnnode = val.outnnode
+                    # TODO: could also be vol/cur or pz/pol/zer
+                    self._simcmdstr += ".pz %s %s %s %s vol pz" % (
+                        inpnode,
+                        innnode,
+                        outpnode,
+                        outnnode,
+                    )
+                    self._simcmdstr += "\n\n"
+                elif str(sim).lower() == "sp":
+                    if val.fscale.lower() == "log":
+                        if val.fpoints != 0:
+                            pts_str = "oct %d" % val.fpoints
+                        elif val.fstepsize != 0:
+                            pts_str = "dec %d" % val.fstepsize
+                        else:
+                            self.print_log(
+                                type="F",
+                                msg="Set either fpoints or fstepsize for SP simulation!",
+                            )
+                    elif val.fscale.lower() == "lin":
+                        if val.fpoints != 0:
+                            pts_str = "lin %d" % val.fpoints
+                        else:
+                            self.print_log(
+                                type="F",
+                                msg="Set fpoints for SP simulation!",
+                            )
+                    self._simcmdstr += f".sp %s {val.fmin} {val.fmax} " % (
+                        pts_str,
+                    )
+                    if val.noise:
+                        self._simcmdstr += "1"
+                    else:
+                        self._simcmdstr += "0"
+                    self._simcmdstr += "\n"
+                elif str(sim).lower() == "noise":
+                    if val.fscale.lower() == "log":
+                        if val.fpoints != 0:
+                            pts_str = "oct %d" % val.fpoints
+                        elif val.fstepsize != 0:
+                            pts_str = "dec %d" % val.fstepsize
+                        else:
+                            self.print_log(
+                                type="F",
+                                msg="Set either fpoints or fstepsize for noise simulation!",
+                            )
+                    elif val.fscale.lower() == "lin":
+                        if val.fpoints != 0:
+                            pts_str = "lin %d" % val.fpoints
+                        else:
+                            self.print_log(
+                                type="F",
+                                msg="Set fpoints for noise simulation!",
+                            )
+                    if len(val.nodes) == 0:
+                        self.print_log(
+                            type="F",
+                            msg="Nodes list is empty. Set the nodes for noise simulation!",
+                        )
+                    if val.fmin == None:
+                        self.print_log(
+                            type="F",
+                            msg="Fmin must be given for noise simulation",
+                        )
+                    if val.fmax == None:
+                        self.print_log(
+                            type="F",
+                            msg="Fmax must be given for noise simulation",
+                        )
+                    if val.noisesrc == None:
+                        self.print_log(
+                            type="F",
+                            msg="noisesrc must be given for noise simulation",
+                        )
+                    for node in val.nodes:
+                        self._simcmdstr += f".noise v({node}) {val.noisesrc} {pts_str} {val.fmin} {val.fmax} \n"
+                elif str(sim).lower() == "pss":
+                    if val.fsig == None:
+                        self.print_log(
+                            type="F",
+                            msg="fsig must be given for PSS simulation",
+                        )
+                    if val.tstab == None:
+                        self.print_log(
+                            type="F",
+                            msg="tstab must be given for PSS simulation",
+                        )
+                    if len(val.nodes) == 0:
+                        self.print_log(
+                            type="F",
+                            msg="node must be given for PSS simulation",
+                        )
+                    if val.fpoints == None:
+                        self.print_log(
+                            type="F",
+                            msg="Fpoints must be defined for PSS simulation",
+                        )
+                    if val.harmonics == None:
+                        self.print_log(
+                            type="F",
+                            msg="Harmonics must be defined for PSS simulation",
+                        )
+                    # TODO: add sciter and steady_coeff
+                    self._simcmdstr += f".pss {val.fsig} {val.tstab} {val.nodes[0]} {val.fpoints} {val.harmonics} "
+                # TODO: .PSS .SENS .TF
                 else:
                     self.print_log(
                         type="E",
@@ -469,17 +585,25 @@ class ngspice_testbench(testbench_common):
                         "%s DC operating points to be captured:\n"
                         % self.parent.spice_simulator.commentchar
                     )
-                    self._plotcmd += "save "
-
+                    # control sequence: save all to get the node voltages
+                    self._plotcmd += ".control\n"
+                    self._plotcmd += "save all\n save "
                     for i in val.plotlist:
-                        self._plotcmd += self.esc_bus(i, esc_colon=False) + " "
+                        self._plotcmd += (
+                            "@" + self.esc_bus(i, esc_colon=False) + " "
+                        )
                     if val.excludelist != []:
                         self._plotcmd += "exclude=[ "
                         for i in val.excludelist:
                             self._plotcmd += i + " "
                         self._plotcmd += "]"
                     self._plotcmd += "\n\n"
-
+                    printfile = (
+                        val.parent.spicetbsrc.split(".ngcir")[0] + ".raw"
+                    )
+                    self._plotcmd += (
+                        f"op\nset filetype=ascii\nwrite {printfile}\n"
+                    )
                 if name.lower() == "tran" or name.lower() == "ac":
                     self._plotcmd += (
                         "%s Output signals\n"
@@ -656,6 +780,32 @@ class ngspice_testbench(testbench_common):
                                 val.ext_file,
                                 supply,
                             )
+                if name.lower() == "sp":
+                    self._plotcmd += ".control\n"
+                    self._plotcmd += "run\n"
+                    printfile = (
+                        val.parent.spicetbsrc.split(".ngcir")[0] + ".raw"
+                    )
+                    self._plotcmd += "wrdata %s " % (printfile)
+                    srange = range(1, len(self.parent.spice_ports) + 1)
+                    sp = [f"S_{i}_{j}" for i in srange for j in srange]
+                    self._plotcmd += " ".join(sp)
+                    if self.parent.noise:
+                        self._plotcmd += " NF NFmin Rn SOpt\n"
+                    else:
+                        self._plotcmd += "\n"
+                if name.lower() == "noise":
+                    self._plotcmd += ".control\n"
+                    self._plotcmd += (
+                        "save onoise_spectrum inoise_spectrum\nrun\n"
+                    )
+                    printfile = (
+                        val.parent.spicetbsrc.split(".ngcir")[0] + ".raw"
+                    )
+                    self._plotcmd += (
+                        "wrdata %s " % (printfile)
+                        + "onoise_spectrum inoise_spectrum\n"
+                    )
             self._plotcmd += ".endc\n"
         return self._plotcmd
 

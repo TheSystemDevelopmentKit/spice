@@ -15,6 +15,8 @@ import subprocess
 import multiprocessing
 from spice.spice_common import spice_common
 import numpy as np
+import traceback
+import glob
 
 
 class ngspice(spice_common):
@@ -276,18 +278,155 @@ class ngspice(spice_common):
     def read_sp_result(self, **kwargs):
         """Internally called function to read the S-parameter simulation results"""
         read_type = kwargs.get("read_type")
-        if "sp" in self.parent.simcmd_bundle.Members.keys():
+        try:
+            if "sp" in self.parent.simcmd_bundle.Members.keys():
+                self.extracts.Members.update({read_type: {}})
+                sweep = False
+                # For distributed runs
+                if self.parent.distributed_run:
+                    # TODO: check functionality and implement
+                    self.print_log(
+                        type="F",
+                        msg=f"Distributed runs not currently supported for \
+                                    S-parameter analyses.",
+                    )
+                    path = os.path.join(
+                        self.parent.spicesimpath,
+                        "tb_%s.raw" % self.parent.name,
+                        "[0-9]*",
+                    )
+                else:
+                    path = os.path.join(
+                        self.parent.spicesimpath,
+                        "tb_%s.raw" % self.parent.name,
+                    )
+                # Sort files such that the sweeps are in correct order.
+                if sweep:
+                    num_sweeps = len(val.sweep)
+                    files = glob.glob(path)
+                    for i in range(num_sweeps):
+                        files = sorted(files, key=lambda x: self.sorter(x, i))
+                    if len(files) > 0:
+                        rd, fileptr = self.create_nested_sweepresult_dict(
+                            0,
+                            0,
+                            self.extracts.Members["sweeps_ran"],
+                            files,
+                            read_type,
+                        )
+                else:
+                    files = glob.glob(path)
+                    if len(files) > 1:  # This should not happen
+                        self.print_log(
+                            type="W",
+                            msg="S-parameter analysis was not a sweep, but for \
+                                        some reason multiple output files were found. \
+                                        results may be in wrong order!",
+                        )
+                    srange = range(1, len(self.parent.spice_ports) + 1)
+                    sp = [f"s{i}{j}" for i in srange for j in srange]
+                    result = {}
+
+                    if len(files) > 0:
+                        with open(files[0], "r") as f:
+                            for line in f:
+                                values = line.split()
+                                frequency = float(values[0])
+                                real = [float(v) for v in values[1::3]]
+                                imag = [float(v) for v in values[2::3]]
+                                if self.parent.noise:
+                                    sopt = complex(real.pop(), imag.pop())
+                                    rn = complex(real.pop(), imag.pop())
+                                    nfmin = complex(real.pop(), imag.pop())
+                                    nf = complex(real.pop(), imag.pop())
+                                if len(real) == len(sp):
+                                    if sp[0] not in result:
+                                        for i in range(len(sp)):
+                                            result[sp[i]] = [
+                                                frequency,
+                                                complex(real[i], imag[i]),
+                                            ]
+                                        if self.parent.noise:
+                                            result["NF"] = [frequency, nf]
+                                            result["NFmin"] = [frequency, nfmin]
+                                            result["Rn"] = [frequency, rn]
+                                            result["SOpt"] = [frequency, sopt]
+                                    else:
+                                        for i in range(len(sp)):
+                                            result[sp[i]] = np.vstack(
+                                                [
+                                                    result[sp[i]],
+                                                    [
+                                                        frequency,
+                                                        complex(
+                                                            real[i], imag[i]
+                                                        ),
+                                                    ],
+                                                ]
+                                            )
+                                        if self.parent.noise:
+                                            result["NF"] = np.vstack(
+                                                [result["NF"], [frequency, nf]]
+                                            )
+                                            result["NFmin"] = np.vstack(
+                                                [
+                                                    result["NFmin"],
+                                                    [frequency, nfmin],
+                                                ]
+                                            )
+                                            result["Rn"] = np.vstack(
+                                                [result["Rn"], [frequency, rn]]
+                                            )
+                                            result["SOpt"] = np.vstack(
+                                                [
+                                                    result["SOpt"],
+                                                    [frequency, sopt],
+                                                ]
+                                            )
+                    rd = {
+                        0: {"param": "nosweep", "value": 0, read_type: result}
+                    }
+                self.extracts.Members[read_type].update({"results": rd})
+        except:
+            self.print_log(type="W", msg=traceback.format_exc())
             self.print_log(
                 type="W",
-                msg="S-Parameters unsupported for %s" % (self.parent.model),
+                msg="Something went wrong while extracting S-parameters",
             )
 
     def read_noise_result(self, **kwargs):
         """Internally called function to read the noise simulation results"""
-        if "noise" in self.parent.simcmd_bundle.Members.keys():
+        try:
+            if "noise" in self.parent.simcmd_bundle.Members.keys():
+                self.extracts.Members.update({"noise": {}})
+                path = os.path.join(
+                    self.parent.spicesimpath,
+                    "tb_%s.raw" % self.parent.name,
+                )
+                files = glob.glob(path)
+                onoise = []
+                inoise = []
+                freq = []
+
+                if len(files) > 0:
+                    with open(files[0], "r") as f:
+                        for line in f:
+                            values = line.split()
+                            freq.append(float(values[0]))
+                            onoise.append(float(values[1]))
+                            inoise.append(float(values[3]))
+                self.extracts.Members["noise"].update(
+                    {"onoise_spectrum": onoise}
+                )
+                self.extracts.Members["noise"].update(
+                    {"inoise_spectrum": inoise}
+                )
+                self.extracts.Members["noise"].update({"freq": freq})
+        except:
+            self.print_log(type="W", msg=traceback.format_exc())
             self.print_log(
-                type="F",
-                msg="Noise analysis unsupported for %s" % (self.parent.model),
+                type="W",
+                msg="Something went wrong while extracting results of noise simulation.",
             )
         return None, None
 
@@ -313,18 +452,121 @@ class ngspice(spice_common):
         """Internally called function to read the DC operating points of the circuit"""
 
         try:
-            if (
-                "dc" in self.parent.simcmd_bundle.Members.keys()
-            ):  # Unsupported model
-                self.print_log(
-                    type="F",
-                    msg="DC analysis unsupported for %s" % (self.parent.model),
-                )
-                raise Exception(
-                    "DC optpoint extraction not supported for Eldo."
-                )
+            if "dc" in self.parent.simcmd_bundle.Members.keys():
+                self.extracts.Members.update({"oppts": {}})
+                # TODO: SWEEP AND MC NOT VERIFIED
+                sweep = False
+                # Get dc simulation file name
+                for name, val in self.parent.simcmd_bundle.Members.items():
+                    mc = val.mc
+                    if name == "dc":
+                        fname = ""
+                        if len(val.sweep) != 0:
+                            for i in range(0, len(val.sweep)):
+                                sweep = True
+                                fname += "Sweep%d-[0-9]*_" % i
+                            if mc:
+                                fname += "mc_oppoint.dc"
+                            else:
+                                fname += "oppoint.dc"
+                        else:
+                            if mc:
+                                fname = "mc_oppoint*.dc"
+                            else:
+                                fname = "oppoint*.dc"
+                        break
+                # For distributed runs
+                if self.parent.distributed_run:
+                    path = os.path.join(
+                        self.parent.spicesimpath,
+                        "tb_%s.raw" % self.parent.name,
+                        "[0-9]*",
+                        fname,
+                    )
+                else:
+                    path = os.path.join(
+                        self.parent.spicesimpath,
+                        "tb_%s.raw" % self.parent.name,
+                    )
+                # Sort files so that sweeps are in correct order
+                if sweep:
+                    num_sweeps = len(val.sweep)
+                    files = glob.glob(path)
+                    for i in range(num_sweeps):
+                        files = sorted(files, key=lambda x: self.sorter(x, i))
+                else:
+                    files = glob.glob(path)
+                    if len(files) > 1:  # This shoudln't happen
+                        self.print_log(
+                            type="W",
+                            msg="DC analysis was not a sweep, but multiple output files were found! Results may be in incorrect order!",
+                        )
+                varbegin = "Variables:\n"
+                variables = []
+                valbegin = "Values:\n"
+                values = []
+                parsevars = False
+                parsevals = False
+                for file in files:
+                    with open(file, "r") as f:
+                        for line in f:
+                            # Scan file until unit descriptions end and values start
+                            if line == varbegin:
+                                parsevars = True
+                            # Scan values from output until EOF
+                            elif line != valbegin and parsevars:
+                                parts = line.split()
+                                if len(parts) >= 3:
+                                    variables.append(parts[1])
+                            elif parsevals:
+                                parts = line.split()
+                                if len(parts) >= 2:
+                                    values.append(parts[1])
+                                elif len(parts) == 1:
+                                    values.append(parts[0])
+                            elif line == valbegin:
+                                parsevars = False
+                                parsevals = True
+                for i in range(len(values)):
+                    # Found new device
+                    var = (
+                        variables[i]
+                        .replace("(", ".")
+                        .replace(")", ".")
+                        .replace("[", ".")
+                        .replace("]", ".")
+                        .split(".")
+                    )
+                    if self.parent.name not in variables[i]:
+                        # Currently node voltages are ignored
+                        param = var[0]
+                        dev = "".join(var[1:])
+
+                    elif "[" in variables[i]:
+                        if self.parent.name in var[1]:
+                            var = var[1:-1]
+                        elif self.parent.name in var[2]:
+                            var = var[2:-2]
+                        dev = ".".join(var[0:-2])
+                        param = var[-1]
+                    elif "(" in variables[i]:
+                        param = var[0]
+                        dev = ".".join(var[1:-1])
+
+                    val = float(values[i])
+
+                    if dev not in self.extracts.Members["oppts"]:
+                        self.extracts.Members["oppts"].update({dev: {}})
+                    # Found new parameter for device
+                    if param not in self.extracts.Members["oppts"][dev]:
+                        self.extracts.Members["oppts"][dev].update(
+                            {param: [val]}
+                        )
+                    else:  # Parameter already existed, just append value. This can occur in e.g. sweeps
+                        self.extracts.Members["oppts"][dev][param].append(val)
             else:  # DC analysis not in simcmds, oppts is empty
                 self.extracts.Members.update({"oppts": {}})
+
         except:
             self.print_log(type="W", msg=traceback.format_exc())
             self.print_log(
@@ -523,11 +765,9 @@ class ngspice(spice_common):
                         k
                     ]  # Indexing of line numbers starts from one
                     if k == len(linenumbers) - 1:
-                        stop = numlines - 1
+                        stop = numlines
                     else:
-                        stop = (
-                            linenumbers[k + 1] - 6
-                        )  # Previous data column ends 5 rows before start of next one
+                        stop = linenumbers[k + 1] - 1
                     nrows = stop - start
                     if nrows < 20e6:
                         self.print_log(
