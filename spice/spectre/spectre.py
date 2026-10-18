@@ -6,6 +6,7 @@ Spectre simulation interface package for Spectre for TheSyDeKick.
 
 Initially written by Okko Järvinen, 2019
 """
+
 import os
 import sys
 import subprocess
@@ -16,6 +17,7 @@ from thesdk import *
 from spice.spice_common import *
 import numpy as np
 import psf_utils as psfu
+
 
 class spectre(spice_common):
     """This class is used as instance in spice_simulatormodule property of
@@ -31,232 +33,427 @@ class spectre(spice_common):
 
     """
 
-    def __init__(self, parent=None,**kwargs):
-            if parent==None:
-                self.print_log(type='F', msg="Parent of simulator module not given")
-            else:
-                self.parent=parent
+    def __init__(self, parent=None, **kwargs):
+        if parent == None:
+            self.print_log(type="F", msg="Parent of simulator module not given")
+        else:
+            self.parent = parent
 
     @property
     def syntaxdict(self):
-        """ dict : Internally used dictionary for syntax conversions
-        """
-        self.print_log(type='O', msg='Syntaxdict is obsoleted. Access properties directly')
+        """dict : Internally used dictionary for syntax conversions"""
+        self.print_log(
+            type="O", msg="Syntaxdict is obsoleted. Access properties directly"
+        )
         self._syntaxdict = {
-                "cmdfile_ext" : self.cmdfile_ext,
-                "resultfile_ext" : self.resultfile_ext,
-                "commentchar" : self.commentchar,
-                "commentline" : self.commentline,
-                "nprocflag" : self.nprocflag,
-                "simulatorcmd" : self.simulatorcmd,
-                "dcsource_declaration" : self.dcsource_declaration,
-                "parameter" : self.parameter,
-                "option" : self.option,
-                "include" : self.include,
-                "dspfinclude" : self.dspfinclude,
-                "subckt" : self.subckt,
-                "lastline" : self.lastline,
-                "eventoutdelim" : self.eventoutdelim, # Two spaces
-                "csvskip" : self.csvskip
-                }
+            "cmdfile_ext": self.cmdfile_ext,
+            "resultfile_ext": self.resultfile_ext,
+            "commentchar": self.commentchar,
+            "commentline": self.commentline,
+            "nprocflag": self.nprocflag,
+            "simulatorcmd": self.simulatorcmd,
+            "dcsource_declaration": self.dcsource_declaration,
+            "parameter": self.parameter,
+            "option": self.option,
+            "include": self.include,
+            "dspfinclude": self.dspfinclude,
+            "subckt": self.subckt,
+            "lastline": self.lastline,
+            "eventoutdelim": self.eventoutdelim,  # Two spaces
+            "csvskip": self.csvskip,
+        }
         return self._syntaxdict
+
     @syntaxdict.setter
-    def syntaxdict(self,value):
-        self._syntaxdict=value
+    def syntaxdict(self, value):
+        self._syntaxdict = value
 
     @property
     def cmdfile_ext(self):
-        """str : Extension of the command file
-        """
-        return '.scs'
+        """str : Extension of the command file"""
+        return ".scs"
+
     @property
     def resultfile_ext(self):
-        """str : Extension of the result file
-        """
-        return '.raw'
+        """str : Extension of the result file"""
+        return ".raw"
+
     @property
     def commentchar(self):
-        """str : Comment character of the simulator
-        """
-        return '//'
+        """str : Comment character of the simulator"""
+        return "//"
+
     @property
     def commentline(self):
-        """str : Comment line for the simulator
-        """
-        return '///////////////////////\n'
+        """str : Comment line for the simulator"""
+        return "///////////////////////\n"
+
     @property
     def nprocflag(self):
-        """str : String for defining multithread execution
-        """
-        return '+mt='
+        """str : String for defining multithread execution"""
+        return "+mt="
+
     @property
     def simulatorcmd(self):
         """str : Simulator execution command
-            (Default: 'ngspice')
+        (Default: 'ngspice')
         """
-        return 'spectre -64 +lqtimeout=0 ++aps=%s' %(self.errpreset)
+        simcmd = "spectre -64 +lqtimeout=0"
+        if self.aps:
+            simcmd += f" ++aps={self.errpreset}"
+        else:
+            simcmd += f" +preset={self.errpreset}"
+        return simcmd
+
     @property
     def dcsource_declaration(self):
-        """str : DC source declaration
-        """
-        return 'vsource type=dc dc='
+        """str : DC source declaration"""
+        return "vsource type=dc dc="
+
     @property
     def parameter(self):
-        """str : Netlist parameter definition string
-        """
-        return 'parameters'
+        """str : Netlist parameter definition string"""
+        return "parameters"
+
     @property
     def option(self):
-        """str : Netlist option definition string
-        """
-        return 'options'
+        """str : Netlist option definition string"""
+        return "options"
+
     @property
     def include(self):
-        """str : Netlist include string
-        """
-        return 'include'
+        """str : Netlist include string"""
+        return "include"
+
     @property
     def dspfinclude(self):
-        """str : Netlist dspf-file include string
-        """
-        return 'dspf_include'
+        """str : Netlist dspf-file include string"""
+        return "dspf_include"
+
     @property
     def subckt(self):
-        """str : Subcircuit include string
-        """
-        return 'subckt'
+        """str : Subcircuit include string"""
+        return "subckt"
+
     @property
     def lastline(self):
-        """str : Last line of the simulator command file
-        """
-        return '///'
+        """str : Last line of the simulator command file"""
+        return "///"
+
     @property
     def eventoutdelim(self):
-        """str : Delimiter for the events
-        """
-        return ','
+        """str : Delimiter for the events"""
+        return ","
+
     @property
     def csvskip(self):
-        """Needs documentation. Lines skipped in result file : int
-        """
+        """Needs documentation. Lines skipped in result file : int"""
         return 0
 
     @property
     def plflag_simcmd_prefix(self):
         """
+        For APS version of Spectre:
         Simulator specific prefix for enabling postlayout optimization
         Postfix comes from self.plflag (user defined)
+
+        Not used in Spectre X
         """
-        if not hasattr(self, '_plflag_simcmd_prefix'):
-            self._plflag_simcmd_prefix="+postlayout"
+        if not hasattr(self, "_plflag_simcmd_prefix"):
+            if self.aps:
+                self._plflag_simcmd_prefix = "+postlayout"
+            else:
+                self._plflag_simcmd_prefix = ""
         return self._plflag_simcmd_prefix
 
     @property
     def plflag(self):
-        '''
+        """
+        For APS version of Spectre:
         Postlayout simulation accuracy/RC reduction flag.
         See: https://community.cadence.com/cadence_blogs_8/b/cic/posts/spectre-optimizing-spectre-aps-performance
-        '''
-        if not hasattr(self, '_plflag'):
-            self._plflag=f"=upa"
+
+        Not used in Spectre X
+        """
+        if not hasattr(self, "_plflag"):
+            if self.aps:
+                self._plflag = f"=upa"
+            else:
+                self._plflag = f""
         return self._plflag
 
     @plflag.setter
     def plflag(self, val):
-        if val in ["upa", "hpa"]:
-            self._plflag=f'={val}'
-        elif val=='':
-            self._plflag=''
-        else:
-            self.print_log(type='W', msg='Unsupported postlayout flag: %s' % val)
+        if self.aps:
+            if val in ["upa", "hpa"]:
+                self._plflag = f"={val}"
+            elif val == "":
+                self._plflag = ""
+            else:
+                self.print_log(
+                    type="W", msg="Unsupported postlayout flag: %s" % val
+                )
+
+    @property
+    def aps(self):
+        """
+        Internally controlled variable. The APS / X selection is done based on the
+        used errpreset (see its documentation for further details).
+
+        Use APS version of Spectre? If False, X is used.
+        """
+        if not hasattr(self, "_aps"):
+            self._aps = True
+        return self._aps
+
+    @aps.setter
+    def aps(self, val):
+        self._aps = val
 
     @property
     def errpreset(self):
-        """ String
+        """String
 
+        For APS version of Spectre:
         Global accuracy parameter for Spectre simulations. Options include
         'liberal', 'moderate' and 'conservative', in order of rising accuracy.
         You can set this by accesssing spice langmodule
+
+        For Spectre X:
+        Global accuracy parameter for Spectre simulations. Options include
+        'cx', 'ax', 'mx', 'lx', 'vx'
 
         Example
         -------
         self.spice_langmodule.errpreset='conservative'
 
         """
-        if not hasattr(self,'_errpreset'):
-            self._errpreset='moderate'
+        if not hasattr(self, "_errpreset"):
+            self._errpreset = "moderate"
         return self._errpreset
+
     @errpreset.setter
-    def errpreset(self,value):
-        self._errpreset=value
+    def errpreset(self, value):
+        if value in ["cx", "ax", "mx", "lx", "vx"]:
+            self.aps = False
+        else:
+            self.aps = True
+        self._errpreset = value
 
     @property
     def plotprogram(self):
-        """ str : Sets the program to be used for visualizing waveform databases.
+        """str : Sets the program to be used for visualizing waveform databases.
 
         Options are ezwave (default) or viva.
         """
-        if not hasattr(self, '_plotprogram'):
-            if hasattr(self.parent,'plotprogram'):
-                self._plotprogram=self.parent.plotprogram
+        if not hasattr(self, "_plotprogram"):
+            if hasattr(self.parent, "plotprogram"):
+                self._plotprogram = self.parent.plotprogram
             else:
-                self._plotprogram='ezwave'
+                self._plotprogram = "ezwave"
         return self._plotprogram
+
     @plotprogram.setter
     def plotprogram(self, value):
-        if value not in  [ 'ezwave', 'viva' ]:
-            self.print_log(type='F',
-                    msg='%s not supported for plotprogram, only ezvave and viva are supported')
+        if value not in ["ezwave", "viva"]:
+            self.print_log(
+                type="F",
+                msg="%s not supported for plotprogram, only ezvave and viva are supported",
+            )
         else:
             self._plotprogram = value
 
     @property
     def plotprogcmd(self):
-        """ str : Command to be run for interactive simulations.
-        """
-        if self.plotprogram == 'ezwave':
-            self._plotprogcmd='%s -MAXWND -LOGfile %s/ezwave.log %s &' % \
-                    (self.plotprogram,self.parent.spicesimpath,self.parent.spicedbpath)
-        elif self.plotprogram == 'viva':
-            self._plotprogcmd='%s -datadir %s -nocdsinit &' % \
-                    (self.plotprogram,self.parent.spicedbpath)
+        """str : Command to be run for interactive simulations."""
+        if self.plotprogram == "ezwave":
+            self._plotprogcmd = "%s -MAXWND -LOGfile %s/ezwave.log %s &" % (
+                self.plotprogram,
+                self.parent.spicesimpath,
+                self.parent.spicedbpath,
+            )
+        elif self.plotprogram == "viva":
+            self._plotprogcmd = "%s -datadir %s -nocdsinit &" % (
+                self.plotprogram,
+                self.parent.spicedbpath,
+            )
         else:
-            self.print_log(type='F',msg='Unsupported plot program \'%s\'.' % self.plotprogram)
+            self.print_log(
+                type="F",
+                msg="Unsupported plot program '%s'." % self.plotprogram,
+            )
         return self._plotprogcmd
+
     @plotprogcmd.setter
     def plotprogcmd(self, value):
-        self._plotprogcmd=value
+        self._plotprogcmd = value
 
     @property
     def spicecmd(self):
         """str : Simulation command string to be executed on the command line.
         Automatically generated.
         """
-        if not hasattr(self,'_spicecmd'):
+        if not hasattr(self, "_spicecmd"):
             if self.parent.nproc:
-                nprocflag = "%s%d" % (self.nprocflag,self.parent.nproc)
-                self.print_log(type='I',msg='Enabling multithreading \'%s\'.' % nprocflag)
+                nprocflag = "%s%d" % (self.nprocflag, self.parent.nproc)
+                self.print_log(
+                    type="I", msg="Enabling multithreading '%s'." % nprocflag
+                )
             else:
                 nprocflag = ""
 
             if self.parent.postlayout:
-                plflag=f"{self.plflag_simcmd_prefix}{self.plflag}"
-                self.print_log(type='I',msg='Enabling post-layout optimization \'%s\'.' % plflag)
+                plflag = f"{self.plflag_simcmd_prefix}{self.plflag}"
+                self.print_log(
+                    type="I",
+                    msg="Enabling post-layout optimization '%s'." % plflag,
+                )
             else:
-                plflag = ''
+                plflag = ""
 
-            spicesimcmd = (self.simulatorcmd + " %s %s -outdir %s "
-                    % (plflag,nprocflag,self.parent.spicesimpath))
-            self._spicecmd = self.parent.spice_submission+spicesimcmd+self.parent.spicetbsrc
+            spicesimcmd = self.simulatorcmd + " %s %s -outdir %s " % (
+                plflag,
+                nprocflag,
+                self.parent.spicesimpath,
+            )
+            self._spicecmd = (
+                self.parent.spice_submission
+                + spicesimcmd
+                + self.parent.spicetbsrc
+            )
 
         return self._spicecmd
 
+    @property
+    def tran_analysis_name(self):
+        """
+        Name of analysis for transient simulations. Used to identify results if psfascii is enabled.
+        """
+        if not hasattr(self, "_tran_analysis_name"):
+            self._tran_analysis_name = "TRAN_analysis"
+        return self._tran_analysis_name
+
+    @tran_analysis_name.setter
+    def tran_analysis_name(self, val):
+        self._tran_analysis_name = val
+
+    @property
+    def ac_analysis_name(self):
+        """
+        Name of analysis for AC simulations. Used to identify results if psfascii is enabled.
+        """
+        if not hasattr(self, "_ac_analysis_name"):
+            self._ac_analysis_name = "AC_analysis"
+        return self._ac_analysis_name
+
+    @ac_analysis_name.setter
+    def ac_analysis_name(self, val):
+        self._ac_analysis_name = val
+
+    @property
+    def pz_analysis_name(self):
+        """
+        Name of analysis for pole-zero analysis. Used to identify results if psfascii is enabled.
+        """
+        if not hasattr(self, "_pz_analysis_name"):
+            self._pz_analysis_name = "PZ_analysis"
+        return self._pz_analysis_name
+
+    @pz_analysis_name.setter
+    def pz_analysis_name(self, val):
+        self._pz_analysis_name = val
+
+    @property
+    def pac_analysis_name(self):
+        """
+        Name of analysis for PAC analysis. Used to identify results if psfascii is enabled.
+        """
+        if not hasattr(self, "_pac_analysis_name"):
+            self._pac_analysis_name = "PAC_analysis"
+        return self._pac_analysis_name
+
+    @pac_analysis_name.setter
+    def pac_analysis_name(self, val):
+        self._pac_analysis_name = val
+
+    @property
+    def sp_analysis_name(self):
+        """
+        Name of analysis for Sparameter analysis. Used to identify results if psfascii is enabled.
+        """
+        if not hasattr(self, "_sp_analysis_name"):
+            self._sp_analysis_name = "SP_analysis"
+        return self._sp_analysis_name
+
+    @sp_analysis_name.setter
+    def sp_analysis_name(self, val):
+        self._sp_analysis_name = val
+
+    @property
+    def noise_analysis_name(self):
+        """
+        Name of analysis for noise analysis. Used to identify results if psfascii is enabled.
+        """
+        if not hasattr(self, "_noise_analysis_name"):
+            self._noise_analysis_name = "noise_analysis"
+        return self._noise_analysis_name
+
+    @noise_analysis_name.setter
+    def noise_analysis_name(self, val):
+        self._noise_analysis_name = val
+
+    @property
+    def pss_analysis_name(self):
+        """
+        Name of analysis for periodic steady-state (PSS) analysis. Used to identify results if psfascii is enabled.
+        """
+        if not hasattr(self, "_pss_analysis_name"):
+            self._pss_analysis_name = "PSS_analysis"
+        return self._pss_analysis_name
+
+    @pss_analysis_name.setter
+    def pss_analysis_name(self, val):
+        self._pss_analysis_name = val
+
+    @property
+    def strobe_indices(self):
+        """
+        Internally set list of indices corresponding to time,amplitude pairs
+        whose time value of is a multiple of the strobeperiod (see spice_simcmd).
+        """
+        if not hasattr(self, "_strobe_indices"):
+            self._strobe_indices = []
+        return self._strobe_indices
+
+    @strobe_indices.setter
+    def strobe_indices(self, val):
+        if isinstance(val, list) or isinstance(val, np.ndarray):
+            self._strobe_indices = val
+        else:
+            self.print_log(
+                type="W",
+                msg="Cannot set strobe_indices to be of type: %s" % type(val),
+            )
+
+    @property
+    def is_strobed(self):
+        """
+        Check if simulation was strobed or not
+        """
+        if not hasattr(self, "_is_strobed"):
+            self._is_strobed = False
+            for simtype, simcmd in self.parent.simcmd_bundle.Members.items():
+                if simtype == "tran":
+                    if simcmd.strobeperiod:
+                        self._is_strobed = True
+        return self._is_strobed
+
     def run_plotprogram(self):
-        ''' Starting a parallel process for waveform viewer program.
+        """Starting a parallel process for waveform viewer program.
 
         The plotting program command can be set with 'plotprogram' property.
         Tested for spectre and eldo.
-        '''
+        """
         # Wait for database to appear.
         tries = 0
         while tries < 100:
@@ -266,154 +463,205 @@ class spectre(spice_common):
                     # Database file has something written to it
                     filesize = []
                     for f in os.listdir(self.parent.spicedbpath):
-                        filesize.append(os.stat('%s/%s' % (self.parent.spicedbpath,f)).st_size)
+                        filesize.append(
+                            os.stat(
+                                "%s/%s" % (self.parent.spicedbpath, f)
+                            ).st_size
+                        )
                     if all(filesize) > 0:
                         break
             else:
                 time.sleep(2)
                 tries += 1
-        cmd=self.plotprogcmd
-        self.print_log(type='I', msg='Running external command: %s' % cmd)
+        cmd = self.plotprogcmd
+        self.print_log(type="I", msg="Running external command: %s" % cmd)
         try:
-            ret=os.system(cmd)
+            ret = os.system(cmd)
             if ret != 0:
-                self.print_log(type='W', msg='%s returned with exit status %d.' % (self.plotprogram, ret))
+                self.print_log(
+                    type="W",
+                    msg="%s returned with exit status %d."
+                    % (self.plotprogram, ret),
+                )
         except:
-            self.print_log(type='W',msg='Something went wrong while launcing %s.' % self.plotprogram)
-            self.print_log(type='W',msg=traceback.format_exc())
+            self.print_log(
+                type="W",
+                msg="Something went wrong while launcing %s."
+                % self.plotprogram,
+            )
+            self.print_log(type="W", msg=traceback.format_exc())
 
-    def read_sp_result(self,**kwargs):
-        """ Internally called function to read the S-parameter simulation results
-        """
-        read_type=kwargs.get('read_type')
+    def read_sp_result(self, **kwargs):
+        """Internally called function to read the S-parameter simulation results"""
+        read_type = kwargs.get("read_type")
         try:
-            if 'sp' in self.parent.simcmd_bundle.Members.keys():
+            if "sp" in self.parent.simcmd_bundle.Members.keys():
                 self.extracts.Members.update({read_type: {}})
-                sweep=False
+                sweep = False
                 # Get sp simulation file name
                 for name, val in self.parent.simcmd_bundle.Members.items():
-                    mc=val.mc
-                    if name=='sp':
-                        fname=''
-                        if len(val.sweep)!=0:
+                    mc = val.mc
+                    if name == "sp":
+                        fname = ""
+                        if len(val.sweep) != 0:
                             for i in range(0, len(val.sweep)):
-                                sweep=True
-                                fname+='Sweep%d-*_' % i
+                                sweep = True
+                                fname += "Sweep%d-*_" % i
                             if mc:
                                 # TODO: implement.
-                                self.print_log(type='F',
-                                        msg=f"Monte carlo currently not supported for \
-                                                S-parameter simulations.")
-                                fname+='mc_oppoint.dc'
+                                self.print_log(
+                                    type="F",
+                                    msg=f"Monte carlo currently not supported for \
+                                                S-parameter simulations.",
+                                )
+                                fname += "mc_oppoint.dc"
                             else:
-                                if 'sparams' in read_type:
-                                    fname+=f'SPanalysis.sp'
-                                elif 'sprobe' in read_type:
-                                    fname+=f'SPanalysis.sprobe.sp'
+                                if "sparams" in read_type:
+                                    fname += f"SPanalysis.sp"
+                                elif "sprobe" in read_type:
+                                    fname += f"SPanalysis.sprobe.sp"
                         else:
                             if mc:
                                 # TODO: implement.
-                                self.print_log(type='F',
-                                        msg=f"Monte carlo currently not supported for \
-                                                S-parameter simulations.")
-                                fname+='mc_oppoint.dc'
+                                self.print_log(
+                                    type="F",
+                                    msg=f"Monte carlo currently not supported for \
+                                                S-parameter simulations.",
+                                )
+                                fname += "mc_oppoint.dc"
                             else:
-                                if 'sparams' in read_type:
-                                    fname+=f'SPanalysis.sp'
-                                elif 'sprobe' in read_type:
-                                    fname+=f'SPanalysis.sprobe.sp'
+                                if "sparams" in read_type:
+                                    fname += f"SPanalysis.sp"
+                                elif "sprobe" in read_type:
+                                    fname += f"SPanalysis.sprobe.sp"
                         break
                 # For distributed runs
                 if self.parent.distributed_run:
                     # TODO: check functionality and implement
-                    self.print_log(type='F',
-                            msg=f"Distributed runs not currently supported for \
-                                    S-parameter analyses.")
-                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, '[0-9]*',
-                            fname)
+                    self.print_log(
+                        type="F",
+                        msg=f"Distributed runs not currently supported for \
+                                    S-parameter analyses.",
+                    )
+                    path = os.path.join(
+                        self.parent.spicesimpath,
+                        "tb_%s.raw" % self.parent.name,
+                        "[0-9]*",
+                        fname,
+                    )
                 else:
-                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name,
-                            fname)
+                    path = os.path.join(
+                        self.parent.spicesimpath,
+                        "tb_%s.raw" % self.parent.name,
+                        fname,
+                    )
                 # Sort files such that the sweeps are in correct order.
                 if sweep:
-                    num_sweeps=len(val.sweep)
-                    files=glob.glob(path)
+                    num_sweeps = len(val.sweep)
+                    files = glob.glob(path)
                     for i in range(num_sweeps):
-                        files=sorted(files,key=lambda x: self.sorter(x, i))
-                    if len(files)>0:
-                        rd, fileptr = self.create_nested_sweepresult_dict(0,0,
-                                self.extracts.Members['sweeps_ran'],files,
-                                read_type)
+                        files = sorted(files, key=lambda x: self.sorter(x, i))
+                    if len(files) > 0:
+                        rd, fileptr = self.create_nested_sweepresult_dict(
+                            0,
+                            0,
+                            self.extracts.Members["sweeps_ran"],
+                            files,
+                            read_type,
+                        )
                 else:
-                    files=glob.glob(path)
-                    if len(files)>1: # This should not happen
-                        self.print_log(type='W',
-                                msg="S-parameter analysis was not a sweep, but for \
+                    files = glob.glob(path)
+                    if len(files) > 1:  # This should not happen
+                        self.print_log(
+                            type="W",
+                            msg="S-parameter analysis was not a sweep, but for \
                                         some reason multiple output files were found. \
-                                        results may be in wrong order!")
-                    result={}
-                    if len(files)>0:
+                                        results may be in wrong order!",
+                        )
+                    result = {}
+                    if len(files) > 0:
                         psf = psfu.PSF(files[0])
-                        psfsweep=psf.get_sweep()
+                        psfsweep = psf.get_sweep()
                         for signal in psf.all_signals():
-                            result[signal.name]=np.vstack((psfsweep.abscissa,
-                                psf.get_signal(f'{signal.name}').ordinate)).T
-                    rd={0:{'param':'nosweep', 'value':0, read_type:result}}
-                self.extracts.Members[read_type].update({'results':rd})
+                            result[signal.name] = np.vstack(
+                                (
+                                    psfsweep.abscissa,
+                                    psf.get_signal(f"{signal.name}").ordinate,
+                                )
+                            ).T
+                    rd = {
+                        0: {"param": "nosweep", "value": 0, read_type: result}
+                    }
+                self.extracts.Members[read_type].update({"results": rd})
         except:
-            self.print_log(type='W',
-                    msg=traceback.format_exc())
-            self.print_log(type='W',
-                    msg="Something went wrong while extracting S-parameters")
-               
+            self.print_log(type="W", msg=traceback.format_exc())
+            self.print_log(
+                type="W",
+                msg="Something went wrong while extracting S-parameters",
+            )
 
-    def read_stb_result(self,**kwargs):
-        ''' Internally called function to read the stb simulation results
-        '''
+    def read_stb_result(self, **kwargs):
+        """Internally called function to read the stb simulation results"""
 
-        if 'stb' in self.parent.simcmd_bundle.Members.keys():
+        if "stb" in self.parent.simcmd_bundle.Members.keys():
             try:
-                fname='STB_analysis.margin.stb'
-                file=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, fname)
-                valbegin= 'VALUE\n'
-                eof = 'END\n'
+                fname = "STB_analysis.margin.stb"
+                file = os.path.join(
+                    self.parent.spicesimpath,
+                    "tb_%s.raw" % self.parent.name,
+                    fname,
+                )
+                valbegin = "VALUE\n"
+                eof = "END\n"
                 parsevals = False
-                with open(file, 'r') as f:
+                with open(file, "r") as f:
                     for line in f:
                         if valbegin == line:
-                            parsevals=True
+                            parsevals = True
                         if parsevals:
-                            if 'gainMarginInfo' in line:
-                                info = line.split("\"")[3].split(" ")
-                                gain_margin = float(info[info.index('margin')+2])
-                                gain_margin_freq = float(info[info.index('frequency')+2])
-                            if 'phaseMarginInfo' in line:
-                                info = line.split("\"")[3].split(" ")
-                                phase_margin = float(info[info.index('margin')+2])
-                                phase_margin_freq = float(info[info.index('frequency')+2])
-                            if 'stb_state' in line:
-                                if 'is stable' in line:
+                            if "gainMarginInfo" in line:
+                                info = line.split('"')[3].split(" ")
+                                gain_margin = float(
+                                    info[info.index("margin") + 2]
+                                )
+                                gain_margin_freq = float(
+                                    info[info.index("frequency") + 2]
+                                )
+                            if "phaseMarginInfo" in line:
+                                info = line.split('"')[3].split(" ")
+                                phase_margin = float(
+                                    info[info.index("margin") + 2]
+                                )
+                                phase_margin_freq = float(
+                                    info[info.index("frequency") + 2]
+                                )
+                            if "stb_state" in line:
+                                if "is stable" in line:
                                     stable = True
                                 else:
                                     stable = False
                         if eof == line:
-                            parsevals=False
-                
-                analysis = 'stb_analysis'
+                            parsevals = False
+
+                analysis = "stb_analysis"
                 self.extracts.Members.update({analysis: {}})
-                self.extracts.Members[analysis].update({
-                    f'gain_margin': (gain_margin_freq, gain_margin),
-                    f'phase_margin': (phase_margin_freq, phase_margin),
-                    f'status': stable
-                    })
+                self.extracts.Members[analysis].update(
+                    {
+                        f"gain_margin": (gain_margin_freq, gain_margin),
+                        f"phase_margin": (phase_margin_freq, phase_margin),
+                        f"status": stable,
+                    }
+                )
             except:
-                analysis = 'stb_analysis'
+                analysis = "stb_analysis"
                 self.extracts.Members.update({analysis: {}})
-                self.extracts.Members[analysis].update({
-                    f'gain_margin': ('Nan', 'Nan'),
-                    f'phase_margin': ('Nan', 'Nan'),
-                    f'status': 'Gain margin and Phase margin could not be read, the circuit is unstable!' 
-                    })
+                self.extracts.Members[analysis].update(
+                    {
+                        f"gain_margin": ("Nan", "Nan"),
+                        f"phase_margin": ("Nan", "Nan"),
+                        f"status": "Gain margin and Phase margin could not be read, the circuit is unstable!",
+                    }
+                )
             try:
                 ocean_command = f"""
                 openResults("{self.parent.spicedbpath}")
@@ -423,55 +671,85 @@ class spectre(spice_common):
                 exit
                 """
                 process = subprocess.Popen(
-                        ["ocean", "-nograph"],
-                        stdin=subprocess.PIPE,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        text=True
-                        )
+                    ["ocean", "-nograph"],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
                 stdout, stderr = process.communicate(input=ocean_command)
                 if stderr:
                     print(stderr, file=sys.stderr)
 
-                freq, loopGain_db20 = self.get_ocnPrint_data(file_name=self.parent.name+'_loopGain_db20')
-                freq, loopGain_phase = self.get_ocnPrint_data(file_name=self.parent.name+'_loopGain_phase')
-                analysis = 'stb_analysis_waveforms'
+                freq, loopGain_db20 = self.get_ocnPrint_data(
+                    file_name=self.parent.name + "_loopGain_db20"
+                )
+                freq, loopGain_phase = self.get_ocnPrint_data(
+                    file_name=self.parent.name + "_loopGain_phase"
+                )
+                analysis = "stb_analysis_waveforms"
                 self.extracts.Members.update({analysis: {}})
-                self.extracts.Members[analysis].update({
-                    f'loopGain_db20': np.concatenate([freq.reshape(-1,1), loopGain_db20.reshape(-1,1)], axis=1),
-                    f'loopGain_phase': np.concatenate([freq.reshape(-1,1), loopGain_phase.reshape(-1,1)], axis=1),
-                    })
+                self.extracts.Members[analysis].update(
+                    {
+                        f"loopGain_db20": np.concatenate(
+                            [freq.reshape(-1, 1), loopGain_db20.reshape(-1, 1)],
+                            axis=1,
+                        ),
+                        f"loopGain_phase": np.concatenate(
+                            [
+                                freq.reshape(-1, 1),
+                                loopGain_phase.reshape(-1, 1),
+                            ],
+                            axis=1,
+                        ),
+                    }
+                )
             except:
                 pass
-    
-    def get_ocnPrint_data(self,file_name):
-        df = pd.read_csv(f"{os.path.join(self.parent.spicesimpath, '%s' % file_name)}", delim_whitespace=True, header=None, skiprows=3)
+
+    def get_ocnPrint_data(self, file_name):
+        df = pd.read_csv(
+            f"{os.path.join(self.parent.spicesimpath, '%s' % file_name)}",
+            delim_whitespace=True,
+            header=None,
+            skiprows=3,
+        )
         freq = df[0].values
         vals = df[1].values
-        return freq, vals 
-    
+        return freq, vals
+
     def get_input_noise_data(self):
-        df = pd.read_csv(f"{os.path.join(self.parent.spicesimpath, '%s_in' % self.parent.name)}", delim_whitespace=True, header=None, skiprows=3)
-        df.columns = ['Frequency', 'in']
-        freq = df['Frequency'].values
-        in_noise = df['in'].values
+        df = pd.read_csv(
+            f"{os.path.join(self.parent.spicesimpath, '%s_in' % self.parent.name)}",
+            delim_whitespace=True,
+            header=None,
+            skiprows=3,
+        )
+        df.columns = ["Frequency", "in"]
+        freq = df["Frequency"].values
+        in_noise = df["in"].values
 
         return freq, in_noise
-    
+
     def get_output_noise_data(self):
-        df = pd.read_csv(f"{os.path.join(self.parent.spicesimpath, '%s_out' % self.parent.name)}", delim_whitespace=True, header=None, skiprows=3)
-        df.columns = ['Frequency', 'out']
-        freq = df['Frequency'].values
-        out_noise = df['out'].values
+        df = pd.read_csv(
+            f"{os.path.join(self.parent.spicesimpath, '%s_out' % self.parent.name)}",
+            delim_whitespace=True,
+            header=None,
+            skiprows=3,
+        )
+        df.columns = ["Frequency", "out"]
+        freq = df["Frequency"].values
+        out_noise = df["out"].values
 
         return freq, out_noise
 
-    def read_noise_result(self,**kwargs):
-        """ Internally called function to read the noise simulation results
-            TODO: Implement for Eldo as well.
+    def read_noise_result(self, **kwargs):
+        """Internally called function to read the noise simulation results
+        TODO: Implement for Eldo as well.
         """
         try:
-            if 'noise' in self.parent.simcmd_bundle.Members.keys():
+            if "noise" in self.parent.simcmd_bundle.Members.keys():
                 ocean_command = f"""
                 openResults("{self.parent.spicedbpath}")
                 selectResult('noise)
@@ -482,26 +760,38 @@ class spectre(spice_common):
                 exit
                 """
                 process = subprocess.Popen(
-                        ["ocean", "-nograph"],
-                        stdin=subprocess.PIPE,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        text=True
-                        )
+                    ["ocean", "-nograph"],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
                 stdout, stderr = process.communicate(input=ocean_command)
                 if stderr:
                     print(stderr, file=sys.stderr)
 
-                df = pd.read_csv(f"{os.path.join(self.parent.spicesimpath, '%s_nf' % self.parent.name)}", delim_whitespace=True, header=None, skiprows=3)
-                df.columns = ['Frequency', 'NF']
-                freq = df['Frequency'].values
-                NF = df['NF'].values
+                df = pd.read_csv(
+                    f"{os.path.join(self.parent.spicesimpath, '%s_nf' % self.parent.name)}",
+                    delim_whitespace=True,
+                    header=None,
+                    skiprows=3,
+                )
+                df.columns = ["Frequency", "NF"]
+                freq = df["Frequency"].values
+                NF = df["NF"].values
 
                 freq, in_noise = self.get_input_noise_data()
-                
+
                 freq, out_noise = self.get_output_noise_data()
 
-                df = pd.read_csv(f"{os.path.join(self.parent.spicesimpath, '%s_noisesum' % self.parent.name)}", sep='\s+', header=None, skipinitialspace=True, skipfooter=5, engine='python')
+                df = pd.read_csv(
+                    f"{os.path.join(self.parent.spicesimpath, '%s_noisesum' % self.parent.name)}",
+                    sep="\s+",
+                    header=None,
+                    skipinitialspace=True,
+                    skipfooter=5,
+                    engine="python",
+                )
                 noise_data = {}
                 current_device = None
                 for index, row in df.iterrows():
@@ -509,196 +799,461 @@ class spectre(spice_common):
                     if all(pd.notna(row[0:4])) and all(pd.isna(row[5:10])):
                         current_device = row[0]
                         noise_data[current_device] = {
-                                'Contribution_percentage': float(row[1]),
-                                'Input_referred': float(row[2]),
-                                'Param': {}
-                                }
-                        noise_data[current_device]['Param'][row[3]] = float(row[4])
+                            "Contribution_percentage": float(row[1]),
+                            "Input_referred": float(row[2]),
+                            "Param": {},
+                        }
+                        noise_data[current_device]["Param"][row[3]] = float(
+                            row[4]
+                        )
                     # Device param row
                     elif all(pd.notna(row[0:2])) and all(pd.isna(row[2:10])):
                         param_name = row[0].strip()
                         if param_name:
-                            noise_data[current_device]['Param'][param_name] = float(row[1])
+                            noise_data[current_device]["Param"][param_name] = (
+                                float(row[1])
+                            )
 
-                analysis='noise'
-                nodes=self.parent.simcmd_bundle.Members[analysis].nodes
-                mc=self.parent.simcmd_bundle.Members[analysis].mc
+                analysis = "noise"
+                nodes = self.parent.simcmd_bundle.Members[analysis].nodes
+                mc = self.parent.simcmd_bundle.Members[analysis].mc
                 self.extracts.Members.update({analysis: {}})
                 # Get simulation result file name
-                fnames=[]
+                fnames = []
                 for node in nodes:
                     if mc:
                         # TODO: implement.
-                        self.print_log(type='F',
-                                msg=f"Monte carlo currently not yet supported for \
-                                        {analysis} simulations. Please implement.")
+                        self.print_log(
+                            type="F",
+                            msg=f"Monte carlo currently not yet supported for \
+                                        {analysis} simulations. Please implement.",
+                        )
                     else:
-                        if 'noise' in analysis:
-                            fnames.append(f'noise_analysis_{node}.noise')
+                        if "noise" in analysis:
+                            fnames.append(f"noise_analysis_{node}.noise")
 
                 # For distributed runs
                 for i in range(len(fnames)):
                     if self.parent.distributed_run:
                         # TODO: check functionality and implement
-                        self.print_log(type='F',
-                                msg=f"Distributed runs not currently supported for \
-                                        PSF file read analyses.")
-                        path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, '[0-9]*',
-                                fnames[i])
+                        self.print_log(
+                            type="F",
+                            msg=f"Distributed runs not currently supported for \
+                                        PSF file read analyses.",
+                        )
+                        path = os.path.join(
+                            self.parent.spicesimpath,
+                            "tb_%s.raw" % self.parent.name,
+                            "[0-9]*",
+                            fnames[i],
+                        )
                     else:
-                        path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name,
-                                fnames[i])
-                    files=glob.glob(path)
-                    if 'noise' in analysis:
-                        self.extracts.Members[analysis].update({
-                            f'{nodes[i]}_freq':freq,
-                            f'{nodes[i]}_NF':NF,
-                            f'{nodes[i]}_input_ref_noise':in_noise,
-                            f'{nodes[i]}_output_ref_noise':out_noise,
-                            f'{nodes[i]}_noise_contributions':noise_data,
-                            })
+                        path = os.path.join(
+                            self.parent.spicesimpath,
+                            "tb_%s.raw" % self.parent.name,
+                            fnames[i],
+                        )
+                    files = glob.glob(path)
+                    if "noise" in analysis:
+                        self.extracts.Members[analysis].update(
+                            {
+                                f"{nodes[i]}_freq": freq,
+                                f"{nodes[i]}_NF": NF,
+                                f"{nodes[i]}_input_ref_noise": in_noise,
+                                f"{nodes[i]}_output_ref_noise": out_noise,
+                                f"{nodes[i]}_noise_contributions": noise_data,
+                            }
+                        )
 
                 # Read total input referred noise
                 try:
-                    file=os.path.join(self.parent.spicesimpath,'%s_noisesum' % self.parent.name)
-                    with open(file, 'r') as f:
+                    file = os.path.join(
+                        self.parent.spicesimpath,
+                        "%s_noisesum" % self.parent.name,
+                    )
+                    with open(file, "r") as f:
                         for line in f:
-                            if 'Total Input Referred Noise' in line:
-                                total_input_ref_noise = float(line.split(' ')[-1])
+                            if "Total Input Referred Noise" in line:
+                                total_input_ref_noise = float(
+                                    line.split(" ")[-1]
+                                )
 
-                    self.extracts.Members[analysis].update({
-                        'total_input_ref_noise':total_input_ref_noise
-                        })
+                    self.extracts.Members[analysis].update(
+                        {"total_input_ref_noise": total_input_ref_noise}
+                    )
                 except:
-                    total_input_ref_noise = 'NaN'
-                    self.extracts.Members[analysis].update({
-                        'total_input_ref_noise':total_input_ref_noise
-                        })
+                    total_input_ref_noise = "NaN"
+                    self.extracts.Members[analysis].update(
+                        {"total_input_ref_noise": total_input_ref_noise}
+                    )
 
         except:
-            self.print_log(type='W',
-                    msg=traceback.format_exc())
-            self.print_log(type='W',
-                    msg="Something went wrong while extracting S-parameters")
+            self.print_log(type="W", msg=traceback.format_exc())
+            self.print_log(
+                type="W",
+                msg="Something went wrong while extracting S-parameters",
+            )
 
-    def create_nested_sweepresult_dict(self, level, fileptr, sweeps_ran_dict,
-            files,read_type):
-        """Documentation missing
-        """
-        rd={} # Return this to upper level
-        if level < len(sweeps_ran_dict)-1:
-            for v in np.arange(len(sweeps_ran_dict[level]['values'])):
-                result={}
+    def create_nested_sweepresult_dict(
+        self, level, fileptr, sweeps_ran_dict, files, read_type
+    ):
+        """Documentation missing"""
+        rd = {}  # Return this to upper level
+        if level < len(sweeps_ran_dict) - 1:
+            for v in np.arange(len(sweeps_ran_dict[level]["values"])):
+                result = {}
                 psf = psfu.PSF(files[fileptr])
                 fileptr += 1
-                psfsweep=psf.get_sweep()
+                psfsweep = psf.get_sweep()
                 for signal in psf.all_signals():
-                    result[signal.name]=np.vstack((psfsweep.abscissa,
-                        psf.get_signal(f'{signal.name}').ordinate)).T
-                    rd.update({v:{'param':sweeps_ran_dict[level]['param'],
-                        'value':sweeps_ran_dict[level]['values'][v],
-                        read_type:result}})
+                    result[signal.name] = np.vstack(
+                        (
+                            psfsweep.abscissa,
+                            psf.get_signal(f"{signal.name}").ordinate,
+                        )
+                    ).T
+                    rd.update(
+                        {
+                            v: {
+                                "param": sweeps_ran_dict[level]["param"],
+                                "value": sweeps_ran_dict[level]["values"][v],
+                                read_type: result,
+                            }
+                        }
+                    )
         return rd, fileptr
 
+    def read_psf_outputs(self, file, dtype):
+        """
+        Function to read outputs from PSF file.
+        Currently assumes that we are reading in transient results.
+        """
+        if not os.path.isfile(file):
+            self.print_log(
+                type="F",
+                msg=f"Something went wrong with running the simulation! PSF output file at {file} does not exist!",
+            )
+        try:
+            libpsf = False
+            if "ascii" in self.parent.spiceoptions["rawfmt"]:
+                # Use PSF utils, known to be slow, but probably most reliable
+                psf = psfu.PSF(file)
+                sweep = psf.get_sweep()
+                abscissa = sweep.abscissa
+                signals = psf.all_signals()
+            elif "bin" in self.parent.spiceoptions["rawfmt"]:
+                # libpsf (has problems, might crash with large number of samples,
+                # or not downloadable for newer versions of Python at the moment)
+                import libpsf
+
+                psf = libpsf.PSFDataSet(file)
+                abscissa = psf.get_sweep_values()
+                signals = psf.get_signal_names()
+                libpsf = True
+            else:
+                self.print_log(
+                    type="F",
+                    msg=f'Invalid raw format option ({self.parent.spiceoptions["rawfmt"]}) with use_psf',
+                )
+        except:
+            self.print_log(type="W", msg=traceback.format_exc())
+            self.print_log(
+                type="F",
+                msg=f"Failed reading PSF file at {file}! Is the rawfmt psfascii or psfbin?",
+            )
+        for signal in signals:
+            if libpsf:
+                command = psf.get_signal(signal)
+                sig_name = signal.upper()
+            else:
+                command = psf.get_signal(f"{signal.name}").ordinate
+                sig_name = signal.name
+            tmpdata = np.vstack((abscissa, command)).T
+            self.parent.iofile_eventdict[sig_name] = tmpdata
+
+    def read_print_file_outputs(self, file, dtype):
+        """
+        Function to read outputs from a print-file generated by Spectre.
+        """
+        label_match = re.compile(r"\(([^)]+)\)")
+        os.system("sync %s" % self.parent.spicesimpath)
+        block_count = subprocess.check_output(
+            "grep -n \"time\|freq\" %s | sed 's/^\([0-9]\+\):/\\1|/'" % file,
+            shell=True,
+        ).decode("utf-8")
+        if not block_count:
+            # We couldn't find the block count, exit
+            if os.path.isfile(file):
+                self.print_log(
+                    type="F", msg="Missing header row(s) from .print file!"
+                )
+            else:
+                self.print_log(
+                    type="F", msg=".print file at %s doesn't exist!" % file
+                )
+        blocks = block_count.split("\n")
+        linenumbers = []
+        labels = []
+        # Parse linenumbers of header blocks
+        for block in blocks:
+            parts = block.split("|")
+            if (
+                len(parts) > 1
+            ):  # Line should now contain linenumber in first element, ioname in second
+                line = 0
+                try:
+                    line = int(parts[0])
+                    linenumbers.append(line)
+                except ValueError:
+                    self.print_log(
+                        type="W",
+                        msg="Couldn't decode linenumber from file %s" % file,
+                    )
+                labelgrp = label_match.findall(
+                    parts[1]
+                )  # Parse IO labels (nodenames)
+                if labelgrp:
+                    tmp = list(dict.fromkeys(labelgrp))
+                    labels.append(tmp)
+                else:
+                    self.print_log(
+                        type="W",
+                        msg="Couldn't find IO on line %d from file %s"
+                        % (line, file),
+                    )
+
+        if len(labels) == len(linenumbers):
+            try:
+                numlines = int(
+                    subprocess.check_output(
+                        "wc -l %s | awk '{print $1}'" % file, shell=True
+                    ).decode("utf-8")
+                )
+            except FileNotFoundError as e:
+                self.print_log(
+                    type="F",
+                    msg="Print-file doesn't exist! Invalid node names in saves statement?",
+                )
+            except ValueError as e:
+                self.print_log(
+                    type="F",
+                    msg="Print-file doesn't exist! Invalid node names in saves statement?",
+                )
+            # Maximum number of concurrent open files. This may or may not help with "too many open files" -error.
+            num_parallel = 50
+            num_loops = int(np.ceil(len(linenumbers) / num_parallel))
+            for it in range(num_loops):
+                lnrange = range(
+                    num_parallel * it,
+                    min([num_parallel * (it + 1), len(linenumbers)]),
+                )
+                procs = []
+                queues = []
+                for k in lnrange:
+                    start = linenumbers[
+                        k
+                    ]  # Indexing of line numbers starts from one
+                    if k == len(linenumbers) - 1:
+                        stop = numlines - 1
+                    else:
+                        stop = (
+                            linenumbers[k + 1] - 6
+                        )  # Previous data column ends 5 rows before start of next one
+                    nrows = stop - start
+                    if nrows < 20e6:
+                        self.print_log(
+                            type="I",
+                            msg=f"Number of lines: {nrows}, reading with multiprocessing",
+                        )
+                        queue = multiprocessing.Queue()
+                        queues.append(queue)
+                        proc = multiprocessing.Process(
+                            target=self.parse_io_from_file,
+                            args=(file, start, stop, dtype, labels[k], queue),
+                        )
+                        procs.append(proc)
+                        proc.start()
+                    else:
+                        self.print_log(
+                            type="I",
+                            msg=f"Number of lines: {nrows}, reading without multiprocessing",
+                        )
+                        queue = None
+                        ret = self.parse_io_from_file(
+                            file, start, stop, dtype, labels[k], queue
+                        )
+                        for item in ret:
+                            self.parent.iofile_eventdict[item[0].upper()] = (
+                                item[1]
+                            )
+                        self.print_log(type="I", msg=f"IO reading complete")
+                for i, p in enumerate(procs):
+                    try:
+                        ret = queues[i].get()
+                        for item in ret:
+                            self.parent.iofile_eventdict[item[0].upper()] = (
+                                item[1]
+                            )
+                        p.join()
+                    except KeyError:
+                        self.print_log(
+                            type="W", msg="Failed reading %s" % (ret[0])
+                        )
+        else:
+            self.print_log(
+                type="W",
+                msg="Couldn't read IOs from file %s. Missing ioname?" % file,
+            )
+
     def read_oppts(self):
-        """ Internally called function to read the DC operating points of the circuit
-            TODO: Implement for Eldo as well.
+        """Internally called function to read the DC operating points of the circuit
+        TODO: Implement for Eldo as well.
         """
 
         try:
-            if 'dc' in self.parent.simcmd_bundle.Members.keys():
-                self.extracts.Members.update({'oppts' : {}})
-                sweep=False
+            if "dc" in self.parent.simcmd_bundle.Members.keys():
+                self.extracts.Members.update({"oppts": {}})
+                sweep = False
                 # Get dc simulation file name
                 for name, val in self.parent.simcmd_bundle.Members.items():
                     mc = val.mc
-                    if name == 'dc':
-                        fname=''
+                    if name == "dc":
+                        fname = ""
                         if len(val.sweep) != 0:
                             for i in range(0, len(val.sweep)):
-                                sweep=True
-                                fname += 'Sweep%d-[0-9]*_' % i
+                                sweep = True
+                                fname += "Sweep%d-[0-9]*_" % i
                             if mc:
-                                fname+='mc_oppoint.dc'
+                                fname += "mc_oppoint.dc"
                             else:
-                                fname+='oppoint.dc'
+                                fname += "oppoint.dc"
                         else:
                             if mc:
-                                fname = 'mc_oppoint*.dc'
+                                fname = "mc_oppoint*.dc"
                             else:
-                                fname = 'oppoint*.dc'
+                                fname = "oppoint*.dc"
                         break
                 # For distributed runs
                 if self.parent.distributed_run:
-                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, '[0-9]*',
-                            fname)
+                    path = os.path.join(
+                        self.parent.spicesimpath,
+                        "tb_%s.raw" % self.parent.name,
+                        "[0-9]*",
+                        fname,
+                    )
                 else:
-                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, fname)
+                    path = os.path.join(
+                        self.parent.spicesimpath,
+                        "tb_%s.raw" % self.parent.name,
+                        fname,
+                    )
                 # Sort files so that sweeps are in correct order
                 if sweep:
                     num_sweeps = len(val.sweep)
                     files = glob.glob(path)
                     for i in range(num_sweeps):
-                        files = sorted(files,key=lambda x: self.sorter(x, i))
+                        files = sorted(files, key=lambda x: self.sorter(x, i))
                 else:
                     files = glob.glob(path)
-                    if len(files)>1:# This shoudln't happen
-                        self.print_log(type='W', msg='DC analysis was not a sweep, but multiple output files were found! Results may be in incorrect order!')
-                valbegin = 'VALUE\n'
-                eof = 'END\n'
+                    if len(files) > 1:  # This shoudln't happen
+                        self.print_log(
+                            type="W",
+                            msg="DC analysis was not a sweep, but multiple output files were found! Results may be in incorrect order!",
+                        )
+                valbegin = "VALUE\n"
+                eof = "END\n"
                 parsevals = False
                 for file in files:
-                    with open(file, 'r') as f:
+                    with open(file, "r") as f:
                         for line in f:
-                            if line == valbegin: # Scan file until unit descriptions end and values start
+                            if (
+                                line == valbegin
+                            ):  # Scan file until unit descriptions end and values start
                                 parsevals = True
-                            elif line != eof and parsevals: # Scan values from output until EOF
-                                line = line.replace('\"', '')
+                            elif (
+                                line != eof and parsevals
+                            ):  # Scan values from output until EOF
+                                line = line.replace('"', "")
                                 parts = line.split()
                                 if len(parts) >= 3:
-                                    if ':' in parts[0]: # This line contains op point parameter (e.g. vgs)
-                                        dev, param = parts[0].split(':')
-                                    elif ':' not in parts[0] and parts[1] == 'V': # This is a node voltage
+                                    if (
+                                        ":" in parts[0]
+                                    ):  # This line contains op point parameter (e.g. vgs)
+                                        dev, param = parts[0].split(":")
+                                    elif (
+                                        ":" not in parts[0] and parts[1] == "V"
+                                    ):  # This is a node voltage
                                         dev = parts[0]
                                         param = parts[1]
                                     val = float(parts[2])
-                                    if dev not in self.extracts.Members['oppts']: # Found new device
-                                        self.extracts.Members['oppts'].update({dev : {}})
-                                    if param not in self.extracts.Members['oppts'][dev]: # Found new parameter for device
-                                        self.extracts.Members['oppts'][dev].update({param : [val]})
-                                    else: # Parameter already existed, just append value. This can occur in e.g. sweeps
-                                        self.extracts.Members['oppts'][dev][param].append(val)
+                                    if (
+                                        dev
+                                        not in self.extracts.Members["oppts"]
+                                    ):  # Found new device
+                                        self.extracts.Members["oppts"].update(
+                                            {dev: {}}
+                                        )
+                                    if (
+                                        param
+                                        not in self.extracts.Members["oppts"][
+                                            dev
+                                        ]
+                                    ):  # Found new parameter for device
+                                        self.extracts.Members["oppts"][
+                                            dev
+                                        ].update({param: [val]})
+                                    else:  # Parameter already existed, just append value. This can occur in e.g. sweeps
+                                        self.extracts.Members["oppts"][dev][
+                                            param
+                                        ].append(val)
                             elif line == eof:
                                 parsevals = False
 
-            elif 'pz' in self.parent.simcmd_bundle.Members.keys():
-                self.extracts.Members.update({'pz' : {}})
+            elif "pz" in self.parent.simcmd_bundle.Members.keys():
+                self.extracts.Members.update({"pz": {}})
                 # Get pz simulation file name
                 for name, val in self.parent.simcmd_bundle.Members.items():
-                    if name == 'pz':
-                        fname = 'PZ_analysis.pz'
+                    if name == "pz":
+                        fname = "PZ_analysis.pz"
                 # For distributed runs
                 if self.parent.distributed_run:
-                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, '[0-9]*',
-                            fname)
+                    path = os.path.join(
+                        self.parent.spicesimpath,
+                        "tb_%s.raw" % self.parent.name,
+                        "[0-9]*",
+                        fname,
+                    )
                 else:
-                    path=os.path.join(self.parent.spicesimpath,'tb_%s.raw' % self.parent.name, fname)
-                valbegin = 'VALUE\n'
-                eof = 'END\n'
+                    path = os.path.join(
+                        self.parent.spicesimpath,
+                        "tb_%s.raw" % self.parent.name,
+                        fname,
+                    )
+                valbegin = "VALUE\n"
+                eof = "END\n"
                 parsevals = False
-                valueline_grep = subprocess.check_output('grep -n \"VALUE\" %s' %path, shell=True)
-                valueline = int(valueline_grep.decode('utf-8').split(':')[0])+1
-                eofline_grep = subprocess.check_output('grep -n \"END\" %s' %path, shell=True)
-                eofline = int(eofline_grep.decode('utf-8').split(':')[0])-1
+                valueline_grep = subprocess.check_output(
+                    'grep -n "VALUE" %s' % path, shell=True
+                )
+                valueline = (
+                    int(valueline_grep.decode("utf-8").split(":")[0]) + 1
+                )
+                eofline_grep = subprocess.check_output(
+                    'grep -n "END" %s' % path, shell=True
+                )
+                eofline = int(eofline_grep.decode("utf-8").split(":")[0]) - 1
 
-                values_sed = subprocess.check_output('sed -n \'%s,%s p\' %s' %(valueline, eofline, path), shell=True)
-                values_listed = values_sed.decode('utf-8').split('\n"')
+                values_sed = subprocess.check_output(
+                    "sed -n '%s,%s p' %s" % (valueline, eofline, path),
+                    shell=True,
+                )
+                values_listed = values_sed.decode("utf-8").split('\n"')
                 results = []
                 for v in values_listed:
-                    line = v.replace('"','')
-                    line = line.replace('\n',' ')
-                    line = line.replace('(','')
-                    line = line.replace(')','')
+                    line = v.replace('"', "")
+                    line = line.replace("\n", " ")
+                    line = line.replace("(", "")
+                    line = line.replace(")", "")
                     parts = line.split()
                     results.append(parts)
 
@@ -706,16 +1261,319 @@ class spectre(spice_common):
                     if len(result) < 4:
                         dev = result[0]
                         val = float(result[2])
-                        self.extracts.Members['pz'].update({dev: val})
+                        self.extracts.Members["pz"].update({dev: val})
                     elif len(result) >= 4:
                         pz = result[0]
                         real = float(result[2])
                         imag = float(result[3])
                         q = float(result[4])
-                        val = [real+1j*imag, q]
-                        self.extracts.Members['pz'].update({pz : val})
+                        val = [real + 1j * imag, q]
+                        self.extracts.Members["pz"].update({pz: val})
 
         except:
-            self.print_log(type='W', msg=traceback.format_exc())
-            self.print_log(type='W',msg='Something went wrong while extracting DC operating points.')
+            self.print_log(type="W", msg=traceback.format_exc())
+            self.print_log(
+                type="W",
+                msg="Something went wrong while extracting DC operating points.",
+            )
 
+    def read_pac_results(self, file):
+        """ """
+        files = glob.glob(
+            file
+        )  # filepath with wildcard -> list of filepath strings
+        if len(files) > 1:  # if True, a sweep was run
+            # Sort based on sweep index?
+            files = sorted(
+                files, key=lambda x: int(x.split(".")[2])
+            )  # glob doesn't return files in aplhabetical order
+        os.system("sync %s" % self.parent.spicesimpath)  # Why this?
+        for file in files:
+            # Use PSF utils
+            psf = psfu.PSF(file)
+            sweep = psf.get_sweep()
+            abscissa = sweep.abscissa
+            for signal in psf.all_signals():
+                tmpdata = np.vstack(
+                    (abscissa, psf.get_signal(f"{signal.name}").ordinate)
+                ).T
+                if signal.name.upper() in self.parent.iofile_eventdict.keys():
+                    # If given signal is already present, append to it io
+                    if (
+                        type(self.parent.iofile_eventdict[signal.name.upper()])
+                        == np.ndarray
+                    ):  #
+                        data = self.parent.iofile_eventdict[signal.name.upper()]
+                        self.parent.iofile_eventdict[signal.name.upper()] = (
+                            np.vstack((data, tmpdata))
+                        )
+                    else:
+                        self.parent.iofile_eventdict[signal.name.upper()] = (
+                            tmpdata
+                        )
+                else:
+                    self.parent.iofile_eventdict[signal.name.upper()] = tmpdata
+
+    def read_pss_results(self, file):
+        """ """
+        files = glob.glob(
+            file
+        )  # filepath with wildcard -> list of filepath strings
+        if len(files) > 1:  # if True, a sweep was run
+            files = sorted(
+                files
+            )  # glob doesn't return files in aplhabetical order
+        os.system("sync %s" % self.parent.spicesimpath)  # Why this?
+        for file in files:
+            # Use PSF utils
+            psf = psfu.PSF(file)
+            sweep = psf.get_sweep()
+            for signal in psf.all_signals():
+                tmpdata = np.vstack(
+                    (sweep.abscissa, psf.get_signal(f"{signal.name}").ordinate)
+                ).T
+                if (
+                    signal.name.upper() in self.parent.iofile_eventdict
+                ):  # first sweep index is added in else below
+                    if (
+                        type(self.parent.iofile_eventdict[signal.name.upper()])
+                        == np.ndarray
+                    ):  #
+                        self.parent.iofile_eventdict[signal.name.upper()] = (
+                            np.insert(
+                                self.parent.iofile_eventdict[
+                                    signal.name.upper()
+                                ],
+                                len(
+                                    self.parent.iofile_eventdict[
+                                        signal.name.upper()
+                                    ][0, :]
+                                    - 1
+                                ),
+                                tmpdata[:, 1],
+                                axis=1,
+                            )
+                        )  # Add sweep iteration's result as new column to io
+                    else:
+                        self.parent.iofile_eventdict[signal.name.upper()] = (
+                            tmpdata
+                        )
+                else:
+                    self.parent.iofile_eventdict[signal.name.upper()] = tmpdata
+
+    def read_output_file(self, file, dtype):
+        """
+        Interfacing function to read in results from a Spectre output file
+        """
+        if self.parent.analysis_type == "pac":
+            self.read_pac_results(file)
+        elif self.parent.analysis_type == "pss":
+            self.read_pss_results(file)
+        else:  # Transient, AC
+            if self.parent.use_psf:
+                self.read_psf_outputs(file, dtype)
+            else:
+                self.read_print_file_outputs(file, dtype)
+            # Finally, check if strobing has been applied and filter if it is
+            if self.is_strobed:
+                for name, val in self.parent.iofile_bundle.Members.items():
+                    if val.dir.lower() == "out" or val.dir.lower() == "output":
+                        if val.iotype == "event":
+                            for ioname in val.ionames:
+                                self.parent.iofile_eventdict[ioname.upper()] = (
+                                    self.filter_strobed(val.name, ioname)
+                                )
+
+    def parse_io_from_file(self, filepath, start, stop, dtype, labels, queue):
+        """Parse specific lines from a spectre print file.
+
+        This is wrapped to a function to allow parallelism.
+        """
+        stack = [(label, None) for label in labels]
+        try:
+            nrows = stop - start
+            if nrows < 0:
+                self.print_log(
+                    type="W",
+                    msg="Stop index smaller than start index in parse_io_from_file!",
+                )
+                nrows = None
+            arr = pd.read_csv(
+                filepath,
+                skiprows=start - 1,
+                nrows=nrows,
+                sep="\s+",
+                encoding="utf-8",
+                engine="c",
+                dtype="float",
+                chunksize=1e6,
+            )
+            arr = pd.concat(arr).to_numpy()
+        except ValueError:
+            # This may happen if the print file
+            # does not round to zero, and the
+            # scientific format exponent may become
+            # over 100, where the space separators
+            # move on top of eachother. This
+            # adds the missing spacebars, which
+            # may fix the crash
+            try:
+                cmd = f'sed -i -E "s/([0-9])+([eE][+-]?[0-9]+)?[+-]/\\1\\2 /g" {filepath}'
+                self.print_log(
+                    type="I", msg="Running external command %s" % (cmd)
+                )
+                subprocess.check_output(cmd, shell=True)
+                nrows = stop - start
+                if nrows < 0:
+                    self.print_log(
+                        type="W",
+                        msg="Stop index smaller than start index in parse_io_from_file!",
+                    )
+                    nrows = None
+                arr = pd.read_csv(
+                    filepath,
+                    skiprows=start - 1,
+                    nrows=nrows,
+                    sep="\s+",
+                    encoding="utf-8",
+                    engine="c",
+                    dtype="float",
+                    chunksize=1e6,
+                )
+                arr = pd.concat(arr).to_numpy()
+            except:
+                self.print_log(type="E", msg=traceback.format_exc())
+                self.print_log(
+                    type="F",
+                    msg="Failed while reading files for %s." % self.name,
+                )
+        except:
+            self.print_log(type="E", msg=traceback.format_exc())
+            self.print_log(
+                type="F", msg="Failed while reading files for %s." % self.name
+            )
+        try:
+            n = 0
+            for i, label in enumerate(labels):
+                self.print_log(type="D", msg="Reading event output %s" % label)
+                if (
+                    dtype == "complex"
+                ):  # Complex data has separate columns in file for real and imag parts
+                    try:
+                        temp = np.vstack(
+                            (arr[:, 0], arr[:, n + 1] + 1j * arr[:, n + 2])
+                        ).T
+                        n += 2
+                    except (
+                        IndexError
+                    ):  # If the data isn't complex (might be the case if there is some real valued extract), parse as usual
+                        self.print_log(
+                            type="W",
+                            msg="Index overrange when reading data for output %s. Inferred datatype incorrect?"
+                            % label,
+                        )
+                        temp = np.vstack((arr[:, 0], arr[:, n + 1])).T
+                        n += 1
+                else:
+                    temp = np.vstack((arr[:, 0], arr[:, n + 1])).T
+                    n += 1
+                stack[i] = (label, temp)
+            if queue != None:
+                queue.put(stack)
+            else:
+                return stack
+        except:
+            self.print_log(type="E", msg=traceback.format_exc())
+            self.print_log(
+                type="E", msg="Failed reading event output %s" % label
+            )
+            if queue != None:
+                queue.put(stack)
+            else:
+                return stack
+
+    def filter_strobed(self, key, ioname):
+        """
+        Helper function to read in the strobed simulation results. Only for spectre.
+
+        TODO:
+        this is because the strobeoutput
+        parameter for some reason still outputs
+        all the data points, even when it is in mode
+        strobeonly
+        If solution is found to this later from simulator
+        remove this.
+        """
+        if len(self.strobe_indices) == 0:
+            tvals = self.parent.iofile_eventdict[ioname.upper()][:, 0]
+            maxtime = np.max(tvals)
+            mintime = np.min(tvals)
+            for (
+                simulationcommand,
+                simulationoption,
+            ) in self.parent.simcmd_bundle.Members.items():
+                strobeperiod = simulationoption.strobeperiod
+                strobedelay = simulationoption.strobedelay
+                skipstart = simulationoption.skipstart
+            if not skipstart:
+                skipstart = 0
+            if not strobedelay:
+                strobedelay = 0
+            strobetimestamps = (
+                np.arange(mintime, maxtime, strobeperiod)
+                + strobedelay
+                + skipstart
+            )
+            self.strobe_indices = np.zeros(
+                len(strobetimestamps)
+            )  # indexes to take the values
+            seg = min(
+                300, len(strobetimestamps)
+            )  # length of a segment in the for loop (how many samples at a time)
+            idxmin = 0
+            l = len(strobetimestamps)
+            nseg = (
+                l // seg
+            )  # number of segments, rounded down (how many loops required)
+            idxmax = 0
+            i = 0
+            for i in np.arange(1, nseg):
+                idxmax = (i - 1) * seg + np.argmin(
+                    abs(tvals[(i - 1) * seg :] - strobetimestamps[i * seg])
+                )  # find index of the received signal which corresponds to the largest value in reference
+                ind = idxmin + abs(
+                    strobetimestamps[seg * (i - 1) : seg * (i), None]
+                    - tvals[None, idxmin:idxmax]
+                ).argmin(
+                    axis=-1
+                )  # take index for the seg's values
+                idxmin = idxmax
+                self.strobe_indices[seg * (i - 1) : seg * i] = ind
+            # again just in case that the loop does not overflow to take the final samples into account
+            idxmax = len(tvals) - 1
+            ind = idxmin + abs(
+                strobetimestamps[seg * (i) :, None] - tvals[None, idxmin:idxmax]
+            ).argmin(axis=-1)
+            idxmin = idxmax
+            self.strobe_indices[seg * (i) :] = ind
+            self.strobe_indices = self.strobe_indices.astype(int)
+            if self.parent.iofile_bundle.Members[key].strobe:
+                new_array = self.parent.iofile_eventdict[ioname.upper()][
+                    self.strobe_indices
+                ]
+                if len(strobetimestamps) != len(new_array):
+                    self.print_log(
+                        type="W",
+                        msg="Oh no, something went wrong while reading the strobeperiod data",
+                    )
+                    self.print_log(type="W", msg="Check data lenghts!")
+            else:
+                new_array = self.parent.iofile_eventdict[ioname.upper()]
+        else:  # We already know the strobe indices, use them!
+            if self.parent.iofile_bundle.Members[key].strobe:
+                new_array = self.parent.iofile_eventdict[ioname.upper()][
+                    self.strobe_indices
+                ]
+            else:
+                new_array = self.parent.iofile_eventdict[ioname.upper()]
+        return new_array
