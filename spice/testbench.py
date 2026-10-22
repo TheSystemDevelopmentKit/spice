@@ -171,6 +171,8 @@ class testbench(testbench_common):
             for cell in self.parent.dspf:
                 if self.model == "ngspice":
                     fileformat = "pex.spice"
+                elif self.model == "vacask":
+                    fileformat = "pex.inc"
                 elif self.model == "spectre" or self.model == "eldo":
                     fileformat = "pex.dspf"
 
@@ -216,6 +218,12 @@ class testbench(testbench_common):
                     elif self.model == "ngspice":
                         origcellmatch = re.compile(r".SUBCKT")
                         dspfpath = "%s/%s.pex.spice" % (
+                            self.parent.spicesimpath,
+                            cellname,
+                        )
+                    elif self.model == "vacask":
+                        origcellmatch = re.compile(r".SUBCKT")
+                        dspfpath = "%s/%s.pex.inc" % (
                             self.parent.spicesimpath,
                             cellname,
                         )
