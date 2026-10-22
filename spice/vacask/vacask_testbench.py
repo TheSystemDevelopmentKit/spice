@@ -280,7 +280,7 @@ class vacask_testbench(testbench_common):
                 % self.parent.spice_simulator.commentchar
             )
             for sim, val in self.simcmds.Members.items():
-                printfile = val.parent.spicetbsrc.split(".vac")[0] + ".raw"
+                printfile = val.parent.spicetbsrc.split(".inc")[0] + ".raw"
                 if str(sim).lower() == "tran":
                     simtime = (
                         val.tstop if val.tstop is not None else self._trantime
@@ -391,7 +391,7 @@ class vacask_testbench(testbench_common):
                         f"analysis %s acsp ports=%s from=%s to=%s %s write=%s\n\n"
                         % (
                             sim,
-                            val.ports,
+                            self.portsrcstr,
                             val.fmin,
                             val.fmax,
                             pts_str,
@@ -514,6 +514,9 @@ class vacask_testbench(testbench_common):
         Also manual plot commands through `spice_simcmd.plotlist` are handled here.
 
         """
+
+        """
+        I THINK "write=<file>" already does all the necessary writing so this should be obsolete:
 
         if not hasattr(self, "_plotcmd"):
             self._plotcmd = ""
@@ -689,6 +692,8 @@ class vacask_testbench(testbench_common):
                                 supply,
                                 val.ext_file,
                             )
+        """
+        self._plotcmd = ""
         return self._plotcmd
 
     @plotcmd.setter
