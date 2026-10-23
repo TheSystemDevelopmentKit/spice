@@ -88,7 +88,7 @@ class vacask_testbench(testbench_common):
                 else:
                     self._libcmd = "// VACASK device models\n"
                     self._libcmd += (
-                        "include " + libfile + " section=" + corner + "\n"
+                        "include \"" + libfile + "\" section=" + corner + "\n"
                     )
             except:
                 self.print_log(
