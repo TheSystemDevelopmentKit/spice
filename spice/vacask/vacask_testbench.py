@@ -88,7 +88,7 @@ class vacask_testbench(testbench_common):
                 else:
                     self._libcmd = "// VACASK device models\n"
                     self._libcmd += (
-                        "include \"" + libfile + "\" section=" + corner + "\n"
+                        'include "' + libfile + '" section=' + corner + "\n"
                     )
             except:
                 self.print_log(
@@ -180,9 +180,9 @@ class vacask_testbench(testbench_common):
                                 self._trantime = maxtime
                             # Adding the source
                             self._inputsignals += (
-                                '%s%s %s %s pwl file="%s"\n'
+                                '%s%s (%s %s) vsource type="pwl" file="%s"\n'
                                 % (
-                                    val.sourcetype.upper(),
+                                    val.sourcetype.lower(),
                                     val.ionames[i].lower(),
                                     val.pos,
                                     val.neg,
@@ -191,61 +191,11 @@ class vacask_testbench(testbench_common):
                             )
                     # Sample signals are digital
                     elif val.iotype.lower() == "sample":
-                        for i in range(len(val.ionames)):
-                            pattstr = ""
-                            for d in val.Data[:, i]:
-                                pattstr += "%s " % str(d)
-                            try:
-                                if (
-                                    float(self._trantime)
-                                    < len(val.Data) / val.rs
-                                ):
-                                    self._trantime = len(val.Data) / val.rs
-                                    self._trantime_name = name
-                            except:
-                                pass
-                            # VACASK digital signal handling
-                            signame = val.ionames[i]
-                            # Extracting the bus width
-                            busstart, busstop, buswidth, busrange = (
-                                self.parent.get_buswidth(signame)
-                            )
-                            signame = (
-                                signame.replace("<", " ")
-                                .replace(">", " ")
-                                .replace("[", " ")
-                                .replace("]", " ")
-                                .replace(":", " ")
-                                .split(" ")
-                            )
-                            # Checking if the given bus is actually a 1-bit signal
-                            if (
-                                ("<" not in val.ionames[i])
-                                and (">" not in val.ionames[i])
-                                and len(str(val.Data[0, i])) == 1
-                            ):
-                                busname = "%s_BUS" % val.ionames[i]
-                                self._inputsignals += ".setbus %s %s\n" % (
-                                    busname,
-                                    val.ionames[i],
-                                )
-                            else:
-                                busname = val.ionames[i]
-                            # Adding the source
-                            self._inputsignals += (
-                                ".sigbus %s vhi=%s vlo=%s tfall=%s trise=%s thold=%s tdelay=%s base=%s PATTERN %s\n"
-                                % (
-                                    busname,
-                                    str(val.vhi),
-                                    str(val.vlo),
-                                    str(val.tfall),
-                                    str(val.trise),
-                                    str(1 / val.rs),
-                                    "0",
-                                    "bin",
-                                    pattstr,
-                                )
-                            )
+                        self.print_log(
+                            type="F",
+                            msg="Input type '%s' undefined. (TODO.)"
+                            % val.iotype,
+                        )
                     else:
                         self.print_log(
                             type="F",
