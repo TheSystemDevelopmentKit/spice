@@ -222,7 +222,7 @@ class testbench(testbench_common):
                             cellname,
                         )
                     elif self.model == "vacask":
-                        origcellmatch = re.compile(r".SUBCKT")
+                        origcellmatch = re.compile(r"subckt")
                         dspfpath = "%s/%s.pex.inc" % (
                             self.parent.spicesimpath,
                             cellname,

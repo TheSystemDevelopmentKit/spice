@@ -20,6 +20,7 @@ import glob
 
 from spice.vacask.vacask_rawread import rawread
 
+
 class vacask(spice_common):
     """This class is used as instance in simulatormodule property of
     spice class. Contains language dependent definitions.
@@ -92,8 +93,8 @@ class vacask(spice_common):
     @property
     def nprocflag(self):
         """str : String for defining multithread execution"""
-        return ""
-        #return "openblas_set_num_threads"  # TODO: not sure
+        return "openblas_set_num_threads"  # TODO: not sure
+        # return ""
 
     @property
     def simulatorcmd(self):
@@ -118,7 +119,7 @@ class vacask(spice_common):
     @property
     def option(self):
         """str : Netlist option definition string"""
-        return "option"
+        return "options"
 
     @property
     def include(self):
@@ -233,17 +234,17 @@ class vacask(spice_common):
         Automatically generated.
         """
         if not hasattr(self, "_vacask_spicecmd"):
-            #if self.parent.nproc:
-            #    nprocflag = "%s(%d)" % (self.nprocflag, self.parent.nproc)
-            #    self.print_log(
-            #        type="I", msg="Enabling multithreading '%s'." % nprocflag
-            #    )
-            #    self.print_log(
-            #        type="I",
-            #        msg="Multithreading for vacask handled in testbench.",
-            #    )
-            #else:
-            nprocflag = ""
+            if self.parent.nproc:
+                nprocflag = "%s(%d)" % (self.nprocflag, self.parent.nproc)
+                self.print_log(
+                    type="I", msg="Enabling multithreading '%s'." % nprocflag
+                )
+                self.print_log(
+                    type="I",
+                    msg="Multithreading for vacask handled in testbench.",
+                )
+            else:
+                nprocflag = ""
 
             if self.parent.postlayout:
                 self.print_log(
@@ -329,6 +330,7 @@ class vacask(spice_common):
         Interfacing function to read in results from an output file
         """
         import pdb
+
         pdb.set_trace()
         raw = rawread(file)
 

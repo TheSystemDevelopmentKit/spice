@@ -184,6 +184,14 @@ class spice_module(thesdk):
                                         startfound = False
                                     if not line[-1] == "\\":
                                         lastline = True
+                            # For vacask we need to process the statline as potential endline
+                            elif self.parent.model == "vacask":
+                                if startfound and len(line) > 0:
+                                    if lastline:
+                                        endfound = True
+                                        startfound = False
+                                    if not line[-1] == "\\":
+                                        lastline = True
                         elif startfound and len(line) > 0:
                             if self.parent.model == "eldo":
                                 if line[0] != "+":
@@ -200,6 +208,12 @@ class spice_module(thesdk):
                                 if line[0] != "+":
                                     endfound = True
                                     startfound = False
+                            elif self.parent.model == "vacask":
+                                if lastline:
+                                    endfound = True
+                                    startfound = False
+                                if not line[-1] == "\\":
+                                    lastline = True
                         if startfound and not endfound:
                             words = line.split(" ")
                             if (
@@ -215,17 +229,24 @@ class spice_module(thesdk):
                                     )
                                 elif self.parent.model == "ngspice":
                                     words[0] = "X%s%s" % (self.parent.name, "")
+                                elif self.parent.model == "vacask":
+                                    words[0] = "X%s%s" % (self.parent.name, "")
                                 words.pop(1)
                                 line = " ".join(words)
-                            self._instance += line + "%s\n" % (
-                                " \\" if lastline else ""
-                            )
+                            if self.parent.model == "vacask":
+                                self._instance += line
+                            else:
+                                self._instance += line + "%s\n" % (
+                                    " \\" if lastline else ""
+                                )
                     if self.parent.model == "eldo":
                         self._instance += ("+") + self.parent.name
                     elif self.parent.model == "spectre":
                         self._instance += (") ") + self.parent.name
                     elif self.parent.model == "ngspice":
                         self._instance += ("+") + self.parent.name
+                    elif self.parent.model == "vacask":
+                        self._instance += (" ") + self.parent.name
                 return self._instance
         except:
             self.print_log(
