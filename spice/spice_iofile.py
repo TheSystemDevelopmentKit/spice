@@ -180,39 +180,41 @@ class spice_iofile(iofile):
         self._file = []
         for ioname in self.ionames:
             if self.dir == "out":
-                analysis = self.parent.analysis_type
-                if (
-                    analysis.lower() == "pss"
-                    and self.parent.simulator != "ngspice"
-                ):
-                    filename = "tb_%s.raw/*%s.fd.pss" % (
-                        self.parent.name,
-                        self.parent.spice_simulator.pss_analysis_name,
-                    )  # return filename with wildcard for possible sweep (-> several files)
-                elif analysis.lower() == "pac":
-                    filename = "tb_%s.raw/%s.*.pac" % (
-                        self.parent.name,
-                        self.parent.spice_simulator.pac_analysis_name,
-                    )  # return filename with wildcard for possible sweep (-> several files)
-                elif self.parent.use_psf:
-                    if self.iotype in [
-                        "event",
-                        "time",
-                        "sample",
-                    ]:  # Support for other iotypes, typically read in from transient
-                        analysis = self.parent.analysis_type
-                        if analysis.lower() == "ac":
-                            filename = "tb_%s.raw/%s.ac" % (
-                                self.parent.name,
-                                self.parent.spice_simulator.ac_analysis_name,
-                            )  # return filename with wildcard for possible sweep (-> several files)
-                        elif analysis.lower() == "tran":
-                            filename = "tb_%s.raw/%s.tran.tran" % (
-                                self.parent.name,
-                                self.parent.spice_simulator.tran_analysis_name,
-                            )  # return filename with wildcard for possible sweep (-> several files)
+                if self.parent.simulator != "vacask":
+                    if (
+                        analysis.lower() == "pss"
+                        and self.parent.simulator != "ngspice"
+                    ):
+                        filename = "tb_%s.raw/*%s.fd.pss" % (
+                            self.parent.name,
+                            self.parent.spice_simulator.pss_analysis_name,
+                        )  # return filename with wildcard for possible sweep (-> several files)
+                    elif analysis.lower() == "pac":
+                        filename = "tb_%s.raw/%s.*.pac" % (
+                            self.parent.name,
+                            self.parent.spice_simulator.pac_analysis_name,
+                        )  # return filename with wildcard for possible sweep (-> several files)
+                    elif self.parent.use_psf:
+                        if self.iotype in [
+                            "event",
+                            "time",
+                            "sample",
+                        ]:  # Support for other iotypes, typically read in from transient
+                            analysis = self.parent.analysis_type
+                            if analysis.lower() == "ac":
+                                filename = "tb_%s.raw/%s.ac" % (
+                                    self.parent.name,
+                                    self.parent.spice_simulator.ac_analysis_name,
+                                )  # return filename with wildcard for possible sweep (-> several files)
+                            elif analysis.lower() == "tran":
+                                filename = "tb_%s.raw/%s.tran.tran" % (
+                                    self.parent.name,
+                                    self.parent.spice_simulator.tran_analysis_name,
+                                )  # return filename with wildcard for possible sweep (-> several files)
+                    else:
+                        filename = "tb_%s.print" % (self.parent.name)
                 else:
-                    filename = "tb_%s.print" % (self.parent.name)
+                    filename = "%s.raw" % (self.parent.runname)
             else:
                 filename = "%s_%s_%s_%s.txt" % (
                     self.parent.runname,
