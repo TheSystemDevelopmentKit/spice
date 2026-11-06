@@ -254,7 +254,7 @@ class vacask(spice_common):
                     msg="Interactive spice not available for VACASK",
                 )
             try:
-                tomlfile = self.GLOBALS['VACASKTOMLFILE']
+                tomlfile = self.GLOBALS["VACASKTOMLFILE"]
             except:
                 self.print_log(
                     type="F",
@@ -265,7 +265,9 @@ class vacask(spice_common):
                 self.parent.spice_submission
                 + self.simulatorcmd
                 + nprocflag
-                + " --tomlfile " + tomlfile + " "
+                + " --tomlfile "
+                + tomlfile
+                + " "
                 + self.parent.spicetbsrc
             )
         return self._vacask_spicecmd
