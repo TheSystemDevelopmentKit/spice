@@ -331,11 +331,84 @@ class vacask(spice_common):
 
     def read_output_file(self, file, dtype):
         """
-        Interfacing function to read in results from an output file
+        Interfacing function to read in results from an output file.
+        Reads VACASK .raw files and populates iofile_eventdict with the data.
         """
-        import pdb
+        try:
+            # Ensure file is synced to disk
+            os.system("sync %s" % self.parent.spicesimpath)
 
-        pdb.set_trace()
-        raw = rawread(file)
+            # Read the raw file
+            raw = rawread(file)
 
-        self.print_log(type="W", msg="Output file reading not impemented yet")
+            if len(raw.arrs) == 0:
+                self.print_log(
+                    type="E", msg="No data found in raw file %s" % file
+                )
+                return
+
+            # Get the first plot's data and metadata
+            data = raw.arrs[0][1]  # shape: (npoints, nvars)
+            varnames = raw.arrs[0][0]["varnames"]
+            flags = raw.arrs[0][0]["flags"]
+
+            # Check if data is complex
+            is_complex_data = b"complex" in flags
+
+            # Regex to extract labels from variable names like v(out) -> out
+            label_match = re.compile(r"\(([^)]+)\)")
+
+            # The first column is typically the independent variable (time or frequency)
+            x_data = data[:, 0]
+            if np.iscomplexobj(x_data):
+                x_data = x_data.real
+
+            # Iterate through all variables and match them to iofile_eventdict keys
+            for col_idx, varname in enumerate(varnames):
+                # Skip the independent variable (first column)
+                if col_idx == 0:
+                    continue
+
+                # Extract label from varname
+                labelgrp = label_match.findall(varname)
+                if labelgrp:
+                    label = labelgrp[0].upper()
+                else:
+                    label = varname.upper()
+
+                # Check if this label exists in iofile_eventdict
+                if label in self.parent.iofile_eventdict:
+                    signal_data = data[:, col_idx]
+
+                    # Handle complex data
+                    if dtype == "complex":
+                        if is_complex_data:
+                            temp = np.vstack((x_data, signal_data)).T
+                        else:
+                            temp = np.vstack((x_data, signal_data + 0j)).T
+                    else:
+                        if is_complex_data:
+                            temp = np.vstack((x_data, signal_data.real)).T
+                        else:
+                            temp = np.vstack((x_data, signal_data.real)).T
+
+                    self.parent.iofile_eventdict[label] = temp
+
+            # Check for unmatched labels
+            unmatched = [
+                k
+                for k in self.parent.iofile_eventdict.keys()
+                if self.parent.iofile_eventdict[k] is None
+            ]
+            if unmatched:
+                self.print_log(
+                    type="W",
+                    msg="Could not match raw file variables to these output labels: %s"
+                    % unmatched,
+                )
+
+        except Exception as e:
+            self.print_log(
+                type="E", msg="Error reading output file: %s" % str(e)
+            )
+            self.print_log(type="E", msg=traceback.format_exc())
