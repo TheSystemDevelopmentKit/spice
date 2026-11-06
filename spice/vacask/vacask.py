@@ -93,8 +93,8 @@ class vacask(spice_common):
     @property
     def nprocflag(self):
         """str : String for defining multithread execution"""
-        return "openblas_set_num_threads"  # TODO: not sure
-        # return ""
+        # return "openblas_set_num_threads"  # TODO: not sure
+        return "-n"
 
     @property
     def simulatorcmd(self):
@@ -235,13 +235,9 @@ class vacask(spice_common):
         """
         if not hasattr(self, "_vacask_spicecmd"):
             if self.parent.nproc:
-                nprocflag = "%s(%d)" % (self.nprocflag, self.parent.nproc)
+                nprocflag = " %s %d " % (self.nprocflag, self.parent.nproc)
                 self.print_log(
                     type="I", msg="Enabling multithreading '%s'." % nprocflag
-                )
-                self.print_log(
-                    type="I",
-                    msg="Multithreading for vacask handled in testbench.",
                 )
             else:
                 nprocflag = ""
@@ -249,23 +245,29 @@ class vacask(spice_common):
             if self.parent.postlayout:
                 self.print_log(
                     type="W",
-                    msg="Post-layout optimization not suported for vacask",
+                    msg="Post-layout optimization not suported for VACASK",
                 )
 
             if self.parent.interactive_spice:
-                self._vacask_spicecmd = (
-                    self.parent.spice_submission
-                    + self.simulatorcmd
-                    + " "
-                    + self.parent.spicetbsrc
+                self.print_log(
+                    type="W",
+                    msg="Interactive spice not available for VACASK",
                 )
-            else:
-                self._vacask_spicecmd = (
-                    self.parent.spice_submission
-                    + self.simulatorcmd
-                    + " -b "
-                    + self.parent.spicetbsrc
+            try:
+                tomlfile = self.GLOBALS['VACASKTOMLFILE']
+            except:
+                self.print_log(
+                    type="F",
+                    msg="VACASKTOMLFILE not found for VACASK!",
                 )
+
+            self._vacask_spicecmd = (
+                self.parent.spice_submission
+                + self.simulatorcmd
+                + nprocflag
+                + " --tomlfile " + tomlfile + " "
+                + self.parent.spicetbsrc
+            )
         return self._vacask_spicecmd
 
     def run_plotprogram(self):
